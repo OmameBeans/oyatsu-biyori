@@ -64,7 +64,7 @@ public static class AllergenJudge
             ContainedAllergens = contained,
             KeywordHits = keywordHits,
             UnconfirmedAllergens = unconfirmed,
-            // 入れられない商品には付けない（「献立に入りません」をほかの表示で薄めないため）
+            // 入れられない商品には付けない（「使えません」をほかの表示で薄めないため）
             ManufacturerCheckAllergens = category == AllergenJudgementCategory.Blocked ? [] : manufacturerCheck,
             LatestCheckId = history.Latest?.Id,
             LatestConfirmedCheckId = history.LatestConfirmed?.Id,
