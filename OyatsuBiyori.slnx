@@ -3,6 +3,9 @@
     <Build />
     <Deploy />
   </Project>
+  <Folder Name="/src/">
+    <Project Path="src/OyatsuBiyori.Biz.Tests/OyatsuBiyori.Biz.Tests.csproj" />
+  </Folder>
   <Project Path="src/OyatsuBiyori.Biz/OyatsuBiyori.Biz.csproj" />
   <Project Path="src/OyatsuBiyori.Claude/OyatsuBiyori.Claude.csproj" />
   <Project Path="src/OyatsuBiyori.Data/OyatsuBiyori.Data.csproj" />

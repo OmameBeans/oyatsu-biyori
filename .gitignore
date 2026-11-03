@@ -20,3 +20,8 @@ dist/
 
 # Python のキャッシュ
 __pycache__/
+
+# Data Protection のキー・publish の出力・バックアップ（秘密や実データを含むため公開しない）
+keys/
+publish/
+backups/
