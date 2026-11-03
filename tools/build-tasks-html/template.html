@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>おやつ日和 {{TITLE}}</title>
+<style>
+  :root {
+    --bg: #fbf8f3;
+    --paper: #ffffff;
+    --ink: #2b2620;
+    --muted: #7a6f63;
+    --line: #e8e0d4;
+    --accent: #c4703a;
+    --accent-soft: #fbeee3;
+    --side: #f4eee5;
+    --code: #f6f2ec;
+    --th: #f7f1e8;
+    --stripe: #fdfbf8;
+    --safety: #fff5f2;
+    --safety-line: #d9534f;
+    --safety-ink: #b3261e;
+    --safety-bg: #fde2e1;
+    --test-ink: #1e7a3a;
+    --test-bg: #def5e3;
+    --side-w: 290px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1916;
+      --paper: #26221e;
+      --ink: #ece4d9;
+      --muted: #a89c8e;
+      --line: #3d3630;
+      --accent: #e8955c;
+      --accent-soft: #3a2a1e;
+      --side: #211d19;
+      --code: #302a24;
+      --th: #2e2822;
+      --stripe: #2a2520;
+      --safety: #33211f;
+      --safety-line: #e06c66;
+      --safety-ink: #ffb4ab;
+      --safety-bg: #4a2522;
+      --test-ink: #8fd8a3;
+      --test-bg: #1f3a28;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.8;
+    font-size: 15px;
+  }
+
+  /* サイドバー */
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; width: var(--side-w);
+    background: var(--side); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  .brand { padding: 20px 20px 12px; border-bottom: 1px solid var(--line); }
+  .brand .name { font-size: 18px; font-weight: 700; }
+  .brand .sub-title { font-size: 12px; color: var(--muted); }
+  .brand .other { font-size: 12px; display: inline-block; margin-top: 4px; }
+  nav { overflow-y: auto; padding: 10px 8px 40px; flex: 1; }
+  nav ul { list-style: none; margin: 0; padding: 0; }
+  nav a {
+    display: flex; gap: 8px; align-items: baseline; color: var(--ink); text-decoration: none;
+    padding: 4px 10px; border-radius: 6px; font-size: 13px; line-height: 1.5;
+  }
+  nav a:hover { background: rgba(127,127,127,.12); }
+  nav .lv2 a { font-weight: 700; margin-top: 4px; }
+  nav .lv3 a { padding-left: 24px; font-size: 12px; color: var(--muted); }
+  nav a .n {
+    margin-left: auto; font-size: 11px; font-weight: 400; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px;
+  }
+  nav a.active { background: var(--accent-soft); color: var(--accent); }
+
+  /* 絞り込みのバー */
+  .filter {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    padding: 12px 0; margin: -12px auto 20px; max-width: 1000px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .filter input[type=search] {
+    flex: 1 1 260px; min-width: 0; padding: 8px 12px; font: inherit; font-size: 14px; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+  }
+  .toggle {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--paper); font-size: 13px; font-weight: 700;
+  }
+  .toggle input { margin: 0; accent-color: var(--accent); }
+  .toggle.t-safety:has(input:checked) { background: var(--safety-bg); color: var(--safety-ink); border-color: transparent; }
+  .toggle.t-test:has(input:checked) { background: var(--test-bg); color: var(--test-ink); border-color: transparent; }
+  .hits { font-size: 13px; color: var(--muted); margin-left: auto; }
+
+  /* 本文 */
+  main { margin-left: var(--side-w); padding: 12px 48px 120px; }
+  .doc {
+    max-width: 1000px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 12px; padding: 28px 36px; margin: 0 auto 28px;
+  }
+  h1 { font-size: 26px; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 3px solid var(--accent); }
+  h2 {
+    font-size: 20px; margin: 0 0 14px; padding-left: 10px; border-left: 5px solid var(--accent);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; line-height: 1.5;
+  }
+  h2 .order {
+    font-size: 12px; font-weight: 700; color: var(--accent); background: var(--accent-soft);
+    padding: 2px 10px; border-radius: 999px;
+  }
+  h2 .count { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: auto; }
+  h3 { font-size: 17px; margin: 28px 0 10px; }
+  h4 { font-size: 15px; margin: 22px 0 8px; color: var(--muted); }
+  p { margin: 10px 0; }
+  a { color: var(--accent); }
+  ul, ol { padding-left: 1.6em; }
+  li { margin: 3px 0; }
+  code {
+    font-family: "Cascadia Code", Consolas, "BIZ UDGothic", monospace; font-size: .88em;
+    background: var(--code); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere;
+  }
+  a.ref { text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--accent); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+  .stat {
+    flex: 1 1 140px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .stat b { font-size: 26px; }
+  .stat span { font-size: 13px; color: var(--muted); }
+  .stat.s-safety b { color: var(--safety-ink); }
+  .stat.s-test b { color: var(--test-ink); }
+
+  /* タスクのカード */
+  .cards { display: grid; gap: 12px; margin: 14px 0; }
+  .card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px 12px;
+    background: var(--paper); scroll-margin-top: 76px;
+  }
+  .card.is-safety { border-left: 4px solid var(--safety-line); }
+  .card:target { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .card header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .tid {
+    font-family: "Cascadia Code", Consolas, monospace; font-weight: 700; font-size: 14px;
+    color: var(--ink); text-decoration: none; margin-right: 4px;
+  }
+  .task { font-size: 14.5px; line-height: 1.85; }
+  .card footer {
+    display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+    margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line);
+  }
+  .req-label { font-size: 11px; color: var(--muted); margin-right: 2px; }
+  .chip {
+    font-size: 12px; line-height: 1.6; padding: 0 8px; border-radius: 6px;
+    background: var(--code); color: var(--muted);
+  }
+  .chip code { background: none; padding: 0; }
+
+  .badge {
+    display: inline-block; padding: 1px 9px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap; line-height: 1.7;
+  }
+  .b-safety { background: var(--safety-bg); color: var(--safety-ink); }
+  .b-test { background: var(--test-bg); color: var(--test-ink); }
+  .b-must { background: var(--safety-bg); color: var(--safety-ink); }
+  .b-nice { background: #fff1cc; color: #8a5a00; }
+  .b-extra { background: #e8eef7; color: #3c5a85; }
+  .b-fix { background: var(--accent-soft); color: var(--accent); }
+
+  /* 表 */
+  .table-wrap { overflow-x: auto; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--th); white-space: nowrap; }
+  tbody tr:nth-child(even) { background: var(--stripe); }
+  td:first-child { white-space: nowrap; font-weight: 700; }
+  td.center { text-align: center; }
+  tr[id] { scroll-margin-top: 76px; }
+  tr:target td { background: var(--accent-soft); }
+
+  /* 絞り込み中 */
+  .empty { display: none; color: var(--muted); font-size: 13px; }
+  [data-item].hidden { display: none; }
+  body.filtering section[data-section].no-hit > :not(h2):not(.empty) { display: none; }
+  body.filtering section[data-section].no-hit .empty { display: block; }
+  body.filtering section[data-section].no-hit { opacity: .7; }
+  body.filtering .doc.lead { display: none; }
+
+  .menu-btn {
+    display: none; position: fixed; top: 10px; left: 12px; z-index: 20;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 8px;
+    padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .to-top {
+    position: fixed; right: 20px; bottom: 20px; width: 40px; height: 40px;
+    border-radius: 50%; border: 1px solid var(--line); background: var(--paper);
+    color: var(--accent); font-size: 18px; text-decoration: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  @media (max-width: 900px) {
+    .sidebar { transform: translateX(-100%); transition: transform .2s; }
+    body.nav-open .sidebar { transform: none; box-shadow: 0 0 24px rgba(0,0,0,.25); }
+    .menu-btn { display: block; }
+    main { margin-left: 0; padding: 0 16px 80px; }
+    .filter { padding-top: 56px; }
+    html { scroll-padding-top: 130px; }
+    .card, tr[id] { scroll-margin-top: 130px; }
+    .doc { padding: 20px 16px; }
+    h2 .count { margin-left: 0; }
+  }
+  @media print {
+    .sidebar, .menu-btn, .to-top, .filter { display: none; }
+    main { margin: 0; padding: 0; }
+    .doc { border: none; padding: 0; }
+    .card { break-inside: avoid; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<button class="menu-btn" type="button" aria-label="目次を開く">☰ 目次</button>
+<aside class="sidebar">
+  <div class="brand">
+    <div class="name">🍪 おやつ日和</div>
+    <div class="sub-title">{{TITLE}}（docs/implementation-tasks/implementation-tasks.md から生成）</div>
+    <a class="other" href="../requirements/index.html">→ 要件定義を開く</a>
+  </div>
+  <nav>
+    <ul>
+{{NAV}}
+    </ul>
+  </nav>
+</aside>
+<main>
+  <div class="filter">
+    <input type="search" placeholder="タスクを絞り込む（例：T1-05、SR-14、照合、Haiku）" aria-label="タスクを絞り込む">
+    <label class="toggle t-safety"><input type="checkbox" data-flag="safety">安全レビュー</label>
+    <label class="toggle t-test"><input type="checkbox" data-flag="test">xUnit</label>
+    <span class="hits" aria-live="polite"></span>
+  </div>
+{{BODY}}
+</main>
+<a class="to-top" href="#top" aria-label="先頭へ戻る">↑</a>
+<script>
+  // 表示中の節を目次で強調する
+  const nav = document.querySelector("nav");
+  const links = [...nav.querySelectorAll("a")];
+  const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+  const anchors = [...document.querySelectorAll("section[id], h3[id]")].filter(h => byId.has(h.id));
+  function onScroll() {
+    let current = null;
+    for (const h of anchors) {
+      if (h.getBoundingClientRect().top <= 120) current = h; else break;
+    }
+    links.forEach(a => a.classList.remove("active"));
+    const a = current && byId.get(current.id);
+    if (!a) return;
+    a.classList.add("active");
+    const r = a.getBoundingClientRect(), n = nav.getBoundingClientRect();
+    if (r.top < n.top || r.bottom > n.bottom) a.scrollIntoView({ block: "nearest" });
+  }
+  document.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  // タスク（カード）と論点（U-xx の行）の絞り込み
+  const input = document.querySelector(".filter input[type=search]");
+  const flags = [...document.querySelectorAll(".filter [data-flag]")];
+  const items = [...document.querySelectorAll("[data-item]")];
+  const sections = [...document.querySelectorAll("section[data-section]")];
+  const hits = document.querySelector(".hits");
+  const norm = s => s.normalize("NFKC").toLowerCase();
+  items.forEach(el => { el.dataset.text = norm(el.textContent); });
+
+  function applyFilter() {
+    const words = norm(input.value).split(/\s+/).filter(Boolean);
+    const on = flags.filter(f => f.checked).map(f => f.dataset.flag);
+    const active = words.length > 0 || on.length > 0;
+    document.body.classList.toggle("filtering", active);
+    let count = 0;
+    items.forEach(el => {
+      const ok = !active || (
+        words.every(w => el.dataset.text.includes(w)) &&
+        on.every(f => el.dataset[f] === "1")
+      );
+      el.classList.toggle("hidden", !ok);
+      if (ok && active) count++;
+    });
+    sections.forEach(s => s.classList.toggle("no-hit", active && !s.querySelector("[data-item]:not(.hidden)")));
+    hits.textContent = active ? `${count} 件` : "";
+  }
+  input.addEventListener("input", applyFilter);
+  flags.forEach(f => f.addEventListener("change", applyFilter));
+
+  // 絞り込み中に ID のリンクを押したら、絞り込みを解いて飛ぶ
+  document.addEventListener("click", e => {
+    const a = e.target.closest("a.ref");
+    if (!a) return;
+    const target = document.getElementById(decodeURIComponent(a.hash.slice(1)));
+    if (target && target.classList.contains("hidden")) {
+      input.value = ""; flags.forEach(f => { f.checked = false; }); applyFilter();
+    }
+  });
+
+  // スマホ：目次の開閉
+  document.querySelector(".menu-btn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
+  nav.addEventListener("click", e => { if (e.target.closest("a")) document.body.classList.remove("nav-open"); });
+</script>
+</body>
+</html>

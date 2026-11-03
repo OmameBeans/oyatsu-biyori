@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>献立作成：チラシ取り込み | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .mock-switch { margin-bottom: 16px; border-bottom: 0; background: #e8edf3; border-radius: 8px; padding: 4px; display: inline-flex; }
+  .mock-switch .tab { border: 0; border-radius: 6px; padding: 6px 14px; margin: 0; font-size: 13px; }
+  .mock-switch .tab.active { background: #fff; box-shadow: var(--shadow-1); }
+  .capture { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .capture-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    height: 132px; border-radius: 12px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+    border: 1px solid rgba(21,101,192,.4); background: var(--primary-50); color: var(--primary-dark);
+  }
+  .capture-btn .material-symbols-outlined { font-size: 40px; }
+  .capture-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: var(--shadow-2); }
+  .drop { margin-top: 16px; border: 2px dashed #90caf9; border-radius: 12px; padding: 18px; text-align: center; color: var(--text-2); background: #fafcff; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .thumb { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--divider); background: #fff; }
+  .thumb.off { opacity: .45; }
+  .thumb .paper-img { aspect-ratio: 3/4; padding: 10px; display: grid; grid-template-rows: 22px 1fr; gap: 8px; background: #fffdf6; }
+  .thumb .paper-img .band { background: linear-gradient(90deg,#ef5350,#ffa726); border-radius: 3px; }
+  .thumb .paper-img .cells { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .thumb .paper-img .cells i { background: #ffe0b2; border-radius: 3px; }
+  .thumb .paper-img .cells i:nth-child(3n) { background: #ffcdd2; }
+  .thumb .paper-img .cells i:nth-child(4n) { background: #c8e6c9; }
+  .thumb .meta { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: 12px; border-top: 1px solid var(--divider); }
+  .thumb .meta .material-symbols-outlined { font-size: 16px; color: var(--text-2); }
+  .thumb .rm { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; background: rgba(255,255,255,.95); box-shadow: var(--shadow-1); }
+  .thumb .off-label { position: absolute; inset: 0 0 37px; display: grid; place-items: center; }
+  .reading { max-width: 640px; margin: 24px auto; text-align: center; }
+  .phase { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; }
+  .phase .material-symbols-outlined { font-size: 22px; }
+  .phase.done { color: var(--text-2); }
+  .phase.done .material-symbols-outlined { color: var(--success); font-variation-settings: "FILL" 1; }
+  .phase.now { font-weight: 700; }
+  .phase.now .material-symbols-outlined { color: var(--primary); animation: spin 1.2s linear infinite; }
+  .phase.wait { color: var(--text-3); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .match { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
+  .match .material-symbols-outlined { font-size: 18px; }
+  .match-same { color: var(--success); }
+  .match-variant { color: var(--primary); }
+  .match-new { color: var(--warning-text); }
+  .reason { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .select-sm { height: 34px; font-size: 13px; padding: 0 8px; width: auto; }
+  .results-table .c-name { min-width: 230px; }
+  .results-table .c-act { white-space: nowrap; }
+  .summary-bar { display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 20px; background: #fafbfc; border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); font-size: 13px; }
+  .summary-bar b { font-size: 16px; }
+  @media (max-width: 900px) {
+    .capture-btn { height: 112px; font-size: 15px; }
+    .thumbs { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .results-table thead { display: none; }
+    .results-table tr { display: grid; grid-template-columns: 1fr auto; padding: 12px 16px; border-bottom: 1px solid var(--divider); gap: 4px 12px; }
+    .results-table td { border: 0; padding: 0; white-space: normal; min-width: 0 !important; }
+    .results-table td.c-name { grid-column: 1; grid-row: 1; }
+    .results-table td.c-price { grid-column: 2; grid-row: 1; text-align: right; }
+    .results-table td.c-match, .results-table td.c-cat, .results-table td.c-act { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body data-nav="menus">
+<main class="main">
+  <div class="container">
+    <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
+        <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
+      </div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="stepper">
+        <a class="step active" href="menu-step1.html"><span class="dot">1</span><span class="label">チラシ取り込み</span></a>
+        <span class="step-line"></span>
+        <span class="step"><span class="dot">2</span><span class="label">今週の商品</span></span>
+        <span class="step-line"></span>
+        <span class="step"><span class="dot">3</span><span class="label">要望の入力</span></span>
+        <span class="step-line"></span>
+        <span class="step"><span class="dot">4</span><span class="label">献立案とチャット</span></span>
+      </div>
+    </div>
+
+    <div class="tabs mock-switch no-print" data-tabs="main">
+      <button class="tab active" data-tab="upload">① 取り込み</button>
+      <button class="tab" data-tab="reading">② 読み取り中</button>
+      <button class="tab" data-tab="result">③ 読み取り結果</button>
+    </div>
+
+    <!-- ① 取り込み -->
+    <section class="tab-panel" data-panel="upload">
+      <div class="card">
+        <div class="card-head"><h2 class="h6">チラシを取り込む</h2><span class="caption">対象週：11/9（月）〜 11/13（金）</span></div>
+        <div class="card-body">
+          <div class="capture">
+            <button class="capture-btn primary"><span class="material-symbols-outlined">photo_camera</span>カメラで撮る</button>
+            <button class="capture-btn"><span class="material-symbols-outlined">upload_file</span>ファイルを選ぶ<span class="caption" style="font-weight:400">画像・PDF</span></button>
+          </div>
+          <div class="drop hide-sm"><span class="material-symbols-outlined">move_to_inbox</span>　ここにチラシの画像や PDF をドラッグ＆ドロップしても追加できます</div>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-head"><h2 class="h6">取り込んだページ <span class="caption">4枚中 3枚を読み取ります</span></h2></div>
+        <div class="card-body">
+          <div class="thumbs">
+            <div class="thumb">
+              <div class="paper-img"><div class="band"></div><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+              <button class="icon-btn rm" aria-label="外す"><span class="material-symbols-outlined">close</span></button>
+              <div class="meta"><span class="material-symbols-outlined">image</span>撮影 1</div>
+            </div>
+            <div class="thumb">
+              <div class="paper-img"><div class="band" style="background:linear-gradient(90deg,#42a5f5,#26c6da)"></div><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+              <button class="icon-btn rm" aria-label="外す"><span class="material-symbols-outlined">close</span></button>
+              <div class="meta"><span class="material-symbols-outlined">image</span>撮影 2</div>
+            </div>
+            <div class="thumb">
+              <div class="paper-img"><div class="band" style="background:linear-gradient(90deg,#66bb6a,#d4e157)"></div><div class="cells"><i></i><i></i><i></i><i></i></div></div>
+              <button class="icon-btn rm" aria-label="外す"><span class="material-symbols-outlined">close</span></button>
+              <div class="meta"><span class="material-symbols-outlined">picture_as_pdf</span>チラシ.pdf　1ページ</div>
+            </div>
+            <div class="thumb off">
+              <div class="paper-img"><div class="band" style="background:#bdbdbd"></div><div class="cells"><i></i><i></i></div></div>
+              <div class="off-label"><span class="chip">外しました</span></div>
+              <div class="meta"><span class="material-symbols-outlined">picture_as_pdf</span>チラシ.pdf　2ページ</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a class="btn" href="menus.html">献立一覧に戻る</a>
+          <button class="btn btn-contained btn-lg" data-goto="reading"><span class="material-symbols-outlined">document_scanner</span>読み取る</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ② 読み取り中 -->
+    <section class="tab-panel" data-panel="reading" hidden>
+      <div class="card">
+        <div class="reading" style="padding:24px 20px">
+          <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary)">document_scanner</span>
+          <h2 class="h6 mt-8">チラシを読み取っています</h2>
+          <p class="muted mb-16">3枚で 30秒ほどかかります。この画面を閉じても、読み取りは続きます。</p>
+          <div class="progress mb-16"><span style="width:62%"></span></div>
+          <div class="phase done"><span class="material-symbols-outlined">check_circle</span>撮影 1 から 14件の商品を見つけました</div>
+          <div class="phase done"><span class="material-symbols-outlined">check_circle</span>撮影 2 から 9件の商品を見つけました</div>
+          <div class="phase now"><span class="material-symbols-outlined">progress_activity</span>チラシ.pdf 1ページを読み取っています…</div>
+          <div class="phase wait"><span class="material-symbols-outlined">radio_button_unchecked</span>登録済みの商品と同じかどうか調べる</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 読み取り結果 -->
+    <section class="tab-panel" data-panel="result" hidden>
+      <div class="alert alert-info mb-16">
+        <span class="material-symbols-outlined">info</span>
+        <div class="alert-body">おやつに使えそうな商品を <b>18件</b> 見つけました。登録済みの商品と同じかどうかを確かめて、「確定」してください。迷うときは「新しい商品として登録」にしてください。</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 class="h6">読み取った商品</h2>
+          <button class="btn btn-outlined btn-sm hide-sm"><span class="material-symbols-outlined">done_all</span>「同じ商品」をまとめて確定</button>
+        </div>
+        <div class="summary-bar">
+          <span><b class="num">11</b> 同じ商品</span>
+          <span><b class="num">3</b> 味違い</span>
+          <span><b class="num">4</b> 新しい商品</span>
+          <span style="margin-left:auto" class="muted">確定済み <b class="num" style="color:var(--text)">6</b> / 18</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table results-table">
+            <thead><tr><th>チラシの表記</th><th class="right">価格（税込）</th><th>同じ商品かどうか</th><th>おやつの分類</th><th class="right">操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="c-name"><b>うすしおポテトチップス 小袋15袋</b><div class="caption">撮影 1</div></td>
+                <td class="c-price right num">298 円</td>
+                <td class="c-match"><span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span><div class="reason">登録済み「うすしおポテトチップス 小袋15袋」と名前・入数が一致</div></td>
+                <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+                <td class="c-act right"><span class="chip chip-primary"><span class="material-symbols-outlined">check</span>確定済み</span></td>
+              </tr>
+              <tr>
+                <td class="c-name"><b>ぶどうゼリー 8個入</b><div class="caption">撮影 1</div></td>
+                <td class="c-price right num">178 円</td>
+                <td class="c-match"><span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span><div class="reason">登録済み「ぶどうゼリー 8個入」と一致</div></td>
+                <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+                <td class="c-act right"><span class="chip chip-primary"><span class="material-symbols-outlined">check</span>確定済み</span></td>
+              </tr>
+              <tr>
+                <td class="c-name"><b>ピーチゼリー 8個入</b><div class="caption">撮影 2</div></td>
+                <td class="c-price right num">178 円</td>
+                <td class="c-match"><span class="match match-variant"><span class="material-symbols-outlined">alt_route</span>味違い</span><div class="reason">「ぶどうゼリー 8個入」と同じシリーズで、味だけが違うようです</div></td>
+                <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+                <td class="c-act right">
+                  <select class="select select-sm"><option>味違いとして登録</option><option>同じ商品</option><option>新しい商品として登録</option></select>
+                  <button class="btn btn-contained btn-sm">確定</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-name"><b>のりしおポップコーン 12袋</b><div class="caption">撮影 2</div></td>
+                <td class="c-price right num">298 円</td>
+                <td class="c-match"><span class="match match-variant"><span class="material-symbols-outlined">alt_route</span>味違い</span><div class="reason">「しお味ポップコーン 12袋」と入数が同じで、味の表記が違います</div></td>
+                <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+                <td class="c-act right">
+                  <select class="select select-sm"><option>味違いとして登録</option><option>同じ商品</option><option>新しい商品として登録</option></select>
+                  <button class="btn btn-contained btn-sm">確定</button>
+                </td>
+              </tr>
+              <tr>
+                <td class="c-name"><b>いちごミニ大福 10個入</b><div class="caption">チラシ.pdf 1ページ</div></td>
+                <td class="c-price right num">448 円</td>
+                <td class="c-match"><span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span><div class="reason">似た商品が見つかりませんでした。アレルゲンは「不明」で登録されます</div></td>
+                <td class="c-cat">
+                  <select class="select select-sm"><option>あまい</option><option>しょっぱい</option><option>のどごし</option><option>対象外</option></select>
+                </td>
+                <td class="c-act right"><button class="btn btn-contained btn-sm">新しい商品として登録</button></td>
+              </tr>
+              <tr>
+                <td class="c-name"><b>キッチンペーパー 4ロール</b><div class="caption">撮影 2</div></td>
+                <td class="c-price right num">258 円</td>
+                <td class="c-match"><span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span><div class="reason">食品ではないようです</div></td>
+                <td class="c-cat"><span class="cat cat-none">対象外</span></td>
+                <td class="c-act right"><button class="btn btn-sm">取り込まない</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-actions">
+          <span class="caption" style="margin-right:auto;align-self:center">確定していない 12件は、今週の商品に入りません</span>
+          <a class="btn btn-contained btn-lg" href="menu-step2.html">今週の商品へ<span class="material-symbols-outlined">arrow_forward</span></a>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+<script>
+  // 「読み取る」で②へ切り替える（モック用）
+  document.querySelectorAll("[data-goto]").forEach((b) =>
+    b.addEventListener("click", () => document.querySelector(`.tab[data-tab="${b.dataset.goto}"]`).click()));
+</script>
+</body>
+</html>

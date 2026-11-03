@@ -1,0 +1,22 @@
+# 手元だけで参照する資料（個人情報・サーバー情報を含むため公開しない）
+docs/context/
+
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+*.user
+
+.vscode/
+
+# Node / Vite
+node_modules/
+dist/
+
+# SQLite（実データを含むため公開しない）
+*.db
+*.db-shm
+*.db-wal
+
+# Python のキャッシュ
+__pycache__/

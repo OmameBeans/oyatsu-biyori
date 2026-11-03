@@ -1,0 +1,60 @@
+{
+  "react": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/react_light.svg",
+    "file": "react.svg",
+    "bytes": 6534,
+    "dark_file": "react_dark.svg",
+    "dark_url": "https://svgl.app/library/react_dark.svg"
+  },
+  "dotnet": {
+    "source": "gilbarbara",
+    "url": "https://cdn.jsdelivr.net/gh/gilbarbara/logos/logos/dotnet.svg",
+    "file": "dotnet.svg",
+    "bytes": 3071
+  },
+  "sqlite": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/sqlite.svg",
+    "file": "sqlite.svg",
+    "bytes": 3646
+  },
+  "claude": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/claude-ai-icon.svg",
+    "file": "claude.svg",
+    "bytes": 1999
+  },
+  "anthropic": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/anthropic_black.svg",
+    "file": "anthropic.svg",
+    "bytes": 347,
+    "dark_file": "anthropic_dark.svg",
+    "dark_url": "https://svgl.app/library/anthropic_white.svg"
+  },
+  "windows": {
+    "source": "svgl",
+    "url": "https://svgl.app/library/windows.svg",
+    "file": "windows.svg",
+    "bytes": 297
+  },
+  "iis": {
+    "source": "lucide",
+    "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/lock.svg",
+    "file": "iis.svg",
+    "bytes": 381
+  },
+  "dev": {
+    "source": "lucide",
+    "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/laptop.svg",
+    "file": "dev.svg",
+    "bytes": 479
+  },
+  "devices": {
+    "source": "lucide",
+    "url": "https://cdn.jsdelivr.net/npm/lucide-static/icons/monitor-smartphone.svg",
+    "file": "devices.svg",
+    "bytes": 475
+  }
+}

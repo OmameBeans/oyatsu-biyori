@@ -1,0 +1,11 @@
+<Solution>
+  <Project Path="src/oyatsubiyori.client/oyatsubiyori.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="src/OyatsuBiyori.Biz/OyatsuBiyori.Biz.csproj" />
+  <Project Path="src/OyatsuBiyori.Claude/OyatsuBiyori.Claude.csproj" />
+  <Project Path="src/OyatsuBiyori.Data/OyatsuBiyori.Data.csproj" />
+  <Project Path="src/OyatsuBiyori.Migrations/OyatsuBiyori.Migrations.csproj" Id="1b2c1897-8cbf-4508-9e09-3f6e9251b3fe" />
+  <Project Path="src/OyatsuBiyori.Server/OyatsuBiyori.Server.csproj" />
+</Solution>

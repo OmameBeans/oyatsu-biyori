@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設定 | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .container { max-width: 960px; }
+  .tabs-card { padding: 0 8px; }
+  .section { padding: 20px 24px; border-bottom: 1px solid var(--divider); display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 24px; }
+  .section:last-of-type { border-bottom: 0; }
+  .section .s-title { font-weight: 500; }
+  .section .s-desc { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+  .w-160 { max-width: 160px; }
+  .days { display: flex; gap: 8px; flex-wrap: wrap; }
+  .day-chip { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--divider); display: grid; place-items: center; font-weight: 500; cursor: pointer; background: #fff; }
+  .day-chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .budget-table { max-width: 480px; }
+  .budget-table td { white-space: nowrap; }
+  .budget-table td { padding: 6px 12px; }
+  .budget-table .input { height: 36px; font-size: 14px; text-align: right; }
+  .budget-table .inherit { color: var(--text-3); font-size: 13px; }
+  .dup { display: grid; grid-template-columns: 140px 140px; gap: 10px 16px; align-items: center; }
+  .avoid-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ck { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 8px; border: 1px solid var(--divider); border-radius: 17px; font-size: 13px; cursor: pointer; background: #fff; }
+  .ck .material-symbols-outlined { font-size: 18px; color: var(--text-3); }
+  .ck.on { background: var(--error-bg); border-color: rgba(211,47,47,.5); color: #8e1f1f; font-weight: 700; }
+  .ck.on .material-symbols-outlined { color: var(--error); font-variation-settings: "FILL" 1; }
+  .grp { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--divider); border-radius: 8px; background: #fafbfc; margin-bottom: 10px; }
+  .grp .g-body { flex: 1; }
+  .extra { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--divider); }
+  .extra .words { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .log { font-size: 13px; }
+  .log td { padding: 8px 12px; }
+  @media (max-width: 900px) {
+    .section { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+    .dup { grid-template-columns: 1fr 120px; }
+    .log tr { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--divider); }
+    .log td { padding: 0; border: 0; white-space: normal !important; }
+    .log td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  }
+</style>
+</head>
+<body data-nav="settings">
+<main class="main">
+  <div class="container">
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">設定</h1>
+        <p class="muted">献立を作るときに、アプリが必ず守る条件です。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs tabs-card" data-tabs="main">
+        <button class="tab active" data-tab="cond"><span class="material-symbols-outlined">tune</span>条件設定</button>
+        <button class="tab" data-tab="avoid"><span class="material-symbols-outlined">no_food</span>避ける品目</button>
+        <button class="tab" data-tab="pw"><span class="material-symbols-outlined">key</span>パスワード変更</button>
+      </div>
+
+      <!-- SC-03 条件設定 -->
+      <div class="tab-panel" data-panel="cond">
+        <div class="section">
+          <div><div class="s-title">子どもの人数</div><div class="s-desc">ふだんの人数。日ごとの増減は、献立を作るときの要望で伝えます。</div></div>
+          <div class="field w-160"><div class="input-adorn"><input class="input num" value="55" style="padding-left:14px"><span class="suffix">人</span></div></div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">月の予算（税込）</div><div class="s-desc">週の予算は月の予算 ÷ 4 です。設定していない月は、前の月の金額を引き継ぎます。</div></div>
+          <div>
+            <table class="table budget-table">
+              <tbody>
+                <tr><td>2026年 10月</td><td><input class="input num" value="60,000"></td><td class="muted">週 15,000 円</td></tr>
+                <tr class="row-current"><td><b>2026年 11月</b></td><td><input class="input num" value="60,000"></td><td class="muted">週 15,000 円</td></tr>
+                <tr><td>2026年 12月</td><td><input class="input num" value="72,000"></td><td class="muted">週 18,000 円</td></tr>
+                <tr><td>2027年 1月</td><td class="inherit">（12月を引き継ぐ）</td><td class="muted">週 18,000 円</td></tr>
+              </tbody>
+            </table>
+            <button class="btn btn-sm mt-8"><span class="material-symbols-outlined">add</span>月を追加</button>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">おやつを出す曜日</div></div>
+          <div class="days">
+            <span class="day-chip on">月</span><span class="day-chip on">火</span><span class="day-chip on">水</span><span class="day-chip on">木</span><span class="day-chip on">金</span><span class="day-chip">土</span><span class="day-chip">日</span>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">アレルゲンの再確認</div><div class="s-desc">「確認済み」からこの日数がたつと「要再確認」に戻ります。</div></div>
+          <div class="field w-160"><div class="input-adorn"><input class="input num" value="90" style="padding-left:14px"><span class="suffix">日</span></div></div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">同じ商品を出さない期間</div><div class="s-desc">期間内の商品が献立に入ると、アプリが「○日前に出した」と警告します。</div></div>
+          <div>
+            <div class="dup">
+              <span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱいもの</span>
+              <div class="input-adorn"><input class="input num" value="30" style="padding-left:14px;height:38px"><span class="suffix" style="top:8px">日</span></div>
+              <span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまいもの</span>
+              <div class="input-adorn"><input class="input num" value="30" style="padding-left:14px;height:38px"><span class="suffix" style="top:8px">日</span></div>
+              <span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span>
+              <div class="input-adorn"><input class="input" placeholder="設定なし" style="padding-left:14px;height:38px"><span class="suffix" style="top:8px">日</span></div>
+            </div>
+            <div class="field mt-16">
+              <label>補足ルール（任意・文章で）</label>
+              <textarea class="textarea" style="min-height:90px">ポテトチップスは味違いでも同じ商品として60日あける。ゼリーは週3回まで。</textarea>
+              <span class="help">献立を作るたびに Claude に伝えます。上の期間を短くすることはできません。</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
+      </div>
+
+      <!-- SC-04 避ける品目 -->
+      <div class="tab-panel" data-panel="avoid" hidden>
+        <div class="section" style="display:block">
+          <div class="alert alert-warning">
+            <span class="material-symbols-outlined">warning</span>
+            <div class="alert-body">ここで選んだ品目を含む商品は、<b>献立に入りません</b>。全員が同じおやつを食べるため、1人でも避ける子がいる品目を選んでください。子どもの名前は登録しません。</div>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">いま避けている品目</div><div class="s-desc">7品目（グループを含む）</div></div>
+          <div class="avoid-grid">
+            <span class="chip chip-lg" style="background:var(--error);color:#fff">卵</span>
+            <span class="chip chip-lg" style="background:var(--error);color:#fff">落花生</span>
+            <span class="chip chip-lg" style="background:var(--error);color:#fff">ナッツ類（すべて・5品目）</span>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">グループ</div><div class="s-desc">まとめて選べます。選んだあとで個別に外せます。</div></div>
+          <div>
+            <div class="grp"><span class="material-symbols-outlined" style="color:var(--error)">check_box</span><div class="g-body"><b>ナッツ類（すべて）</b><div class="caption">くるみ・アーモンド・カシューナッツ・マカダミアナッツ・ヘーゼルナッツ</div></div><span class="chip chip-outlined">5 / 5</span></div>
+            <div class="grp"><span class="material-symbols-outlined" style="color:var(--text-3)">check_box_outline_blank</span><div class="g-body"><b>甲殻類</b><div class="caption">えび・かに</div></div><span class="chip chip-outlined">0 / 2</span></div>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">特定原材料（8品目）</div><div class="s-desc">表示義務があります。</div></div>
+          <div class="avoid-grid">
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>えび</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>かに</span>
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>くるみ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>小麦</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>そば</span>
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>卵</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>乳</span>
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>落花生</span>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">特定原材料に準ずるもの（20品目）</div><div class="s-desc">表示されないことがあります。選んだ品目は「表示なし＝安全」とせず、メーカーへの確認を求めます。</div></div>
+          <div class="avoid-grid">
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>アーモンド</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>あわび</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>いか</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>いくら</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>オレンジ</span>
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>カシューナッツ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>キウイフルーツ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>牛肉</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>ごま</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>さけ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>さば</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>大豆</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>鶏肉</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>バナナ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>豚肉</span>
+            <span class="ck on"><span class="material-symbols-outlined">check_box</span>マカダミアナッツ</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>もも</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>やまいも</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>りんご</span>
+            <span class="ck"><span class="material-symbols-outlined">check_box_outline_blank</span>ゼラチン</span>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">施設で追加した品目</div><div class="s-desc">28品目に入らない食材です。アレルゲン表示ではなく、原材料表示の全文から「探す言葉」で探します。</div></div>
+          <div>
+            <div class="extra">
+              <span class="ck on"><span class="material-symbols-outlined">check_box</span>ヘーゼルナッツ</span>
+              <div style="flex:1"><div class="caption">探す言葉</div><div class="words"><span class="chip chip-tag">ヘーゼルナッツ</span><span class="chip chip-tag">ヘーゼル</span><span class="chip chip-tag">ヘイゼルナッツ</span><span class="chip chip-tag">フィルバート</span></div></div>
+              <button class="icon-btn" aria-label="編集"><span class="material-symbols-outlined">edit</span></button>
+            </div>
+            <div class="row mt-16" style="align-items:flex-end;flex-wrap:wrap">
+              <div class="field" style="flex:1;min-width:160px"><label>品目名</label><input class="input" placeholder="例：ピスタチオ"></div>
+              <div class="field" style="flex:2;min-width:220px"><label>探す言葉（読点で区切る）</label><input class="input" placeholder="例：ピスタチオ、ピスタチオペースト"></div>
+              <button class="btn btn-outlined" style="height:44px"><span class="material-symbols-outlined">add</span>追加</button>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div><div class="s-title">変更の記録</div></div>
+          <table class="table log">
+            <tbody>
+              <tr><td class="num nowrap">2026/9/1 10:12</td><td><span class="chip chip-primary" style="height:20px">追加</span> ヘーゼルナッツ（施設の追加品目）</td><td class="muted nowrap">ひまわり学童クラブ</td></tr>
+              <tr><td class="num nowrap">2026/4/6 09:40</td><td><span class="chip chip-primary" style="height:20px">追加</span> ナッツ類（すべて）</td><td class="muted nowrap">ひまわり学童クラブ</td></tr>
+              <tr><td class="num nowrap">2026/4/6 09:38</td><td><span class="chip" style="height:20px">外す</span> そば</td><td class="muted nowrap">ひまわり学童クラブ</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
+      </div>
+
+      <!-- SC-12 パスワード変更 -->
+      <div class="tab-panel" data-panel="pw" hidden>
+        <div class="section">
+          <div><div class="s-title">パスワード変更</div><div class="s-desc">12文字以上。ほかのサービスと同じパスワードは使わないでください。</div></div>
+          <div class="stack" style="max-width:360px">
+            <div class="field"><label>いまのパスワード</label><input class="input" type="password" value="xxxxxxxxxxxx"></div>
+            <div class="field"><label>新しいパスワード</label><input class="input" type="password" value="xxxxxxxxxxxxxx"><div class="meter mt-8"><span style="width:75%;background:var(--success)"></span></div><span class="help">強さ：じゅうぶん</span></div>
+            <div class="field"><label>新しいパスワード（確認）</label><input class="input" type="password"></div>
+          </div>
+        </div>
+        <div class="card-actions"><button class="btn btn-contained">変更する</button></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- 品目を外すときの確認（?dlg=1 で表示） -->
+<div class="dialog-backdrop" id="remove-dlg" hidden>
+  <div class="dialog" role="dialog">
+    <div class="dialog-title">「卵」を避ける品目から外しますか？</div>
+    <div class="dialog-content">
+      <p>この品目を避ける子がもういないことを確認しましたか？</p>
+      <p class="caption mt-8">外すと、卵を含む商品も献立の候補に入るようになります。変更は日時と操作した職員とともに記録されます。</p>
+    </div>
+    <div class="dialog-actions"><button class="btn">やめる</button><button class="btn btn-contained" style="background:var(--error)">確認したので外す</button></div>
+  </div>
+</div>
+<style>.dialog-backdrop[hidden] { display: none; }</style>
+<script src="assets/mock.js"></script>
+<script>
+  if (new URLSearchParams(location.search).get("dlg")) document.getElementById("remove-dlg").hidden = false;
+</script>
+</body>
+</html>

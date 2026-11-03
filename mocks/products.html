@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商品一覧 | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .toolbar { display: flex; gap: 12px; align-items: center; padding: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--divider); }
+  .toolbar .input-adorn { flex: 1; min-width: 220px; max-width: 420px; }
+  .toolbar .input { height: 40px; font-size: 14px; }
+  .toolbar .input-adorn > .material-symbols-outlined { top: 10px; }
+  .seg { display: inline-flex; border: 1px solid rgba(21,101,192,.5); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-right: 1px solid rgba(21,101,192,.5); background: #fff; color: var(--primary); font: inherit; font-size: 13px; font-weight: 500; padding: 0 12px; height: 38px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--primary-light); color: var(--primary-dark); }
+  .seg .n { font-size: 12px; color: var(--text-2); }
+  .pname a { color: var(--text); font-weight: 700; }
+  .pname .caption { display: block; }
+  tr.unused td { color: var(--text-3); }
+  tr.unused .pname a { color: var(--text-3); }
+  .pager { display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--divider); font-size: 13px; color: var(--text-2); }
+  @media (max-width: 900px) {
+    .seg { width: 100%; overflow-x: auto; }
+    .ptable thead { display: none; }
+    .ptable tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 16px; border-bottom: 1px solid var(--divider); }
+    .ptable td { padding: 0; border: 0; }
+    .ptable td.c-name { grid-column: 1 / -1; }
+    .ptable td.c-status { grid-column: 1; }
+    .ptable td.c-date { grid-column: 2; text-align: right; }
+    .ptable td.c-maker, .ptable td.c-cat, .ptable td.c-go { display: none; }
+  }
+</style>
+</head>
+<body data-nav="products">
+<main class="main">
+  <div class="container">
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">商品一覧</h1>
+        <p class="muted">登録済みの商品 128件。チラシの取り込みで自動で増えます。</p>
+      </div>
+      <button class="btn btn-contained"><span class="material-symbols-outlined">add</span>商品を登録</button>
+    </div>
+
+    <div class="safety-note mb-16"><span class="material-symbols-outlined">verified_user</span>アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください。</div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="input-adorn">
+          <span class="material-symbols-outlined">search</span>
+          <input class="input" placeholder="商品名で探す（ひらがな・カタカナどちらでも）">
+        </div>
+        <div class="seg">
+          <button class="on">すべて <span class="n">128</span></button>
+          <button><span class="material-symbols-outlined" style="font-size:16px;color:var(--success)">check_circle</span>確認済み <span class="n">114</span></button>
+          <button><span class="material-symbols-outlined" style="font-size:16px;color:var(--warning)">history</span>要再確認 <span class="n">3</span></button>
+          <button><span class="material-symbols-outlined" style="font-size:16px;color:var(--warning)">help</span>参考 <span class="n">2</span></button>
+          <button><span class="material-symbols-outlined" style="font-size:16px;color:var(--error)">error</span>不明 <span class="n">2</span></button>
+        </div>
+        <label class="checkbox"><input type="checkbox" checked>「使わない」商品も表示</label>
+      </div>
+      <div class="table-wrap">
+        <table class="table ptable">
+          <thead><tr><th>商品名</th><th>メーカー</th><th>分類</th><th>アレルゲンの状態</th><th>最終確認日</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">いちごミニ大福 10個入</a><span class="caption">11/2 にチラシから登録</span></td>
+              <td class="c-maker muted">さくら製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
+              <td class="c-status"><span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span></td>
+              <td class="c-date muted">—</td>
+              <td class="c-go right"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">えびせん 15袋</a><span class="caption">11/2 にチラシから登録</span></td>
+              <td class="c-maker muted">うみかぜ食品（架空）</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span></td>
+              <td class="c-date muted">—</td>
+              <td class="c-go right"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">みかんゼリー 8個入</a></td>
+              <td class="c-maker muted">あおぞらフーズ（架空）</td>
+              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+              <td class="c-status"><span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></td>
+              <td class="c-date num">2026/7/23</td>
+              <td class="c-go right"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">のりしおポップコーン 12袋</a></td>
+              <td class="c-maker muted">ほしぞら製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></td>
+              <td class="c-date num">2026/7/29</td>
+              <td class="c-go right"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">動物ビスケット 20袋</a><span class="caption">チラシの情報のみ</span></td>
+              <td class="c-maker muted">こもれび製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
+              <td class="c-status"><span class="status status-ref"><span class="material-symbols-outlined">help</span>参考</span></td>
+              <td class="c-date muted">—</td>
+              <td class="c-go right"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">うすしおポテトチップス 小袋15袋</a></td>
+              <td class="c-maker muted">ほしぞら製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
+              <td class="c-date num">2026/10/14</td>
+              <td class="c-go right"><a class="icon-btn" href="product-detail.html" aria-label="開く"><span class="material-symbols-outlined">chevron_right</span></a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">ぶどうゼリー 8個入</a></td>
+              <td class="c-maker muted">あおぞらフーズ（架空）</td>
+              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
+              <td class="c-date num">2026/9/30</td>
+              <td class="c-go right"><a class="icon-btn" href="product-detail.html" aria-label="開く"><span class="material-symbols-outlined">chevron_right</span></a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">ごま揚げせんべい 12袋</a><span class="caption" style="color:var(--error)">避ける品目（卵）を含む</span></td>
+              <td class="c-maker muted">こもれび製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
+              <td class="c-date num">2026/11/2</td>
+              <td class="c-go right"><a class="icon-btn" href="product-detail.html" aria-label="開く"><span class="material-symbols-outlined">chevron_right</span></a></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><a href="product-detail.html">塩せんべい 20枚入</a></td>
+              <td class="c-maker muted">うみかぜ食品（架空）</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
+              <td class="c-date num">2026/10/5</td>
+              <td class="c-go right"><a class="icon-btn" href="product-detail.html" aria-label="開く"><span class="material-symbols-outlined">chevron_right</span></a></td>
+            </tr>
+            <tr class="unused">
+              <td class="c-name pname"><a href="product-detail.html">からいスナック 8袋</a><span class="caption">使わない：子どもには辛すぎる</span></td>
+              <td class="c-maker">ほしぞら製菓（架空）</td>
+              <td class="c-cat"><span class="cat cat-none">しょっぱい</span></td>
+              <td class="c-status"><span class="chip chip-outlined">使わない</span></td>
+              <td class="c-date num">2026/6/11</td>
+              <td class="c-go right"><a class="icon-btn" href="product-detail.html" aria-label="開く"><span class="material-symbols-outlined">chevron_right</span></a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">1〜10 / 128件<span class="row"><button class="icon-btn" disabled><span class="material-symbols-outlined">chevron_left</span></button><button class="icon-btn"><span class="material-symbols-outlined">chevron_right</span></button></span></div>
+    </div>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+</body>
+</html>

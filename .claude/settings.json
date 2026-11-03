@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys,json\np=json.loads(sys.stdin.buffer.read().decode('utf-8')).get('tool_input',{}).get('file_path','').replace(chr(92),'/')\nif p.lower().endswith('docs/requirements/index.html'):\n    sys.stderr.buffer.write('docs/requirements/index.html は生成物なので直接編集しないでください。docs/requirements/*.md（または docs/README.md）を直すと、自動で作り直されます。'.encode('utf-8'))\n    sys.exit(2)\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-commit.py\"",
+            "timeout": 30,
+            "statusMessage": "コミットする内容に、公開してはいけないものがないか確かめています…"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys,json,re,subprocess\np=json.loads(sys.stdin.buffer.read().decode('utf-8')).get('tool_input',{}).get('file_path','').replace(chr(92),'/')\nif re.search(r'docs/(requirements/[^/]+|README)\\.md$',p,re.I):\n    r=subprocess.run([sys.executable,sys.argv[1]],capture_output=True)\n    if r.returncode!=0:\n        sys.stderr.buffer.write('要件定義の HTML の作り直しに失敗しました:\\n'.encode('utf-8')+r.stdout+r.stderr)\n        sys.exit(2)\" \"$CLAUDE_PROJECT_DIR/tools/build-requirements-html/build.py\"",
+            "timeout": 60,
+            "statusMessage": "要件定義の HTML を作り直しています…"
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-biz-tests.py\"",
+            "timeout": 300,
+            "statusMessage": "Biz のテストを走らせています…"
+          }
+        ]
+      }
+    ]
+  }
+}

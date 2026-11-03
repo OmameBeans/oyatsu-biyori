@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>おやつ日和 | 学童保育のおやつ献立アシスタント</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  body { background: #fff; font-size: 15px; }
+  .round { font-family: "M PLUS Rounded 1c", var(--font); }
+  .lp-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .lp-nav { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--divider); }
+  .lp-nav .lp-wrap { display: flex; align-items: center; gap: 16px; height: 64px; }
+  .lp-nav .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; color: var(--primary-dark); }
+  .lp-nav .brand .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--primary); color: #fff; display: grid; place-items: center; }
+  .lp-nav .links { display: flex; gap: 4px; margin-left: auto; }
+  .lp-nav .links a { color: var(--text-2); font-size: 14px; padding: 8px 12px; border-radius: 6px; }
+  .btn-pill { border-radius: 999px; }
+
+  .hero { background: radial-gradient(1200px 500px at 85% -10%, #bbdefb 0%, rgba(187,222,251,0) 60%), linear-gradient(180deg, #e3f2fd 0%, #fff 100%); padding: 72px 0 64px; overflow: hidden; }
+  .hero .lp-wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
+  .hero h1 { font-size: 44px; font-weight: 800; line-height: 1.35; color: #0b3d91; letter-spacing: .01em; }
+  .hero h1 .accent { color: var(--primary); }
+  .hero .lead { font-size: 17px; color: var(--text-2); margin: 20px 0 28px; line-height: 1.9; }
+  .hero .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero .note { margin-top: 14px; font-size: 12px; color: var(--text-2); }
+  .shot { border-radius: 16px; background: #fff; box-shadow: 0 24px 48px -12px rgba(13,71,161,.28), 0 0 0 1px rgba(13,71,161,.06); overflow: hidden; }
+  .shot .bar { height: 30px; background: var(--primary); display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+  .shot .bar i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.5); }
+  .shot .body { padding: 14px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; background: var(--bg); font-size: 11px; }
+  .mini-card { background: #fff; border-radius: 8px; box-shadow: var(--shadow-1); padding: 10px; }
+  .mini-card .d { font-weight: 700; font-size: 12px; display: flex; justify-content: space-between; }
+  .mini-card .it { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+  .mini-card .cat { height: 18px; font-size: 10px; padding: 0 6px; }
+  .mini-card .why { margin-top: 6px; color: var(--text-2); font-size: 10px; line-height: 1.6; display: flex; gap: 4px; }
+  .mini-card .why .material-symbols-outlined { font-size: 13px; color: var(--primary); }
+  .mini-chat .bubble { border-radius: 8px; padding: 6px 8px; margin-top: 6px; font-size: 10px; line-height: 1.6; }
+  .mini-chat .ai { background: #f4f6fa; }
+  .mini-chat .me { background: var(--primary); color: #fff; margin-left: 20px; }
+
+  section.lp { padding: 80px 0; }
+  .sec-head { text-align: center; margin-bottom: 40px; }
+  .sec-head .kicker { display: inline-block; font-size: 13px; font-weight: 700; color: var(--primary); background: var(--primary-light); border-radius: 999px; padding: 4px 14px; margin-bottom: 12px; }
+  .sec-head h2 { font-size: 30px; font-weight: 800; color: #0b3d91; }
+  .sec-head p { color: var(--text-2); margin-top: 10px; }
+  .cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .pain { padding: 28px 24px; border-radius: 20px; background: #f7fafe; border: 1px solid #e3edf9; }
+  .pain .ic { width: 52px; height: 52px; border-radius: 16px; background: #fff; display: grid; place-items: center; color: var(--primary); box-shadow: var(--shadow-1); margin-bottom: 16px; }
+  .pain .ic .material-symbols-outlined { font-size: 28px; }
+  .pain h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .pain p { color: var(--text-2); font-size: 14px; line-height: 1.8; }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; counter-reset: s; }
+  .stepc { position: relative; background: #fff; border-radius: 20px; padding: 20px; box-shadow: var(--shadow-2); }
+  .stepc .num { position: absolute; top: -14px; left: 20px; width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 800; box-shadow: var(--shadow-2); }
+  .stepc .img { height: 120px; border-radius: 12px; background: linear-gradient(135deg, #e3f2fd, #f4f8fd); display: grid; place-items: center; margin: 10px 0 14px; color: var(--primary); }
+  .stepc .img .material-symbols-outlined { font-size: 48px; }
+  .stepc h3 { font-size: 20px; font-weight: 800; color: #0b3d91; }
+  .stepc p { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.8; }
+
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .feat { display: flex; gap: 16px; padding: 24px; border-radius: 20px; border: 1px solid var(--divider); background: #fff; }
+  .feat .ic { flex: none; width: 48px; height: 48px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; }
+  .feat h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .feat p { font-size: 14px; color: var(--text-2); line-height: 1.8; }
+  .feat .eg { margin-top: 10px; font-size: 13px; background: var(--primary-50); border-radius: 10px; padding: 8px 12px; color: var(--primary-dark); }
+
+  .safety { background: #0d2b55; color: #e8eef7; }
+  .safety .sec-head h2 { color: #fff; }
+  .safety .sec-head p { color: #b6c6dd; }
+  .safety .sec-head .kicker { background: rgba(255,255,255,.12); color: #90caf9; }
+  .safety-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .sbox { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 24px; }
+  .sbox h3 { color: #fff; font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .sbox h3 .material-symbols-outlined { color: #90caf9; }
+  .sbox ul { margin: 0; padding-left: 20px; line-height: 2; font-size: 14px; }
+  .three { display: flex; flex-direction: column; gap: 10px; }
+  .three div { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+  .three .status { flex: none; width: 96px; justify-content: center; }
+  .safety .callout { margin-top: 20px; border-radius: 16px; padding: 20px 24px; background: #fff; color: var(--text); display: flex; gap: 16px; align-items: flex-start; }
+  .safety .callout .material-symbols-outlined { color: var(--warning); font-size: 28px; }
+
+  .video { aspect-ratio: 16/9; max-width: 800px; margin: 0 auto; border-radius: 20px; background: linear-gradient(135deg, #1565c0, #42a5f5); display: grid; place-items: center; color: #fff; box-shadow: var(--shadow-8); }
+  .video .play { width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,.95); color: var(--primary); display: grid; place-items: center; }
+  .video .play .material-symbols-outlined { font-size: 44px; }
+  .why-box { max-width: 760px; margin: 0 auto; font-size: 15px; line-height: 2.1; color: var(--text); background: #f7fafe; border-radius: 20px; padding: 32px 36px; }
+
+  .lp-foot { background: #0b1f3d; color: #b6c6dd; padding: 40px 0; font-size: 13px; }
+  .lp-foot .lp-wrap { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+  .lp-foot a { color: #e3f2fd; }
+
+  @media (max-width: 900px) {
+    .lp-nav .links { display: none; }
+    .lp-nav .brand { margin-right: auto; }
+    .hero { padding: 40px 0; }
+    .hero .lp-wrap { grid-template-columns: 1fr; gap: 32px; }
+    .hero h1 { font-size: 30px; }
+    .hero .lead { font-size: 15px; }
+    section.lp { padding: 56px 0; }
+    .sec-head h2 { font-size: 23px; }
+    .cards3, .steps, .features, .safety-grid { grid-template-columns: 1fr; }
+    .steps { gap: 28px; }
+    .lp-wrap { padding: 0 16px; }
+    .shot .body { grid-template-columns: 1fr; }
+    .mini-chat { display: none; }
+    .why-box { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+<header class="lp-nav">
+  <div class="lp-wrap">
+    <div class="brand round"><span class="mark"><span class="material-symbols-outlined icon-fill">cookie</span></span>おやつ日和</div>
+    <nav class="links"><a href="#how">使い方</a><a href="#features">できること</a><a href="#safety">安全への考え方</a><a href="#why">作った理由</a></nav>
+    <a class="btn btn-contained btn-pill" href="login.html">ログイン</a>
+  </div>
+</header>
+
+<!-- 1. ファーストビュー -->
+<section class="hero">
+  <div class="lp-wrap">
+    <div>
+      <h1 class="round">チラシを撮るだけで、<br><span class="accent">1週間のおやつ</span>が<br>決まる。</h1>
+      <p class="lead">おやつ日和は、学童保育の職員のための献立アシスタントです。コープのチラシから、予算とアレルギーの条件を守った1週間分のおやつを、理由つきで提案します。</p>
+      <div class="cta">
+        <a class="btn btn-contained btn-lg btn-pill" href="login.html"><span class="material-symbols-outlined">login</span>ログイン</a>
+        <a class="btn btn-outlined btn-lg btn-pill" href="#how"><span class="material-symbols-outlined">play_circle</span>使い方を見る</a>
+      </div>
+      <p class="note">※ 画面の画像はダミーデータです。</p>
+    </div>
+    <div class="shot" aria-label="献立案の画面の例">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="body">
+        <div class="stack" style="gap:8px">
+          <div class="mini-card">
+            <div class="d"><span>11/9（月）</span><span class="num">2,438 円</span></div>
+            <div class="it"><span class="cat cat-salty">しょっぱい</span>うすしおポテトチップス</div>
+            <div class="it"><span class="cat cat-smooth">のどごし</span>ぶどうゼリー</div>
+            <div class="why"><span class="material-symbols-outlined">lightbulb</span>要望の「しょっぱいもの＋ゼリー系」に合わせました。</div>
+          </div>
+          <div class="mini-card">
+            <div class="d"><span>11/13（金）誕生日会</span><span class="num">4,482 円</span></div>
+            <div class="it"><span class="cat cat-sweet">あまい</span>いちごミニ大福</div>
+            <div class="it"><span class="cat cat-smooth">のどごし</span>オレンジジュース</div>
+            <div class="why"><span class="material-symbols-outlined">lightbulb</span>誕生日会なので、季節のいちごの大福にしました。</div>
+          </div>
+        </div>
+        <div class="mini-card mini-chat">
+          <div class="d"><span>献立の相談</span></div>
+          <div class="bubble ai">献立案を作りました。週の予算まであと 1,104 円です。</div>
+          <div class="bubble me">水曜を別のしょっぱいものにして</div>
+          <div class="bubble ai">確認済みの商品から2つ候補を出しました。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. 悩み -->
+<section class="lp">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">こんな悩みはありませんか</span><h2 class="round">おやつの献立づくり、<br class="show-sm">実はとても大変です</h2></div>
+    <div class="cards3">
+      <div class="pain"><div class="ic"><span class="material-symbols-outlined">schedule</span></div><h3>毎週 1〜2時間かかる</h3><p>チラシを見比べ、予算を電卓で計算し、ノートに手書きする。保育の合間に、毎週この作業があります。</p></div>
+      <div class="pain"><div class="ic"><span class="material-symbols-outlined">checklist</span></div><h3>守る条件が多い</h3><p>アレルギー、月の予算、人数、同じものを続けない、行事の日は豪華に……。全部を頭の中で組み合わせるのは大変です。</p></div>
+      <div class="pain"><div class="ic"><span class="material-symbols-outlined">health_and_safety</span></div><h3>気が抜けない</h3><p>子どもの安全に直結します。28品目に入らない食材の見落としなど、ひとつのミスが大きな事故につながります。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 使い方 -->
+<section class="lp" id="how" style="background:#f4f8fd">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">使い方</span><h2 class="round">4つのステップで、献立ができます</h2></div>
+    <div class="steps">
+      <div class="stepc"><span class="num">1</span><div class="img"><span class="material-symbols-outlined">photo_camera</span></div><h3 class="round">撮る</h3><p>コープのチラシをスマホで撮影。PDF や画像も取り込めます。</p></div>
+      <div class="stepc"><span class="num">2</span><div class="img"><span class="material-symbols-outlined">fact_check</span></div><h3 class="round">確かめる</h3><p>読み取った商品と、アレルゲンの状態を一覧で確認します。</p></div>
+      <div class="stepc"><span class="num">3</span><div class="img"><span class="material-symbols-outlined">edit_note</span></div><h3 class="round">伝える</h3><p>「金曜は誕生日会」など、今週の要望を文章で伝えます。</p></div>
+      <div class="stepc"><span class="num">4</span><div class="img"><span class="material-symbols-outlined">forum</span></div><h3 class="round">直す</h3><p>理由つきの献立案を見て、チャットで気になるところを直します。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. できること -->
+<section class="lp" id="features">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">できること</span><h2 class="round">考える時間を、子どもと過ごす時間に</h2></div>
+    <div class="features">
+      <div class="feat"><span class="ic"><span class="material-symbols-outlined">lightbulb</span></span><div><h3>理由つきの提案</h3><p>なぜこの組み合わせにしたのかを、日ごとに説明します。納得して選べます。</p><div class="eg">「ポテトチップスは前回から 45日あいています」</div></div></div>
+      <div class="feat"><span class="ic"><span class="material-symbols-outlined">chat</span></span><div><h3>文章で伝える要望</h3><p>決まった項目を埋めるのではなく、ふだんの言葉で伝えられます。</p><div class="eg">「水曜は子どもが 48人。金曜は誕生日会なので豪華に」</div></div></div>
+      <div class="feat"><span class="ic"><span class="material-symbols-outlined">savings</span></span><div><h3>予算に合わせる入れ替え案</h3><p>週の予算に少し届かないとき、ちょうどよくなる入れ替えを最大3つ提案します。</p><div class="eg">「月曜のゼリーを果肉入りに → 週の予算まであと 70円」</div></div></div>
+      <div class="feat"><span class="ic"><span class="material-symbols-outlined">event_repeat</span></span><div><h3>重複の警告</h3><p>しょっぱいもの・あまいものは、決めた期間内に同じ商品を出すと知らせます。</p><div class="eg">「スティックポテトは 7日前に出しました」</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. 安全への考え方 -->
+<section class="lp safety" id="safety">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">安全への考え方</span><h2>アレルギーの判断は、AI に任せません</h2><p>子どもの安全に関わるところは、アプリのしくみと職員の確認で守ります。</p></div>
+    <div class="safety-grid">
+      <div class="sbox"><h3><span class="material-symbols-outlined">shield</span>アプリが必ずチェックすること</h3>
+        <ul><li>施設の「避ける品目」を含む商品は、献立に入れません</li><li>要望の文章で、アレルギーの条件をゆるめることはできません</li><li>AI の献立案は、アプリが検証して、問題があれば直させます</li></ul></div>
+      <div class="sbox"><h3><span class="material-symbols-outlined">person_check</span>職員が確定すること</h3>
+        <ul><li>パッケージの原材料表示を撮影し、品目ごとに職員が確定します</li><li>AI の読み取り結果は「候補」として表示するだけです</li><li>確認した日時と確認者を、履歴として残します</li></ul></div>
+      <div class="sbox"><h3><span class="material-symbols-outlined">traffic</span>アレルゲンの状態は3段階</h3>
+        <div class="three">
+          <div><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span>職員がパッケージで確認したもの</div>
+          <div><span class="status status-ref"><span class="material-symbols-outlined">help</span>参考</span>チラシなどの情報。確認が必要</div>
+          <div><span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span>「食べられる」扱いにはしません</div>
+        </div>
+      </div>
+      <div class="sbox"><h3><span class="material-symbols-outlined">search</span>28品目に入らない食材も</h3>
+        <p style="font-size:14px;line-height:1.9">ヘーゼルナッツのように、表示義務のない食材は見落としやすいものです。施設で追加した品目は、原材料表示の<b>全文</b>から探し、見つかった言葉を色で示します。</p></div>
+    </div>
+    <div class="callout"><span class="material-symbols-outlined icon-fill">warning</span><div><b>アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください。</b><div class="caption mt-8">おやつ日和は確認を手伝う道具です。原材料は予告なく変わることがあるため、一定期間たった商品は「要再確認」に戻します。</div></div></div>
+  </div>
+</section>
+
+<!-- 6. デモ動画 -->
+<section class="lp">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">デモ動画</span><h2 class="round">3分でわかる、おやつ日和</h2></div>
+    <div class="video"><span class="play"><span class="material-symbols-outlined icon-fill">play_arrow</span></span></div>
+  </div>
+</section>
+
+<!-- 7. 作った理由 -->
+<section class="lp" id="why" style="padding-top:0">
+  <div class="lp-wrap">
+    <div class="sec-head"><span class="kicker">作った理由</span><h2 class="round">現場の「あたりまえ」を、少し軽く</h2></div>
+    <div class="why-box">
+      学童保育のおやつは、毎週、職員がチラシと電卓とノートで決めています。条件は多く、ひとつの見落としが子どもの安全に関わります。それでも、開発者のいない現場では、道具を作ってくれる人はいません。<br>
+      おやつ日和は、その作業をそばで見てきた経験から生まれました。AI に任せるところと、人が必ず確かめるところをはっきり分けて、職員が安心して使える道具を目指しています。
+    </div>
+  </div>
+</section>
+
+<footer class="lp-foot">
+  <div class="lp-wrap">
+    <div class="round" style="font-size:16px;color:#fff;font-weight:700">おやつ日和</div>
+    <div>「Built with Claude: Japan 2026」提出作品</div>
+    <a href="#"><span class="material-symbols-outlined" style="font-size:16px">code</span> GitHub</a>
+    <div style="margin-left:auto">献立の提案に Claude（Anthropic）を使っています</div>
+  </div>
+</footer>
+<script src="assets/mock.js"></script>
+</body>
+</html>

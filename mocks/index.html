@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>画面モック一覧 | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .head { background: var(--primary); color: #fff; padding: 40px 0 72px; }
+  .head .container, .body .container { max-width: 1040px; padding: 0 24px; }
+  .head h1 { font-size: 26px; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+  .head .mark { width: 40px; height: 40px; border-radius: 10px; background: #fff; color: var(--primary); display: grid; place-items: center; }
+  .head p { opacity: .85; margin-top: 8px; }
+  .body { margin-top: -48px; padding-bottom: 48px; }
+  .group { margin-bottom: 24px; }
+  .group h2 { font-size: 13px; color: var(--text-2); font-weight: 500; margin: 0 0 8px 4px; }
+  .head + .body .group:first-child h2 { color: #fff; }
+  .list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .item { display: flex; gap: 14px; padding: 16px 18px; color: var(--text); }
+  .item:hover { text-decoration: none; box-shadow: var(--shadow-4); }
+  .item .ic { width: 44px; height: 44px; border-radius: 10px; background: var(--primary-light); color: var(--primary); display: grid; place-items: center; flex: none; }
+  .item .t { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .item .id { font-size: 11px; font-weight: 500; color: var(--text-2); background: #eef1f5; border-radius: 4px; padding: 0 6px; }
+  .item .d { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .item .vs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .item .vs a { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--primary-50); border: 1px solid #bbdefb; }
+  .prio { font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 4px; }
+  .prio-must { background: var(--primary); color: #fff; }
+  .prio-nice { background: #eceff1; color: #546e7a; }
+  .notes { font-size: 13px; color: var(--text-2); line-height: 1.9; padding: 16px 20px; }
+  @media (max-width: 900px) { .list { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-no-banner="1">
+<header class="head">
+  <div class="container">
+    <h1><span class="mark"><span class="material-symbols-outlined icon-fill">cookie</span></span>おやつ日和　画面モック</h1>
+    <p>docs/requirements/05-screens.md の画面一覧に沿ったモックです。データはすべてダミーです。</p>
+  </div>
+</header>
+<main class="body">
+  <div class="container">
+    <section class="group">
+      <h2>ログイン前</h2>
+      <div class="list">
+        <a class="card item" href="landing.html"><span class="ic"><span class="material-symbols-outlined">home</span></span><div><div class="t">ランディング <span class="id">SC-13</span><span class="prio prio-must">必須</span></div><div class="d">ログイン不要。実データを出さない紹介ページ</div></div></a>
+        <a class="card item" href="login.html"><span class="ic"><span class="material-symbols-outlined">login</span></span><div><div class="t">ログイン <span class="id">SC-01</span><span class="prio prio-must">必須</span></div><div class="d">失敗が続いたときのロックの案内を表示した状態</div></div></a>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>献立（左サイドバーの枠 SC-02 の中）</h2>
+      <div class="list">
+        <div class="card item"><span class="ic"><span class="material-symbols-outlined">calendar_month</span></span><div><div class="t"><a href="menus.html">献立一覧</a> <span class="id">SC-10</span><span class="prio prio-must">必須</span></div><div class="d">ログイン直後の画面。対応が必要なこと・週ごとの状態</div>
+          <div class="vs"><a href="menus.html">一覧</a><a href="calendar.html">カレンダー（SC-11・余裕があれば）</a></div></div></div>
+        <div class="card item"><span class="ic"><span class="material-symbols-outlined">document_scanner</span></span><div><div class="t"><a href="menu-step1.html">献立作成 手順1：チラシ取り込み</a> <span class="id">SC-09</span></div><div class="d">撮影・ファイル → 読み取り → 同じ商品かどうかの確定</div>
+          <div class="vs"><a href="menu-step1.html">取り込み</a><a href="menu-step1.html?tab=reading">読み取り中</a><a href="menu-step1.html?tab=result">読み取り結果</a></div></div></div>
+        <a class="card item" href="menu-step2.html"><span class="ic"><span class="material-symbols-outlined">shopping_basket</span></span><div><div class="t">献立作成 手順2：今週の商品 <span class="id">SC-09</span></div><div class="d">アレルゲンの状態・避ける品目・重複・今週は使わない</div></div></a>
+        <a class="card item" href="menu-step3.html"><span class="ic"><span class="material-symbols-outlined">edit_note</span></span><div><div class="t">献立作成 手順3：要望の入力 <span class="id">SC-09</span></div><div class="d">要望を文章で。いつもの条件を横に表示</div></div></a>
+        <div class="card item" style="grid-column:1/-1"><span class="ic"><span class="material-symbols-outlined">forum</span></span><div><div class="t"><a href="menu-step4.html">献立作成 手順4：献立案とチャット</a> <span class="id">SC-09</span></div><div class="d">要望の理解・予算と入れ替え案・日ごとのカード（理由・警告・代わりの提案）・チャット・確定の確認</div>
+          <div class="vs"><a href="menu-step4.html">献立案</a><a href="menu-step4.html?tab=making">作成中</a><a href="menu-step4.html?tab=confirm">確定の確認ダイアログ</a></div></div></div>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>商品</h2>
+      <div class="list">
+        <a class="card item" href="products.html"><span class="ic"><span class="material-symbols-outlined">inventory_2</span></span><div><div class="t">商品一覧 <span class="id">SC-06</span><span class="prio prio-must">必須</span></div><div class="d">検索・アレルゲンの状態で絞り込み</div></div></a>
+        <a class="card item" href="product-detail.html"><span class="ic"><span class="material-symbols-outlined">description</span></span><div><div class="t">商品詳細・編集 <span class="id">SC-07</span><span class="prio prio-must">必須</span></div><div class="d">基本情報・28品目＋追加品目・原材料の全文・確認の履歴</div></div></a>
+        <div class="card item"><span class="ic"><span class="material-symbols-outlined">photo_camera</span></span><div><div class="t"><a href="allergen-check.html">アレルゲン確認</a> <span class="id">SC-08</span><span class="prio prio-must">必須</span></div><div class="d">スマホ優先。撮影 → 候補を職員が確定 → 影響する献立</div>
+          <div class="vs"><a href="allergen-check.html?tab=shoot">撮影</a><a href="allergen-check.html">確認</a><a href="allergen-check.html?tab=done">記録の結果</a></div></div></div>
+      </div>
+    </section>
+
+    <section class="group">
+      <h2>設定（タブ）</h2>
+      <div class="list">
+        <div class="card item" style="grid-column:1/-1"><span class="ic"><span class="material-symbols-outlined">settings</span></span><div><div class="t"><a href="settings.html">設定</a> <span class="id">SC-03 / SC-04 / SC-12</span><span class="prio prio-must">必須</span></div><div class="d">条件設定（人数・月の予算・曜日・再確認・重複ルール）／避ける品目／パスワード変更</div>
+          <div class="vs"><a href="settings.html">条件設定</a><a href="settings.html?tab=avoid">避ける品目</a><a href="settings.html?tab=avoid&amp;dlg=1">品目を外す確認</a><a href="settings.html?tab=pw">パスワード変更</a></div></div></div>
+      </div>
+    </section>
+
+    <div class="card notes">
+      <b style="color:var(--text)">デザインの方針</b><br>
+      ・MUI（Material Design）に合わせた部品（AppBar・Drawer・Card・Chip・Alert・Stepper・Dialog）。実装では MUI のテーマで同じ色を指定する想定です<br>
+      ・主色 <span class="chip" style="background:#1565c0;color:#fff;height:20px">#1565C0</span> と白が基調。アレルゲンの状態は色と文字の両方で示します（確認済み＝緑・参考／要再確認＝黄・不明＝赤）<br>
+      ・おやつの分類は色分けしたラベル（しょっぱい＝茶・あまい＝ピンク・のどごし＝水色）<br>
+      ・PC とスマホ（幅 390px 前後）の両方で確認済み。ブラウザの幅を変えると表示が切り替わります
+    </div>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+</body>
+</html>

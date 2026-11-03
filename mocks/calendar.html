@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>献立カレンダー | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .cal-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--divider); }
+  .cal-head .h6 { min-width: 150px; text-align: center; }
+  .legend { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .cal { display: grid; grid-template-columns: 0.6fr repeat(5, 1fr) 0.6fr; }
+  .dow { padding: 8px; font-size: 12px; font-weight: 500; color: var(--text-2); text-align: center; border-bottom: 1px solid var(--divider); background: #fafbfc; }
+  .dow.sun { color: var(--error); } .dow.sat { color: var(--primary); }
+  .cell { min-height: 118px; padding: 6px 8px; border-right: 1px solid var(--divider); border-bottom: 1px solid var(--divider); font-size: 12px; }
+  .cell:nth-child(7n) { border-right: 0; }
+  .cell .d { font-weight: 500; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .cell.off { background: #fafbfc; color: var(--text-3); }
+  .cell.other { background: #fafbfc; color: var(--text-3); }
+  .cell.today .d span:first-child { background: var(--primary); color: #fff; border-radius: 50%; width: 24px; height: 24px; display: inline-grid; place-items: center; }
+  .cell .hol { font-size: 11px; color: var(--error); }
+  .snack { display: block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-size: 11px; line-height: 1.5; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .snack:hover { text-decoration: none; filter: brightness(.97); }
+  .s-salty { background: var(--salty-bg); } .s-sweet { background: var(--sweet-bg); } .s-smooth { background: var(--smooth-bg); }
+  .s-bad { background: var(--error); color: #fff; font-weight: 700; }
+  .draft .snack { border: 1px dashed rgba(0,0,0,.25); }
+  .wk-state { font-size: 10px; margin-left: auto; color: var(--text-2); }
+</style>
+</head>
+<body data-nav="menus">
+<main class="main">
+  <div class="container">
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">献立一覧</h1>
+        <p class="muted">月のカレンダーで、出したおやつを見渡せます。</p>
+      </div>
+      <div class="view-toggle">
+        <a href="menus.html"><span class="material-symbols-outlined" style="font-size:18px">view_list</span>一覧</a>
+        <a class="on" href="calendar.html"><span class="material-symbols-outlined" style="font-size:18px">calendar_month</span>カレンダー</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cal-head">
+        <button class="icon-btn"><span class="material-symbols-outlined">chevron_left</span></button>
+        <h2 class="h6">2026年 11月</h2>
+        <button class="icon-btn"><span class="material-symbols-outlined">chevron_right</span></button>
+        <button class="btn btn-outlined btn-sm">今月</button>
+        <div class="legend hide-sm">
+          <span><i style="background:var(--salty-bg)"></i>しょっぱい</span>
+          <span><i style="background:var(--sweet-bg)"></i>あまい</span>
+          <span><i style="background:var(--smooth-bg)"></i>のどごし</span>
+          <span><i style="border:1px dashed rgba(0,0,0,.4)"></i>下書き</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="cal" style="min-width:860px">
+          <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
+
+          <div class="cell off"><div class="d">1</div></div>
+          <div class="cell"><div class="d"><span>2</span><span class="wk-state">確定</span></div><a class="snack s-salty" href="menu-step4.html">スティックポテト</a><a class="snack s-smooth" href="menu-step4.html">ぶどうゼリー</a></div>
+          <div class="cell off today"><div class="d"><span>3</span><span class="hol">文化の日</span></div></div>
+          <div class="cell"><div class="d">4</div><a class="snack s-sweet" href="menu-step4.html">動物ビスケット</a><a class="snack s-smooth" href="menu-step4.html">りんごジュース</a></div>
+          <div class="cell"><div class="d">5</div><a class="snack s-salty" href="menu-step4.html">野菜クラッカー</a><a class="snack s-smooth" href="menu-step4.html">みかんゼリー</a></div>
+          <div class="cell"><div class="d">6</div><a class="snack s-sweet" href="menu-step4.html">ミニどら焼き</a><a class="snack s-smooth" href="menu-step4.html">麦茶</a></div>
+          <div class="cell off"><div class="d">7</div></div>
+
+          <div class="cell off"><div class="d">8</div></div>
+          <div class="cell draft"><div class="d"><span>9</span><span class="wk-state">下書き</span></div><a class="snack s-salty" href="menu-step4.html">うすしおポテトチップス</a><a class="snack s-smooth" href="menu-step4.html">ぶどうゼリー</a></div>
+          <div class="cell draft"><div class="d">10</div><a class="snack s-salty" href="menu-step4.html">塩せんべい</a><a class="snack s-smooth" href="menu-step4.html">みかんゼリー</a></div>
+          <div class="cell draft"><div class="d">11</div><a class="snack s-bad" href="menu-step4.html">⚠ ごま揚げせんべい</a><a class="snack s-smooth" href="menu-step4.html">りんごゼリー</a></div>
+          <div class="cell draft"><div class="d">12</div><a class="snack s-salty" href="menu-step4.html">のりしおポップコーン</a><a class="snack s-smooth" href="menu-step4.html">ぶどうゼリー</a></div>
+          <div class="cell draft"><div class="d">13</div><a class="snack s-sweet" href="menu-step4.html">いちごミニ大福</a><a class="snack s-smooth" href="menu-step4.html">オレンジジュース</a></div>
+          <div class="cell off"><div class="d">14</div></div>
+
+          <div class="cell off"><div class="d">15</div></div>
+          <div class="cell"><div class="d">16</div><a class="btn btn-sm" href="menu-step1.html" style="margin-top:6px;padding:0 6px"><span class="material-symbols-outlined">add</span>献立を作る</a></div>
+          <div class="cell"><div class="d">17</div></div>
+          <div class="cell"><div class="d">18</div></div>
+          <div class="cell"><div class="d">19</div></div>
+          <div class="cell"><div class="d">20</div></div>
+          <div class="cell off"><div class="d">21</div></div>
+
+          <div class="cell off"><div class="d">22</div></div>
+          <div class="cell off"><div class="d"><span>23</span><span class="hol">勤労感謝の日</span></div></div>
+          <div class="cell"><div class="d">24</div></div>
+          <div class="cell"><div class="d">25</div></div>
+          <div class="cell"><div class="d">26</div></div>
+          <div class="cell"><div class="d">27</div></div>
+          <div class="cell off"><div class="d">28</div></div>
+
+          <div class="cell off"><div class="d">29</div></div>
+          <div class="cell"><div class="d">30</div></div>
+          <div class="cell other"><div class="d">12/1</div></div>
+          <div class="cell other"><div class="d">2</div></div>
+          <div class="cell other"><div class="d">3</div></div>
+          <div class="cell other"><div class="d">4</div></div>
+          <div class="cell other"><div class="d">5</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+</body>
+</html>

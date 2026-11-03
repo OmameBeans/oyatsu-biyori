@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ja"><!-- ラベルの言語に合わせる（英語なら "en"） -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><!-- TITLE --></title>
+<script>
+/* render_png.py 用：URL の #shot でキャンバスだけを表示、#dark でダークテーマにする */
+(function () {
+  var h = location.hash, d = document.documentElement;
+  if (/dark/.test(h)) d.setAttribute('data-theme', 'dark');
+  if (/shot/.test(h)) d.classList.add('shot');
+})();
+</script>
+<style>
+/* 方眼紙テーマ（stack-diagram と同じトークン）。色・フォントは :root のトークンだけで調整する */
+:root {
+  color-scheme: light;
+  --color-paper:   oklch(98.5% 0.004 250);
+  --color-paper-2: oklch(96.5% 0.005 252);
+  --color-rule:    oklch(93% 0.007 255);    /* 方眼 */
+  --color-rule-2:  oklch(83% 0.011 255);    /* 細い枠線 */
+  --color-muted:   oklch(56% 0.013 255);
+  --color-neutral: oklch(46% 0.015 255);    /* 通常の遷移 */
+  --color-ink-2:   oklch(34% 0.018 257);
+  --color-ink:     oklch(24% 0.020 258);
+  --color-accent:  oklch(58% 0.20 256);     /* 主な流れ。色は1つだけ */
+  --color-accent-soft: oklch(58% 0.20 256 / .45);
+  --color-accent-tint: oklch(97% 0.012 256 / .5);
+  --color-area-tint:   oklch(96.5% 0.005 252 / .6);
+  /* ワイヤーフレーム（サムネイルがない画面）。画面は両テーマとも白なので固定色 */
+  --wf-ink:  oklch(80% 0.010 255);
+  --wf-line: oklch(90% 0.008 255);
+  --wf-card: oklch(95.5% 0.006 255);
+  --wf-side: oklch(94.5% 0.008 255);
+  /* 日本語の字形：JP フォントを明示しないと Linux で中国語の字形になる */
+  --font-display: "Geist", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  /* 英数字は等幅、日本語はゴシックで出す（同梱の JetBrains Mono はラテン文字だけ） */
+  --font-mono: "JetBrains Mono", "Hiragino Sans", "Yu Gothic UI", "Noto Sans CJK JP", "Noto Sans JP", ui-monospace, monospace;
+  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px;
+  --radius-card: 10px; --radius-group: 12px;
+  --color-veil: oklch(98.5% 0.004 250 / .78);
+}
+/* ダーク：<html data-theme="dark">。画面（サムネイル）は明るい UI のまま白い枠に載せる */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper:   oklch(18% 0.012 255);
+  --color-paper-2: oklch(22% 0.014 255);
+  --color-rule:    oklch(24% 0.013 255);
+  --color-rule-2:  oklch(38% 0.018 255);
+  --color-muted:   oklch(65% 0.014 255);
+  --color-neutral: oklch(72% 0.012 255);
+  --color-ink-2:   oklch(85% 0.010 255);
+  --color-ink:     oklch(94% 0.008 255);
+  --color-accent:  oklch(70% 0.16 256);
+  --color-accent-soft: oklch(70% 0.16 256 / .5);
+  --color-accent-tint: oklch(28% 0.045 256 / .35);
+  --color-area-tint:   oklch(22% 0.014 255 / .6);
+  --color-veil: oklch(18% 0.012 255 / .78);
+}
+@font-face { font-family:"Geist"; font-style:normal; font-weight:100 900; font-display:swap;
+  src:url(data:font/woff2;base64,%%FONT_DISPLAY%%) format("woff2"); }
+@font-face { font-family:"JetBrains Mono"; font-style:normal; font-weight:100 800; font-display:swap;
+  src:url(data:font/woff2;base64,%%FONT_JBM%%) format("woff2"); }
+.kicker, .screen .sub, .sid, .el, .legend, .foot, .g-label .gsub { letter-spacing: 0.03em; }
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { overflow-x: clip; }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); padding: var(--space-xl) var(--space-lg) var(--space-2xl); }
+.page { width: fit-content; max-width: 100%; margin: 0 auto; }
+
+.head { display:grid; grid-template-columns: 1fr auto; gap: var(--space-lg); align-items:end;
+  padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-rule-2); margin-bottom: var(--space-lg); }
+.kicker { font-family: var(--font-mono); font-size: 11px; color: var(--color-accent); margin-bottom: var(--space-sm); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 4vw, 30px); line-height: 1.3; }
+.lede { max-width: 340px; font-size: 12px; line-height: 1.7; color: var(--color-neutral); padding-bottom: 2px; }
+@media (max-width: 680px) { .head { grid-template-columns: 1fr; align-items:start; } .lede { max-width:none; } }
+
+.scroller { overflow-x: auto; border: 1px solid var(--color-rule-2); border-radius: var(--radius-card); }
+/* キャンバスの大きさ：ここ・svg.edges・viewBox の3か所をそろえる */
+.canvas { position: relative; width: 1256px; height: 546px; background: var(--color-paper);
+  background-image:
+    linear-gradient(var(--color-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-rule) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px; }
+
+/* グループ：area＝公開範囲など / shell＝共通レイアウト（サイドバーなど） / sub＝1画面の中のタブ・手順 */
+.group { position:absolute; border-radius: var(--radius-group); }
+.group.area  { border:1.5px solid var(--color-rule-2); background: var(--color-area-tint); }
+.group.shell { border:1.5px solid var(--color-accent-soft); background: var(--color-accent-tint); }
+.group.sub   { border:1.5px dashed var(--color-rule-2); }
+.g-label { position:absolute; top:12px; left:12px; display:flex; align-items:baseline; gap:6px;
+  font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  color: var(--color-neutral); white-space: nowrap; }
+.group.shell > .g-label { color: var(--color-accent); }
+.g-label .gsub { font-family: var(--font-mono); font-size: 9.5px; font-weight: 400; color: var(--color-muted); }
+
+/* 画面ノード：幅 176。frame（画面）160×100 の下に名前と URL */
+.screen { position:absolute; width:176px; text-align:center; }
+.frame { position:relative; width:160px; height:100px; margin:0 auto; overflow:hidden;
+  background:#fff; border:1px solid var(--color-rule-2); border-radius:6px;
+  box-shadow: 0 1px 2px oklch(24% 0.02 258 / 0.06); transition: border-color .15s cubic-bezier(0.16,1,0.3,1); }
+.screen:hover .frame { border-color: var(--color-accent); }
+/* PC：ブラウザのタイトルバー（高さ 8） */
+.frame.pc::before { content:""; position:absolute; z-index:2; left:0; top:0; right:0; height:8px;
+  background:
+    radial-gradient(circle at 6px 4px, oklch(80% .01 255) 1.6px, transparent 2px),
+    radial-gradient(circle at 12px 4px, oklch(80% .01 255) 1.6px, transparent 2px),
+    radial-gradient(circle at 18px 4px, oklch(80% .01 255) 1.6px, transparent 2px),
+    oklch(96% .005 255);
+  border-bottom:1px solid oklch(90% .008 255); }
+/* スマホ：56×100 */
+.frame.sp { width:56px; border-radius:9px; border:1.5px solid oklch(70% .012 255); }
+.frame img { position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; object-position:top; }
+.frame.pc img { top:8px; height:calc(100% - 8px); }
+/* ワイヤーフレーム（サムネイルなし）：wf ＝ 普通のページ、wf side ＝ サイドバーつき */
+.frame.wf { --x:12px; --w:136px; --sb:0px;
+  background:
+    linear-gradient(var(--wf-ink),var(--wf-ink)) var(--x) 20px / 52px 6px no-repeat,
+    linear-gradient(var(--wf-line),var(--wf-line)) var(--x) 34px / var(--w) 4px no-repeat,
+    linear-gradient(var(--wf-line),var(--wf-line)) var(--x) 43px / calc(var(--w) - 28px) 4px no-repeat,
+    linear-gradient(var(--wf-card),var(--wf-card)) var(--x) 56px / calc(var(--w) / 2 - 3px) 34px no-repeat,
+    linear-gradient(var(--wf-card),var(--wf-card)) calc(var(--x) + var(--w) / 2 + 3px) 56px / calc(var(--w) / 2 - 3px) 34px no-repeat,
+    linear-gradient(var(--wf-side),var(--wf-side)) 0 8px / var(--sb) 100% no-repeat,
+    #fff; }
+.frame.wf.side { --x:40px; --w:108px; --sb:30px; }
+.frame.sp.wf { --x:7px; --w:40px; }
+/* ダイアログ：枠を破線に。wf と組み合わせると、暗くした画面の上にダイアログを描く */
+.frame.modal { border-style:dashed; border-color: var(--color-neutral); }
+.frame.modal.wf::after { content:""; position:absolute; z-index:1; left:38px; right:38px; top:28px; bottom:18px;
+  background:
+    linear-gradient(var(--wf-ink),var(--wf-ink)) 8px 8px / 40px 5px no-repeat,
+    linear-gradient(var(--wf-line),var(--wf-line)) 8px 20px / 68px 4px no-repeat,
+    linear-gradient(var(--wf-line),var(--wf-line)) 8px 28px / 56px 4px no-repeat,
+    linear-gradient(oklch(62% .15 256),oklch(62% .15 256)) right 8px bottom 7px / 22px 8px no-repeat,
+    #fff;
+  border-radius:4px; box-shadow: 0 0 0 200px oklch(30% .02 258 / .22); }
+/* 余裕があれば作る画面など：薄く・破線で */
+.screen.planned .frame { border-style:dashed; }
+.screen.planned .frame::after { content:""; position:absolute; z-index:2; inset:0;
+  background: color-mix(in oklch, var(--color-paper) 50%, transparent); box-shadow:none; }  /* 札（.badge）は膜の上に出る */
+.badge { position:absolute; z-index:3; top:12px; right:5px; font-style:normal;
+  font-family: var(--font-mono); font-size:9px; line-height:1.5; padding:0 5px; border-radius:3px;
+  background: oklch(34% 0.018 257); color:#fff; }  /* 画面は両テーマとも白なので固定色 */
+
+.screen .name { font-family: var(--font-display); font-weight:600; font-size:12.5px; margin-top: var(--space-sm); line-height:1.45; }
+.sid { font-family: var(--font-mono); font-weight:500; font-size:9.5px; color: var(--color-accent); margin-right:5px; }
+.screen .sub { font-family: var(--font-mono); font-size:9.5px; color: var(--color-muted); margin-top:2px; }
+.screen .name > span, .screen .sub > span { background: var(--color-veil); backdrop-filter: blur(1.5px);
+  padding: 0 var(--space-xs); border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+
+svg.edges { position:absolute; inset:0; width:1256px; height:546px; pointer-events:none; }
+.e  { stroke: var(--color-accent); stroke-width:1.6; fill:none; }   /* 主な流れ */
+.n  { stroke: var(--color-neutral); stroke-width:1.4; fill:none; }  /* 通常の遷移 */
+.dash { stroke-dasharray:4 5; }                                     /* 条件つき・自動の遷移 */
+.start { fill: var(--color-accent); }                               /* 入口 */
+.el { font-family: var(--font-mono); font-size:10.5px; fill: var(--color-neutral);
+  paint-order: stroke; stroke: var(--color-paper); stroke-width:4px; stroke-linejoin:round; }
+.el.a { fill: var(--color-accent); }
+
+.legend { display:flex; gap: var(--space-lg); align-items:center; margin-top: var(--space-md);
+  font-family: var(--font-mono); font-size:10px; color: var(--color-muted); flex-wrap:wrap; }
+.legend .sw { display:inline-block; width:30px; vertical-align:middle; margin-right:6px;
+  border-top:1.6px solid var(--color-accent); }
+.legend .sw.n { border-color: var(--color-neutral); border-top-width:1.4px; }
+.legend .sw.dash { border-top-style: dashed; }
+.legend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background: var(--color-accent);
+  vertical-align:middle; margin-right:6px; }
+
+/* 遷移一覧（任意）：図と同じ内容を文字で。検索・読み上げ用 */
+.tx { margin-top: var(--space-xl); border-collapse: collapse; font-size:12px; width:100%; }
+.tx caption { text-align:left; font-family: var(--font-display); font-weight:600; font-size:13px; margin-bottom: var(--space-sm); }
+.tx th, .tx td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--color-rule-2); vertical-align:top; }
+.tx th { font-family: var(--font-mono); font-size:10px; font-weight:500; color: var(--color-muted); }
+.tx td.k { font-family: var(--font-mono); font-size:10.5px; color: var(--color-neutral); white-space:nowrap; }
+
+.foot { margin-top: var(--space-xl); padding-top: var(--space-md); border-top: 1px solid var(--color-rule-2);
+  display:flex; justify-content:space-between; gap: var(--space-md); flex-wrap:wrap;
+  font-family: var(--font-mono); font-size:10px; color: var(--color-muted); }
+.foot a { color: inherit; text-decoration-color: var(--color-rule-2); text-underline-offset: 2px; }
+.foot a:hover { color: var(--color-accent); }
+
+/* 撮影モード（#shot）：キャンバスだけを左上に */
+.shot body { padding:0; }
+.shot .page { width:auto; margin:0; }
+.shot .head, .shot .legend, .shot .tx, .shot .foot { display:none; }
+.shot .scroller { border:0; border-radius:0; overflow:visible; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="head">
+    <div>
+      <div class="kicker"><!-- KICKER: 例 screen-flow / プロジェクト名 / 2026-11 --></div>
+      <h1><!-- TITLE --></h1>
+    </div>
+    <p class="lede"><!-- LEDE: 1〜2文。不要なら <p> ごと消す --></p>
+  </header>
+
+  <div class="scroller">
+  <div class="canvas">
+
+    <!-- GROUPS ============================================================ -->
+    <!-- area ＝ 公開範囲・ログイン後など / shell ＝ 共通レイアウト（中の画面どうしはサイドバーで行き来する。線は引かない）
+         sub ＝ 1画面の中のタブ・手順（shell や area の中に入れ子にする）
+         ラベル：<b class="sid">画面ID</b>名前<span class="gsub">/url</span>
+         座標のルール：references/geometry.md -->
+    <div class="group area" style="left:40px; top:44px; width:464px; height:224px;">
+      <div class="g-label">ログイン不要</div>
+    </div>
+    <div class="group shell" style="left:528px; top:44px; width:704px; height:478px;">
+      <div class="g-label"><b class="sid">S-02</b>ホーム<span class="gsub">左サイドバーで移動</span></div>
+    </div>
+    <div class="group sub" style="left:552px; top:274px; width:424px; height:224px;">
+      <div class="g-label"><b class="sid">S-05</b>設定（タブ）<span class="gsub">/settings</span></div>
+    </div>
+
+    <!-- EDGES ============================================================= -->
+    <svg class="edges" viewBox="0 0 1256 546" aria-hidden="true">
+      <defs>
+        <!-- context-stroke で線と同じ色になる（ダークでも自動） -->
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/>
+        </marker>
+      </defs>
+      <!-- 入口 -->
+      <circle class="start" cx="22" cy="150" r="5"/>
+      <path class="e" d="M28 150 H66" marker-end="url(#ar)"/>
+      <!-- 主な流れ -->
+      <path class="e" d="M238 150 H358" marker-end="url(#ar)"/>
+      <text class="el a" x="298" y="142" text-anchor="middle">ログイン</text>
+      <!-- スマホの frame は幅 56 なので、横の線は中心 ±34 で止める -->
+      <path class="e" d="M426 150 H554" marker-end="url(#ar)"/>
+      <path class="e" d="M726 150 H794" marker-end="url(#ar)"/>
+      <text class="el a" x="760" y="142" text-anchor="middle">開く</text>
+      <!-- 往復（ダイアログを開いて閉じる）：marker-start も付ける -->
+      <path class="n" d="M972 150 H1028" marker-start="url(#ar)" marker-end="url(#ar)"/>
+      <text class="el" x="1000" y="142" text-anchor="middle">編集</text>
+      <!-- グループから出る線 ＝ その中のどの画面からでも -->
+      <path class="n dash" d="M528 400 H392 V250" marker-end="url(#ar)"/>
+      <text class="el" x="460" y="392" text-anchor="middle">未ログイン</text>
+    </svg>
+
+    <!-- SCREENS =========================================================== -->
+    <!-- left = 中心X - 88。frame の class：pc | sp（スマホ）| modal（ダイアログ）、
+         サムネイルがあれば <img src="%%ICON_<名前>%%" alt="">、なければ wf（side でサイドバーつき）
+         .screen に planned を付けると薄く・破線（未着手・余裕があれば）。<i class="badge">…</i> で右上に札 -->
+    <div class="screen" style="left:64px;top:100px">
+      <div class="frame pc wf"></div>
+      <div class="name"><span><b class="sid">S-00</b>ランディング</span></div><div class="sub"><span>/</span></div>
+    </div>
+    <div class="screen" style="left:304px;top:100px">
+      <div class="frame sp wf"></div>
+      <div class="name"><span><b class="sid">S-01</b>ログイン</span></div><div class="sub"><span>/login</span></div>
+    </div>
+    <div class="screen" style="left:552px;top:100px">
+      <div class="frame pc wf side"></div>
+      <div class="name"><span><b class="sid">S-03</b>一覧</span></div><div class="sub"><span>/items</span></div>
+    </div>
+    <div class="screen" style="left:792px;top:100px">
+      <div class="frame pc wf side"></div>
+      <div class="name"><span><b class="sid">S-04</b>詳細</span></div><div class="sub"><span>/items/{id}</span></div>
+    </div>
+    <div class="screen" style="left:1032px;top:100px">
+      <div class="frame pc modal wf side"></div>
+      <div class="name"><span><b class="sid">S-04a</b>編集</span></div><div class="sub"><span>ダイアログ</span></div>
+    </div>
+    <div class="screen" style="left:576px;top:330px">
+      <div class="frame pc wf side"></div>
+      <div class="name"><span><b class="sid">S-05a</b>一般</span></div><div class="sub"><span>タブ</span></div>
+    </div>
+    <div class="screen planned" style="left:776px;top:330px">
+      <div class="frame pc wf side"><i class="badge">余裕があれば</i></div>
+      <div class="name"><span><b class="sid">S-05b</b>通知</span></div><div class="sub"><span>タブ</span></div>
+    </div>
+
+  </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot"></span>入口</span>
+    <span><span class="sw"></span>主な流れ</span>
+    <span><span class="sw n"></span>遷移</span>
+    <span><span class="sw n dash"></span>条件つき・自動</span>
+    <span>枠の中どうしはサイドバーで移動（線は省略）</span>
+  </div>
+
+  <!-- 遷移一覧（任意）。いらなければ table ごと消す -->
+  <table class="tx">
+    <caption>遷移一覧</caption>
+    <thead><tr><th>遷移元</th><th>きっかけ</th><th>遷移先</th><th>種類</th></tr></thead>
+    <tbody>
+      <tr><td>S-00 ランディング</td><td>「ログイン」ボタン</td><td>S-01 ログイン</td><td class="k">主な流れ</td></tr>
+      <tr><td>S-02 ホームの全画面</td><td>未ログインで開く</td><td>S-01 ログイン</td><td class="k">自動</td></tr>
+    </tbody>
+  </table>
+
+  <div class="foot">
+    <span><!-- FOOT-LEFT: 作成者 / 出典（例：docs/requirements/05-screens.md・mocks/） --></span>
+    <span><!-- FOOT-RIGHT: 使ったアイコンがあれば出典 --> based on <a href="https://github.com/caru-ini/stack-diagram" target="_blank" rel="noopener">stack-diagram</a></span>
+  </div>
+
+</div>
+</body>
+</html>

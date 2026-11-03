@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>献立作成：献立案とチャット | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .main { padding-bottom: 96px; }
+  .container { max-width: 1440px; }
+  .mock-switch { margin-bottom: 16px; background: #e8edf3; border-radius: 8px; padding: 4px; display: inline-flex; gap: 2px; }
+  .mock-switch button { border: 0; background: none; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; }
+  .mock-switch button.active { background: #fff; color: var(--primary); font-weight: 500; box-shadow: var(--shadow-1); }
+  body:not([data-state="making"]) .state-making { display: none; }
+  body[data-state="making"] .state-plan { display: none; }
+  body:not([data-state="confirm"]) .state-confirm { display: none; }
+
+  /* 要望の理解 */
+  .understood { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .u-item { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 12px; border-radius: 16px; background: var(--primary-50); border: 1px solid #bbdefb; font-size: 13px; }
+  .u-item b { color: var(--primary-dark); font-weight: 700; }
+  .u-item .mini-input { width: 52px; height: 24px; border: 1px solid rgba(0,0,0,.23); border-radius: 4px; text-align: right; padding: 0 6px; font: inherit; font-size: 13px; background: #fff; }
+  .u-item.no-edit { padding-right: 12px; }
+
+  /* 予算 */
+  .budget { display: grid; grid-template-columns: 1fr 1fr auto; gap: 24px; align-items: center; padding: 16px 20px; }
+  .budget .b-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--text-2); margin-bottom: 6px; }
+  .budget .b-value { font-size: 20px; font-weight: 500; color: var(--text); }
+  .budget .b-value small { font-size: 13px; color: var(--text-2); font-weight: 400; }
+  .swaps { border-top: 1px solid var(--divider); padding: 12px 20px 16px; background: #fafcff; border-radius: 0 0 8px 8px; }
+  .swap { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; border: 1px solid var(--divider); border-radius: 8px; margin-top: 8px; }
+  .swap .s-text { flex: 1; min-width: 0; }
+  .swap .s-text .caption { display: block; }
+  .swap .s-total { font-weight: 700; white-space: nowrap; }
+
+  /* 献立とチャット */
+  .work { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; margin-top: 16px; }
+  .days { display: flex; flex-direction: column; gap: 12px; }
+  .day { overflow: hidden; }
+  .day-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--divider); background: #fafbfc; flex-wrap: wrap; }
+  .day-head .d-date { font-size: 16px; font-weight: 700; }
+  .day-head .d-people { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .day-head .d-people .material-symbols-outlined { font-size: 18px; }
+  .day-head .d-people.changed { color: var(--primary); font-weight: 700; }
+  .day-head .d-total { margin-left: auto; text-align: right; font-size: 13px; color: var(--text-2); }
+  .day-head .d-total b { font-size: 16px; color: var(--text); font-weight: 500; }
+  .day.has-error { outline: 2px solid var(--error); }
+  .day.has-error .day-head { background: var(--error-bg); }
+  .item { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 16px; border-bottom: 1px dashed var(--divider); align-items: start; }
+  .item .i-name { font-weight: 700; }
+  .item .i-name .status { margin-left: 6px; vertical-align: 1px; }
+  .item .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .item .i-calc { text-align: right; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .item .i-calc b { display: block; font-size: 15px; color: var(--text); font-weight: 500; }
+  .item.blocked .i-name { text-decoration: line-through; color: var(--text-2); }
+  .tag-hit { background: var(--primary-light) !important; color: var(--primary-dark) !important; }
+  .reason { display: flex; gap: 10px; padding: 12px 16px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
+  .reason .material-symbols-outlined { color: var(--primary); font-size: 18px; margin-top: 2px; }
+  .reason .fixed { display: block; margin-top: 4px; color: #014361; background: var(--info-bg); border-radius: 4px; padding: 4px 8px; }
+  .day .alert { margin: 0 16px 12px; padding: 10px 12px; font-size: 13px; }
+  .alts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .alt { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 6px; padding: 8px 10px; border: 1px solid rgba(211,47,47,.25); color: var(--text); }
+  .alt .a-text { flex: 1; min-width: 0; }
+
+  .chat { position: sticky; top: calc(var(--appbar-h) + 16px); display: flex; flex-direction: column; height: calc(100vh - var(--appbar-h) - 120px); min-height: 520px; }
+  .chat-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--divider); }
+  .chat-head .ai { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; }
+  .chat-log { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #fafbfc; }
+  .msg { max-width: 88%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.7; }
+  .msg.ai { background: #fff; border: 1px solid var(--divider); border-top-left-radius: 4px; }
+  .msg.me { align-self: flex-end; background: var(--primary); color: #fff; border-top-right-radius: 4px; }
+  .msg .time { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
+  .msg ol { margin: 6px 0 0; padding-left: 20px; }
+  .chat-input { padding: 12px; border-top: 1px solid var(--divider); }
+  .chat-input .row { flex-wrap: nowrap; align-items: flex-end; }
+  .chat-input .textarea { min-height: 44px; height: 44px; font-size: 14px; padding: 10px 12px; resize: none; }
+  .chat-input .caption { margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+
+  .actionbar { position: fixed; left: var(--drawer-w); right: 0; bottom: 0; z-index: 25; background: #fff; border-top: 1px solid var(--divider); box-shadow: 0 -2px 8px rgba(0,0,0,.06); display: flex; align-items: center; gap: 12px; padding: 12px 32px; }
+  .actionbar .info { flex: 1; font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+  .actionbar .info .material-symbols-outlined { color: var(--success); font-size: 18px; }
+
+  /* 作成中 */
+  .making { max-width: 560px; margin: 40px auto; padding: 32px; text-align: center; }
+  .phase { display: flex; align-items: center; gap: 12px; padding: 12px 0; text-align: left; border-bottom: 1px solid var(--divider); }
+  .phase:last-child { border-bottom: 0; }
+  .phase .material-symbols-outlined { font-size: 24px; }
+  .phase.done { color: var(--text-2); }
+  .phase.done .material-symbols-outlined { color: var(--success); font-variation-settings: "FILL" 1; }
+  .phase.now { font-weight: 700; }
+  .phase.now .material-symbols-outlined { color: var(--primary); animation: spin 1.2s linear infinite; }
+  .phase.wait { color: var(--text-3); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .confirm-list { margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .confirm-list li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .confirm-list li .d { width: 72px; color: var(--text-2); font-size: 13px; flex: none; }
+
+  .mobile-tabs { display: none; }
+  @media (max-width: 1200px) {
+    .budget { grid-template-columns: 1fr 1fr; }
+    .budget .b-action { grid-column: 1 / -1; }
+  }
+  @media (max-width: 900px) {
+    .budget { grid-template-columns: 1fr; gap: 14px; padding: 14px 16px; }
+    .mobile-tabs { display: flex; background: #fff; border-radius: 8px 8px 0 0; margin-top: 16px; box-shadow: var(--shadow-1); }
+    .mobile-tabs .tab { flex: 1; justify-content: center; }
+    .work { grid-template-columns: 1fr; margin-top: 0; }
+    body[data-mtab="menu"] .chat { display: none; }
+    body[data-mtab="chat"] .days { display: none; }
+    .chat { position: static; height: 70vh; border-radius: 0 0 8px 8px; }
+    .item { grid-template-columns: 1fr auto; }
+    .item .i-cat { grid-column: 1 / -1; }
+    .actionbar { left: 0; padding: 10px 16px; }
+    .actionbar .info { display: none; }
+    .actionbar .btn { flex: 1; }
+    .swap { flex-wrap: wrap; }
+    .swap .btn { margin-left: auto; }
+  }
+</style>
+</head>
+<body data-nav="menus" data-state="plan" data-mtab="menu" data-no-banner="1">
+<main class="main">
+  <div class="container">
+    <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
+        <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
+      </div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="stepper">
+        <a class="step done" href="menu-step1.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">チラシ取り込み</span></a>
+        <span class="step-line"></span>
+        <a class="step done" href="menu-step2.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">今週の商品</span></a>
+        <span class="step-line"></span>
+        <a class="step done" href="menu-step3.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">要望の入力</span></a>
+        <span class="step-line"></span>
+        <a class="step active" href="menu-step4.html"><span class="dot">4</span><span class="label">献立案とチャット</span></a>
+      </div>
+    </div>
+
+    <div class="mock-switch no-print">
+      <button data-state="plan" class="active">献立案</button>
+      <button data-state="making">作成中</button>
+      <button data-state="confirm">確定の確認</button>
+    </div>
+
+    <!-- 作成中 -->
+    <div class="card making state-making">
+      <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary)">auto_awesome</span>
+      <h2 class="h6 mt-8">献立案を作っています</h2>
+      <p class="muted mb-16">30秒ほどかかります。このままお待ちください。</p>
+      <div class="progress mb-16"><span style="width:55%"></span></div>
+      <div class="phase done"><span class="material-symbols-outlined">check_circle</span>要望を読み取っています</div>
+      <div class="phase now"><span class="material-symbols-outlined">progress_activity</span>献立を考えています…</div>
+      <div class="phase wait"><span class="material-symbols-outlined">radio_button_unchecked</span>条件を確かめて、直しています</div>
+    </div>
+
+    <div class="state-plan">
+      <!-- 要望の理解 -->
+      <div class="card mb-16">
+        <div class="card-head" style="padding-bottom:10px">
+          <h2 class="h6"><span class="material-symbols-outlined" style="color:var(--primary)">psychology</span> 要望をこう理解しました</h2>
+          <a class="btn btn-sm" href="menu-step3.html"><span class="material-symbols-outlined">edit</span>要望を直す</a>
+        </div>
+        <div class="card-body">
+          <div class="understood">
+            <span class="u-item no-edit"><b>毎日</b>しょっぱいもの ＋ ゼリー系</span>
+            <span class="u-item"><b>水曜</b>人数 <input class="mini-input num" value="48"> 人</span>
+            <span class="u-item no-edit"><b>金曜</b>誕生日会なので豪華にする</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 予算 -->
+      <div class="card">
+        <div class="budget">
+          <div>
+            <div class="b-label"><span>週の実績 / 週の予算</span><span>あと <b class="num" style="color:var(--text)">1,104 円</b></span></div>
+            <div class="b-value num mb-8">13,896 <small>/ 15,000 円</small></div>
+            <div class="meter"><span style="width:92.6%"></span></div>
+          </div>
+          <div>
+            <div class="b-label"><span>11月の実績 / 月の予算</span><span>作成中の献立を含む</span></div>
+            <div class="b-value num mb-8">25,516 <small>/ 60,000 円</small></div>
+            <div class="meter"><span style="width:42.5%"></span></div>
+          </div>
+          <div class="b-action"><button class="btn btn-outlined"><span class="material-symbols-outlined">savings</span>予算に合わせる</button></div>
+        </div>
+        <div class="swaps">
+          <div class="caption">週の予算に近づける入れ替え案（選ぶと献立に反映します）</div>
+          <div class="swap">
+            <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
+            <div class="s-text">月曜の「ぶどうゼリー」を「果肉入りフルーツゼリー 6個入（228円×10）」に<span class="caption">確認済みの商品です</span></div>
+            <span class="s-total num">→ 14,930 円</span>
+            <button class="btn btn-sm btn-outlined">選ぶ</button>
+          </div>
+          <div class="swap">
+            <span class="material-symbols-outlined" style="color:var(--primary)">add_circle</span>
+            <div class="s-text">火曜に「野菜クラッカー 20袋（548円×2）」を追加<span class="caption">確認済みの商品です</span></div>
+            <span class="s-total num">→ 14,992 円</span>
+            <button class="btn btn-sm btn-outlined">選ぶ</button>
+          </div>
+          <div class="swap">
+            <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
+            <div class="s-text">水曜の「りんごゼリー」を「りんごジュース 24本（698円×2）」に<span class="caption">確認済みの商品です</span></div>
+            <span class="s-total num">→ 14,224 円</span>
+            <button class="btn btn-sm btn-outlined">選ぶ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs mobile-tabs" data-mobile-tabs>
+        <button class="tab active" data-m="menu"><span class="material-symbols-outlined">restaurant_menu</span>献立</button>
+        <button class="tab" data-m="chat"><span class="material-symbols-outlined">chat</span>チャット</button>
+      </div>
+
+      <div class="work">
+        <div class="days">
+          <!-- 月 -->
+          <article class="card day">
+            <div class="day-head">
+              <span class="d-date">11/9（月）</span>
+              <span class="d-people"><span class="material-symbols-outlined">group</span>55人</span>
+              <span class="d-total"><b class="num">2,438 円</b>　1人あたり <span class="num">44.3 円</span></span>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+              <div><div class="i-name">うすしおポテトチップス 小袋15袋</div><div class="tags"><span class="chip chip-tag">うすしお</span></div></div>
+              <div class="i-calc num">298円 × 4（60袋）<b>1,192 円</b></div>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+              <div><div class="i-name">ぶどうゼリー 8個入</div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">ぶどう</span></div></div>
+              <div class="i-calc num">178円 × 7（56個）<b>1,246 円</b></div>
+            </div>
+            <div class="reason"><span class="material-symbols-outlined">lightbulb</span><div>要望の「しょっぱいもの＋ゼリー系」に合わせました。ポテトチップスは前回から 45日あいています。</div></div>
+          </article>
+
+          <!-- 火 -->
+          <article class="card day">
+            <div class="day-head">
+              <span class="d-date">11/10（火）</span>
+              <span class="d-people"><span class="material-symbols-outlined">group</span>55人</span>
+              <span class="d-total"><b class="num">2,140 円</b>　1人あたり <span class="num">38.9 円</span></span>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+              <div><div class="i-name">塩せんべい 20枚入</div><div class="tags"><span class="chip chip-tag">しお</span></div></div>
+              <div class="i-calc num">298円 × 3（60枚）<b>894 円</b></div>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+              <div><div class="i-name">みかんゼリー 8個入<span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">みかん</span></div></div>
+              <div class="i-calc num">178円 × 7（56個）<b>1,246 円</b></div>
+            </div>
+            <div class="alert alert-warning">
+              <span class="material-symbols-outlined">warning</span>
+              <div class="alert-body">「みかんゼリー」は最後の確認から 103日たっています。パッケージの原材料表示を撮影して確認してください。</div>
+              <a class="btn btn-sm alert-action" href="allergen-check.html" style="color:var(--warning-text)"><span class="material-symbols-outlined">photo_camera</span>確認する</a>
+            </div>
+            <div class="reason"><span class="material-symbols-outlined">lightbulb</span><div>月曜と味が重ならないよう、のりやスパイスを使わない塩味のせんべいにしました。</div></div>
+          </article>
+
+          <!-- 水：食べられないと分かった商品 -->
+          <article class="card day has-error">
+            <div class="day-head">
+              <span class="d-date">11/11（水）</span>
+              <span class="d-people changed"><span class="material-symbols-outlined">group</span>48人（要望から）</span>
+              <span class="d-total"><b class="num">2,100 円</b>　1人あたり <span class="num">43.8 円</span></span>
+            </div>
+            <div class="item blocked">
+              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+              <div><div class="i-name">ごま揚げせんべい 12袋</div><div class="tags"><span class="chip chip-tag">ごま</span></div></div>
+              <div class="i-calc num">258円 × 4（48袋）<b>1,032 円</b></div>
+            </div>
+            <div class="alert alert-error">
+              <span class="material-symbols-outlined">dangerous</span>
+              <div class="alert-body">
+                <div class="alert-title">この商品は出せません：避ける品目（卵）を含みます</div>
+                届いた商品のパッケージ確認で、原材料に「卵白」があると記録されました。代わりの商品を選んでください。
+                <div class="alts">
+                  <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>のりしおせんべい 12袋</b>　<span class="caption num">258円 × 4 ＝ 1,032 円 ・ 確認済み</span></div><button class="btn btn-sm btn-contained">これにする</button></div>
+                  <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>野菜クラッカー 20袋</b>　<span class="caption num">548円 × 3 ＝ 1,644 円 ・ 確認済み</span></div><button class="btn btn-sm btn-outlined">これにする</button></div>
+                </div>
+              </div>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+              <div><div class="i-name">りんごゼリー 8個入</div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">りんご</span></div></div>
+              <div class="i-calc num">178円 × 6（48個）<b>1,068 円</b></div>
+            </div>
+            <div class="reason"><span class="material-symbols-outlined">lightbulb</span><div>要望どおり人数を 48人で計算しました。<span class="fixed"><b>アプリの確認で直した点：</b>ゼリーが 5パック（40個）で人数に足りなかったため、6パックに直しました。</span></div></div>
+          </article>
+
+          <!-- 木 -->
+          <article class="card day">
+            <div class="day-head">
+              <span class="d-date">11/12（木）</span>
+              <span class="d-people"><span class="material-symbols-outlined">group</span>55人</span>
+              <span class="d-total"><b class="num">2,736 円</b>　1人あたり <span class="num">49.7 円</span></span>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+              <div><div class="i-name">のりしおポップコーン 12袋<span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></div><div class="tags"><span class="chip chip-tag">のりしお</span></div></div>
+              <div class="i-calc num">298円 × 5（60袋）<b>1,490 円</b></div>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+              <div><div class="i-name">ぶどうゼリー 8個入</div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">ぶどう</span></div></div>
+              <div class="i-calc num">178円 × 7（56個）<b>1,246 円</b></div>
+            </div>
+            <div class="alert alert-warning">
+              <span class="material-symbols-outlined">warning</span>
+              <div class="alert-body">「のりしおポップコーン」は最後の確認から 97日たっています。パッケージの原材料表示を撮影して確認してください。</div>
+              <a class="btn btn-sm alert-action" href="allergen-check.html" style="color:var(--warning-text)"><span class="material-symbols-outlined">photo_camera</span>確認する</a>
+            </div>
+            <div class="reason"><span class="material-symbols-outlined">lightbulb</span><div>しょっぱいものの中で、今週まだ使っていない食感のものを選びました。ぶどうゼリーは月曜と同じですが、のどごしの重複ルールはありません。</div></div>
+          </article>
+
+          <!-- 金 -->
+          <article class="card day">
+            <div class="day-head">
+              <span class="d-date">11/13（金）</span>
+              <span class="chip chip-primary"><span class="material-symbols-outlined">celebration</span>誕生日会</span>
+              <span class="d-people"><span class="material-symbols-outlined">group</span>55人</span>
+              <span class="d-total"><b class="num">4,482 円</b>　1人あたり <span class="num">81.5 円</span></span>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></span>
+              <div><div class="i-name">いちごミニ大福 10個入<span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span></div><div class="tags"><span class="chip chip-tag">いちご</span><span class="chip chip-tag tag-hit">ごほうび</span></div></div>
+              <div class="i-calc num">448円 × 6（60個）<b>2,688 円</b></div>
+            </div>
+            <div class="item">
+              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+              <div><div class="i-name">オレンジジュース 125ml×20本</div><div class="tags"><span class="chip chip-tag">オレンジ</span></div></div>
+              <div class="i-calc num">598円 × 3（60本）<b>1,794 円</b></div>
+            </div>
+            <div class="alert alert-error">
+              <span class="material-symbols-outlined">error</span>
+              <div class="alert-body">「いちごミニ大福」はアレルゲンが不明です。確定の前に、パッケージの原材料表示を撮影して確認してください。</div>
+              <a class="btn btn-sm alert-action" href="allergen-check.html" style="color:var(--error)"><span class="material-symbols-outlined">photo_camera</span>確認する</a>
+            </div>
+            <div class="reason"><span class="material-symbols-outlined">lightbulb</span><div>誕生日会なので、ふだんより 1人あたりの金額を上げて、季節のいちごの大福にしました。<span class="fixed"><b>アプリの確認で直した点：</b>ジュースが 2パック（40本）で人数に足りなかったため、3パックに直しました。</span></div></div>
+          </article>
+        </div>
+
+        <!-- チャット -->
+        <aside class="card chat">
+          <div class="chat-head">
+            <span class="ai"><span class="material-symbols-outlined">auto_awesome</span></span>
+            <div><div class="subtitle">献立の相談</div><div class="caption">直してほしいことを書いてください</div></div>
+          </div>
+          <div class="chat-log">
+            <div class="msg ai">11/9〜11/13 の献立案を作りました。毎日「しょっぱいもの＋ゼリー系」の組み合わせにし、金曜の誕生日会はいちご大福とジュースにしています。<br>週の実績は 13,896 円で、予算まであと 1,104 円です。<span class="time">10:42</span></div>
+            <div class="msg me">水曜のごま揚げせんべいに卵が入っていたので、代わりを考えてください。<span class="time">10:45</span></div>
+            <div class="msg ai">確認ありがとうございます。避ける品目を含まない、確認済みの商品から2つ選び、水曜のカードに出しました。
+              <ol><li>のりしおせんべい：同じ金額で、食感も近いです</li><li>野菜クラッカー：612円上がりますが、予算の残りに収まります</li></ol>
+              どちらにしますか？<span class="time">10:45</span></div>
+          </div>
+          <div class="chat-input">
+            <div class="row">
+              <textarea class="textarea" placeholder="例：木曜をあまいものにしたい"></textarea>
+              <button class="btn btn-contained" style="height:44px;padding:0 14px" aria-label="送る"><span class="material-symbols-outlined">send</span></button>
+            </div>
+            <div class="caption"><span class="material-symbols-outlined" style="font-size:14px">person_off</span>子どもの名前は書かないでください</div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="actionbar state-plan">
+  <div class="info"><span class="material-symbols-outlined icon-fill">cloud_done</span>10:45 に下書きを保存しました</div>
+  <button class="btn btn-outlined"><span class="material-symbols-outlined">save</span>下書き保存</button>
+  <button class="btn btn-contained" data-open-confirm><span class="material-symbols-outlined">task_alt</span>確定する</button>
+</div>
+
+<!-- 確定の確認ダイアログ -->
+<div class="dialog-backdrop state-confirm">
+  <div class="dialog" role="dialog" aria-labelledby="dlg-title">
+    <div class="dialog-title" id="dlg-title">確定する前に確認してください</div>
+    <div class="dialog-content">
+      <div class="alert alert-error">
+        <span class="material-symbols-outlined">dangerous</span>
+        <div class="alert-body"><div class="alert-title">避ける品目を含む商品があるため、確定できません</div>水曜の「ごま揚げせんべい」（卵を含む）を、別の商品に差し替えてください。</div>
+      </div>
+      <p class="mt-16" style="font-size:14px">次の商品は、アレルゲンの確認が終わっていません。</p>
+      <ul class="confirm-list">
+        <li><span class="d">11/10（火）</span>みかんゼリー<span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></li>
+        <li><span class="d">11/12（木）</span>のりしおポップコーン<span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span></li>
+        <li><span class="d">11/13（金）</span>いちごミニ大福<span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span></li>
+      </ul>
+      <p class="caption mt-16">確認が終わっていない商品は、届いたときに必ずパッケージの原材料表示を確認してください。</p>
+    </div>
+    <div class="dialog-actions">
+      <button class="btn" data-close-confirm>献立に戻る</button>
+      <button class="btn btn-contained" disabled>確定する</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/mock.js"></script>
+<script>
+  // モックの状態切り替え（献立案 / 作成中 / 確定の確認）
+  const setState = (s) => {
+    document.body.dataset.state = s;
+    document.querySelectorAll(".mock-switch button").forEach((b) => b.classList.toggle("active", b.dataset.state === s));
+  };
+  document.querySelectorAll(".mock-switch button").forEach((b) => b.addEventListener("click", () => setState(b.dataset.state)));
+  document.querySelector("[data-open-confirm]").addEventListener("click", () => setState("confirm"));
+  document.querySelector("[data-close-confirm]").addEventListener("click", () => setState("plan"));
+  const q = new URLSearchParams(location.search);
+  if (q.get("tab") === "making") setState("making");
+  if (q.get("tab") === "confirm") setState("confirm");
+  // スマホ：献立 / チャットのタブ
+  document.querySelectorAll("[data-mobile-tabs] .tab").forEach((t) => t.addEventListener("click", () => {
+    document.body.dataset.mtab = t.dataset.m;
+    document.querySelectorAll("[data-mobile-tabs] .tab").forEach((x) => x.classList.toggle("active", x === t));
+  }));
+  if (q.get("m") === "chat") document.querySelector('[data-m="chat"]').click();
+</script>
+</body>
+</html>

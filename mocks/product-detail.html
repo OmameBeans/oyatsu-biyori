@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商品詳細 | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .tag-input { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-height: 44px; padding: 6px 10px; border: 1px solid rgba(0,0,0,.23); border-radius: 6px; }
+  .tag-input .chip .material-symbols-outlined { font-size: 14px; color: var(--text-2); }
+  .cats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cats label { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; height: 36px; border: 1px solid var(--divider); border-radius: 18px; font-size: 13px; cursor: pointer; }
+  .cats label.on { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); font-weight: 500; }
+  .cats input { display: none; }
+  .status-big { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+  .status-big .meta { flex: 1; font-size: 13px; color: var(--text-2); }
+  .allergens { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px; }
+  .al { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; font-size: 13px; background: #f5f7fa; color: var(--text-2); }
+  .al .material-symbols-outlined { font-size: 16px; }
+  .al.has { background: #fff3e0; color: #7a4100; font-weight: 700; }
+  .al.avoid { background: var(--error); color: #fff; font-weight: 700; }
+  .al .mark { margin-left: auto; font-size: 11px; }
+  .group-title { font-size: 12px; color: var(--text-2); font-weight: 500; margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }
+  .raw { font-size: 13px; line-height: 1.9; padding: 12px 14px; background: #fafbfc; border: 1px solid var(--divider); border-radius: 6px; }
+  mark { background: #ffcdd2; color: #8e1f1f; padding: 0 2px; border-radius: 2px; font-weight: 700; }
+  mark.soft { background: #ffe0b2; color: #7a4100; }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .timeline li { position: relative; padding: 0 0 18px 28px; }
+  .timeline li::before { content: ""; position: absolute; left: 7px; top: 18px; bottom: 0; width: 2px; background: var(--divider); }
+  .timeline li:last-child::before { display: none; }
+  .timeline .dot { position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid var(--success); }
+  .timeline .dot.ref { border-color: var(--warning); }
+  .timeline .dot.unk { border-color: var(--error); }
+  .timeline .t-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .timeline .t-body { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+  .affected { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid rgba(211,47,47,.3); border-radius: 6px; background: #fff; margin-top: 8px; color: var(--text); }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } .allergens { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body data-nav="products">
+<main class="main">
+  <div class="container">
+    <div class="breadcrumbs"><a href="products.html">商品一覧</a><span class="material-symbols-outlined">chevron_right</span>ごま揚げせんべい 12袋</div>
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">ごま揚げせんべい 12袋</h1>
+        <p class="caption">こもれび製菓（架空）・ 登録 2026/7/3（チラシから）</p>
+      </div>
+      <a class="btn btn-contained" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>アレルゲンを確認する</a>
+    </div>
+
+    <div class="alert alert-error mb-16">
+      <span class="material-symbols-outlined">dangerous</span>
+      <div class="alert-body">
+        <div class="alert-title">避ける品目（卵）を含むため、この商品は献立に入りません</div>
+        この商品を使っている今日以降の献立があります。献立を開いて差し替えてください。
+        <a class="affected" href="menu-step4.html"><span class="material-symbols-outlined" style="color:var(--error)">event</span><span style="flex:1"><b>11/11（水）</b>　11/9（月）〜 11/13（金）の献立（下書き）</span><span class="btn btn-sm">献立を開く</span></a>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- 基本情報 -->
+      <div class="card">
+        <div class="card-head"><h2 class="h6">基本情報</h2></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field full"><label>商品名</label><input class="input" value="ごま揚げせんべい 12袋"></div>
+            <div class="field full"><label>メーカー</label><input class="input" value="こもれび製菓（架空）"></div>
+            <div class="field"><label>内容量</label><input class="input" value="1袋 2枚"></div>
+            <div class="field"><label>入数</label><div class="input-adorn"><input class="input" value="12" style="padding-left:14px"><span class="suffix">袋</span></div></div>
+            <div class="field full"><label>JAN コード（任意）</label><input class="input num" placeholder="パッケージのバーコードの数字（チラシにはありません）"></div>
+            <div class="field full"><span class="label">おやつの分類</span>
+              <div class="cats">
+                <label class="on"><input type="radio" name="c" checked><span class="material-symbols-outlined" style="font-size:16px">grain</span>しょっぱい</label>
+                <label><input type="radio" name="c"><span class="material-symbols-outlined" style="font-size:16px">cake</span>あまい</label>
+                <label><input type="radio" name="c"><span class="material-symbols-outlined" style="font-size:16px">water_drop</span>のどごし</label>
+                <label><input type="radio" name="c">対象外</label>
+              </div>
+            </div>
+            <div class="field full"><span class="label">タグ（キャラクター・味など）</span>
+              <div class="tag-input"><span class="chip">ごま<span class="material-symbols-outlined">close</span></span><span class="chip">せんべい<span class="material-symbols-outlined">close</span></span><span class="caption">＋ 追加</span></div>
+            </div>
+            <div class="field full"><label>職員用メモ（献立の提案に使います）</label><textarea class="textarea" style="min-height:80px">かたいので低学年には割って出す。</textarea><span class="help">子どもの名前は書かないでください</span></div>
+            <div class="full row" style="justify-content:space-between">
+              <div><div class="subtitle">使わない</div><div class="caption">削除はせず、献立の候補から外します</div></div>
+              <label class="switch"><input type="checkbox"><span class="track"></span><span class="thumb"></span></label>
+            </div>
+          </div>
+        </div>
+        <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
+      </div>
+
+      <!-- アレルゲン -->
+      <div class="stack">
+        <div class="card">
+          <div class="status-big">
+            <span class="status status-ok" style="height:32px;font-size:14px;padding:0 14px 0 10px"><span class="material-symbols-outlined">check_circle</span>確認済み</span>
+            <div class="meta">2026/11/2 14:20 ・ 確認者：ひまわり学童クラブ<br>次の再確認：2027/1/31（90日後）</div>
+          </div>
+          <hr class="divider">
+          <div class="card-body" style="padding-top:12px">
+            <div class="group-title"><span class="material-symbols-outlined" style="font-size:16px">priority_high</span>特定原材料（表示義務のある 8品目）</div>
+            <div class="allergens">
+              <span class="al">えび</span><span class="al">かに</span><span class="al">くるみ</span>
+              <span class="al has"><span class="material-symbols-outlined">check</span>小麦<span class="mark">含む</span></span>
+              <span class="al">そば</span>
+              <span class="al avoid"><span class="material-symbols-outlined">block</span>卵<span class="mark">含む</span></span>
+              <span class="al">乳</span><span class="al">落花生</span>
+            </div>
+            <div class="group-title">特定原材料に準ずるもの（推奨 20品目）</div>
+            <div class="allergens">
+              <span class="al">アーモンド</span><span class="al">あわび</span><span class="al">いか</span><span class="al">いくら</span><span class="al">オレンジ</span><span class="al">カシューナッツ</span><span class="al">キウイ</span><span class="al">牛肉</span>
+              <span class="al has"><span class="material-symbols-outlined">check</span>ごま<span class="mark">含む</span></span>
+              <span class="al">さけ</span><span class="al">さば</span>
+              <span class="al has"><span class="material-symbols-outlined">check</span>大豆<span class="mark">含む</span></span>
+              <span class="al">鶏肉</span><span class="al">バナナ</span><span class="al">豚肉</span><span class="al">マカダミア</span><span class="al">もも</span><span class="al">やまいも</span><span class="al">りんご</span><span class="al">ゼラチン</span>
+            </div>
+            <div class="group-title">施設で追加した品目（原材料表示の全文から探します）</div>
+            <div class="allergens"><span class="al">ヘーゼルナッツ</span></div>
+            <div class="row mt-16 caption"><span class="al avoid" style="padding:2px 8px">赤</span>施設の避ける品目に当たる　<span class="al has" style="padding:2px 8px">橙</span>含むが避ける品目ではない</div>
+
+            <div class="group-title" style="margin-top:20px">原材料表示（全文）</div>
+            <div class="raw">うるち米（国産）、植物油脂、<mark class="soft">ごま</mark>、しょうゆ（<mark class="soft">小麦</mark>・<mark class="soft">大豆</mark>を含む）、砂糖、<mark>卵白</mark>、食塩／調味料（アミノ酸等）</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 class="h6">アレルゲン確認の履歴</h2><span class="caption">記録は上書きされず、積み上がります</span></div>
+          <div class="card-body">
+            <ol class="timeline">
+              <li><span class="dot"></span>
+                <div class="t-head"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span><b class="num">2026/11/2 14:20</b><span class="muted">ひまわり学童クラブ</span></div>
+                <div class="t-body">パッケージを撮影して確認。卵（卵白）・小麦・大豆・ごまを含む。前回の記録から「卵」が増えています（原材料の変更の可能性）。</div>
+              </li>
+              <li><span class="dot"></span>
+                <div class="t-head"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span><b class="num">2026/7/10 16:05</b><span class="muted">ひまわり学童クラブ</span></div>
+                <div class="t-body">パッケージを撮影して確認。小麦・大豆・ごまを含む。</div>
+              </li>
+              <li><span class="dot ref"></span>
+                <div class="t-head"><span class="status status-ref"><span class="material-symbols-outlined">help</span>参考</span><b class="num">2026/7/3 09:30</b><span class="muted">チラシから登録</span></div>
+                <div class="t-body">チラシの情報のみ。パッケージでの確認が必要。</div>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+</body>
+</html>

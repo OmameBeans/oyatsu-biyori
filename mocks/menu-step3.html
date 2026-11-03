@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>献立作成：要望の入力 | おやつ日和</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
+<link rel="stylesheet" href="assets/mock.css">
+<style>
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .examples { display: flex; gap: 8px; flex-wrap: wrap; }
+  .examples .chip { cursor: pointer; height: 30px; border-radius: 15px; }
+  .examples .chip .material-symbols-outlined { color: var(--primary); }
+  .textarea { min-height: 180px; }
+  .textarea::placeholder { color: var(--text-3); }
+  .no-name { display: flex; gap: 8px; align-items: center; color: var(--warning-text); font-size: 13px; font-weight: 500; }
+  .no-name .material-symbols-outlined { color: var(--warning); font-size: 18px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; font-size: 14px; }
+  .kv dt { color: var(--text-2); }
+  .kv dd { margin: 0; text-align: right; font-weight: 500; }
+  .avoid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .avoid .chip { background: var(--error-bg); color: #8e1f1f; }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body data-nav="menus">
+<main class="main">
+  <div class="container">
+    <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
+    <div class="page-head">
+      <div class="titles">
+        <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
+        <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
+      </div>
+    </div>
+
+    <div class="card mb-16">
+      <div class="stepper">
+        <a class="step done" href="menu-step1.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">チラシ取り込み</span></a>
+        <span class="step-line"></span>
+        <a class="step done" href="menu-step2.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">今週の商品</span></a>
+        <span class="step-line"></span>
+        <a class="step active" href="menu-step3.html"><span class="dot">3</span><span class="label">要望の入力</span></a>
+        <span class="step-line"></span>
+        <span class="step"><span class="dot">4</span><span class="label">献立案とチャット</span></span>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="card">
+        <div class="card-head"><h2 class="h6">今週の要望</h2><span class="caption">空欄でも献立を作れます</span></div>
+        <div class="card-body stack">
+          <div class="field">
+            <label for="req">要望を文章で書いてください</label>
+            <textarea id="req" class="textarea" placeholder="例：しょっぱいものとゼリー系を合わせて出したい。&#10;例：金曜は誕生日会なので豪華に。&#10;例：水曜は行事のため、子どもが40人。"></textarea>
+          </div>
+          <div class="no-name"><span class="material-symbols-outlined icon-fill">person_off</span>子どもの名前は書かないでください。</div>
+          <div>
+            <div class="caption mb-8">よく使う要望（押すと入力欄に追加されます）</div>
+            <div class="examples">
+              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>しょっぱいもの＋ゼリー系</span>
+              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>金曜は誕生日会なので豪華に</span>
+              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>○曜は子どもが○人</span>
+              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>手で持って食べられるもの</span>
+            </div>
+          </div>
+          <div class="alert alert-info">
+            <span class="material-symbols-outlined">info</span>
+            <div class="alert-body">要望の文章で、避ける品目（アレルギー）の条件を変えることはできません。避ける品目は「設定」で変更します。</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a class="btn" href="menu-step2.html" style="margin-right:auto"><span class="material-symbols-outlined">arrow_back</span>戻る</a>
+          <a class="btn btn-contained btn-lg" href="menu-step4.html?tab=making"><span class="material-symbols-outlined">auto_awesome</span>献立を作る</a>
+        </div>
+      </div>
+
+      <aside class="card">
+        <div class="card-head"><h2 class="h6">いつもの条件</h2><a class="btn btn-sm" href="settings.html">変更</a></div>
+        <div class="card-body">
+          <dl class="kv" style="margin:0">
+            <dt>人数</dt><dd class="num">55 人</dd>
+            <dt>おやつを出す日</dt><dd>月〜金（5日）</dd>
+            <dt>週の予算</dt><dd class="num">15,000 円</dd>
+            <dt class="caption" style="grid-column:1/-1;margin-top:-6px">11月の予算 60,000 円 ÷ 4</dt>
+            <dt>1人1日あたり</dt><dd class="num">約 54 円</dd>
+            <dt>使える商品</dt><dd class="num">15 件</dd>
+          </dl>
+          <hr class="divider" style="margin:16px 0">
+          <div class="caption mb-8">避ける品目（必ず守ります）</div>
+          <div class="avoid">
+            <span class="chip">卵</span><span class="chip">落花生</span><span class="chip">ナッツ類（ヘーゼルナッツを含む）</span>
+          </div>
+          <hr class="divider" style="margin:16px 0">
+          <div class="caption mb-8">同じ商品を出さない期間</div>
+          <dl class="kv" style="margin:0">
+            <dt>しょっぱいもの</dt><dd>30日</dd>
+            <dt>あまいもの</dt><dd>30日</dd>
+            <dt>のどごし</dt><dd class="muted">設定なし</dd>
+          </dl>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+<script src="assets/mock.js"></script>
+</body>
+</html>

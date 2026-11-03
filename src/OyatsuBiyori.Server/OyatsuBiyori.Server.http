@@ -1,0 +1,6 @@
+@OyatsuBiyori.Server_HostAddress = http://localhost:5032
+
+GET {{OyatsuBiyori.Server_HostAddress}}/api/weatherforecast/
+Accept: application/json
+
+###
