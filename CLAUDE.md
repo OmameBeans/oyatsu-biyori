@@ -37,7 +37,7 @@
 - API：ASP.NET Core（.NET 10）。DI・EF Core・リポジトリパターン
 - DB：SQLite（EF Core）
 - Claude の呼び出し：公式 C# SDK（NuGet の `Anthropic` パッケージ）
-- テスト：xUnit
+- テスト：xUnit（Biz のロジック）、Playwright（画面の E2E。D-87）。クライアントのユニットテストは置かない
 - 本番：XServer VPS for Windows Server（2GB）+ IIS、`https://oyatsu-biyori.com`
 - Next.js は使わない
 
@@ -52,7 +52,7 @@ src/
 ├── OyatsuBiyori.Migrations/ EF Core のマイグレーション（Data から分けたもの）
 ├── OyatsuBiyori.Claude/     Claude API の呼び出し
 ├── OyatsuBiyori.Server/     ASP.NET Core Web API（起動プロジェクト）
-└── oyatsubiyori.client/     React（Vite）
+└── oyatsubiyori.client/     React（Vite）。e2e/ に画面の E2E（Playwright）
 docs/requirements/           要件定義（md が正。index.html は生成物）
 samples/                     ダミーデータ（架空のチラシ・パッケージ画像・投入データ）。実データは置かない
 tools/                       開発用の道具（アプリには含めない）
@@ -60,13 +60,15 @@ tools/                       開発用の道具（アプリには含めない）
 
 - 依存方向は `Server → Data / Claude → Biz`。マイグレーションは `Migrations → Data` で参照し、`Server → Migrations` で読み込む（Data から Migrations は参照しない。Data で `MigrationsAssembly("OyatsuBiyori.Migrations")` を指定する。D-40）
 - コーディング規約は `.claude/rules/` にある（C#：`csharp.md`、React：`react.md`）。該当ファイルを編集するときは必ず従う
-- 新しいプロジェクトやフォルダ構成の変更は、ユーザーが決める。勝手に作らず、必要になったら提案して確認を取ること（テストプロジェクトは `src/OyatsuBiyori.Biz.Tests/`（xUnit）を1つ、マイグレーションは `src/OyatsuBiyori.Migrations/` を作ると決定済み。どちらも未作成）
+- 新しいプロジェクトやフォルダ構成の変更は、ユーザーが決める。勝手に作らず、必要になったら提案して確認を取ること（テストプロジェクトは `src/OyatsuBiyori.Biz.Tests/`（xUnit）を1つ、マイグレーションは `src/OyatsuBiyori.Migrations/`、画面の E2E は `src/oyatsubiyori.client/e2e/` と決定済み）
 
 ### よく使うコマンド
 
 - ビルド：`dotnet build OyatsuBiyori.slnx`
 - 起動：`dotnet run --project src/OyatsuBiyori.Server`（Vite も自動で起動する）
 - フロントの確認：`src/oyatsubiyori.client` で `npm run lint` と `npm run build`
+- コミット前の確認：`python tools/precheck/precheck.py`（差分からリスクの区分を決め、ビルド・テスト・lint・E2E のうち必要なものを走らせる。`--dry-run` で区分だけ見る）
+- 画面の E2E：`src/oyatsubiyori.client` で `npm run e2e`（サーバーを E2E の環境・偽の Claude・ダミーデータで起動する。T0-15 で作る）
 - 本番用の出力：`dotnet publish src/OyatsuBiyori.Server -c Release`
 - 要件定義の HTML を作り直す：`python tools/build-requirements-html/build.py`（`docs/requirements/*.md` を直したら必ず実行する。`index.html` は直接編集しない）
 - ダミーのチラシ・パッケージを作り直す：`python tools/build-samples/build.py`（`samples/flyers/*.json`・`samples/packages/*.json` を直したら実行する。画像・PDF・正解データ（`*.expected.json`）を作る。Edge か Chrome が必要）
@@ -115,11 +117,11 @@ tools/                       開発用の道具（アプリには含めない）
 - **コミットとプッシュは、ユーザーが指示したときだけ行う**
 - 開発は `main` ブランチで直接行う（1人で開発するため、作業用のブランチは切らない。審査ではリポジトリの既定ブランチが見られるので、`main` を常に最新に保つ）
 - **コミット前の手順は `REVIEW.md` に従う**。変えたものでリスクの区分（高・中・低）を決め、区分に応じて確かめる
-  - 中・高：ビルド・テスト・lint（`dotnet build OyatsuBiyori.slnx`・`dotnet test src/OyatsuBiyori.Biz.Tests`・フロントの `npm run lint` と `npm run build`）を実行し、その結果をユーザーに見せる。そのうえで `/code-review` で差分をレビューする
+  - 中・高：ビルド・テスト・lint（`dotnet build OyatsuBiyori.slnx`・`dotnet test src/OyatsuBiyori.Biz.Tests`・フロントの `npm run lint` と `npm run build`。画面を変えたら `npm run e2e` も）を `python tools/precheck/precheck.py` でまとめて実行し（確認していない差分のコミットはフックが止める）、その結果をユーザーに見せる。そのうえで `/code-review` で差分をレビューする
   - 高：アレルゲンの判定・献立の検証・アレルゲン確認の記録・Claude の出力の扱いに触れる変更は、サブエージェント `allergen-safety-reviewer` でもレビューする。コミットメッセージの本文に「確かめ方・リスク・戻し方」を書く
   - レビューの往復は3回まで。同じ種類の指摘が2回出たら、`CLAUDE.md`・`.claude/rules/`・`REVIEW.md` の方に書き足す
 - CI（`.github/workflows/ci.yml`）：main への push ごとに、ビルド・Biz のテスト・フロントの lint とビルドを走らせる。失敗したら次の作業より先に直す
-- フック（`.claude/settings.json`）：コミット前に公開してはいけないもの（`docs/context/`・DB・`samples/` 以外の画像や PDF・API キー・IP アドレス）を確かめて止める。Biz の `.cs` を編集すると xUnit を走らせる
+- フック（`.claude/settings.json`）：コミット前に公開してはいけないもの（`docs/context/`・DB・`samples/` 以外の画像や PDF・API キー・IP アドレス）を確かめて止める。中・高の変更で `precheck.py` が通っていない差分のコミットも止める。Biz の `.cs` を編集すると xUnit を走らせる
 - コードのコメント・コミットメッセージ・UI の文言は**日本語**。識別子（クラス名・変数名など）は英語
 - ロジック（アレルゲン判定、金額・1人あたり金額・予算の実績の計算、予算に合わせる入れ替え案の探索、重複チェック、商品名の正規化・照合）には xUnit のユニットテストを書く
 - 本番サーバー上ではビルドしない。手元で `dotnet publish` した成果物を配置する

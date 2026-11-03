@@ -29,3 +29,6 @@ backups/
 # 外部から取り入れた Claude Code のスキル（自作ではないため公開しない）
 .claude/skills/screen-flow/
 .claude/skills/stack-diagram/
+
+# コミット前の確認の記録（tools/precheck/precheck.py が書く。手元だけで使う）
+.claude/precheck-state.json

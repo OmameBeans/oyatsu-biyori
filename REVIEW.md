@@ -10,16 +10,20 @@
 
 | 区分 | 当てはまる変更 | 例 |
 | --- | --- | --- |
-| **高** | アレルゲンの判定・確認の記録、献立の検証・確定の条件、Claude の出力の扱い、ログイン・認可、個人情報、公開を止める仕組み | `Allergen*.cs`・`Flyer*.cs`・`Menu*.cs`（Validator・ConfirmationChecker・CandidateFilter・ProposalBuilder・ImpactAnalyzer）・`ProductMatcher.cs`・`TextNormalizer.cs`・`InterpretedRequestApplier.cs`・`MasterData/`、`OyatsuBiyori.Claude/` のプロンプトとスキーマ、`Server/Security/`・`Program.cs` の認証の設定、アレルゲンの表示や確定のダイアログの画面、`.claude/hooks/`、`.gitignore`、`.github/workflows/` |
-| **中** | ふつうの機能の追加・変更 | 金額・予算・重複の計算、API の追加、画面の追加、DB のスキーマとマイグレーション |
+| **高** | アレルゲンの判定・確認の記録、献立の検証・確定の条件、Claude の出力の扱い、ログイン・認可、個人情報、公開を止める仕組み | `src/` の下でパスに `allergen`・`flyer`・`confirm` を含むもの（Biz・テスト・Data・Server・画面のどれでも。確認の記録の保存、確定の API とダイアログを含む）、`Menu*.cs`（Validator・ConfirmationChecker・CandidateFilter・ProposalBuilder・ImpactAnalyzer）・`ProductMatcher.cs`・`TextNormalizer.cs`・`InterpretedRequestApplier.cs`（どれも Biz.Tests の同じ名前のテストを含む）・`MasterData/`、`Data/DbContexts/`・`OyatsuBiyori.Migrations/`（確認の記録の保存のしかたを変えうるため）、`OyatsuBiyori.Claude/`（プロンプトとスキーマを含む全体）、`Server/Security/`・`Program.cs`、`.claude/hooks/`・`.claude/settings.json`・`allergen-safety-reviewer`、`tools/precheck/`、`.gitignore`、`.github/workflows/` |
+| **中** | ふつうの機能の追加・変更 | 金額・予算・重複の計算、API の追加、画面の追加 |
 | **低** | 動作を変えないもの | ドキュメント（`docs/`・README）、見た目だけの CSS、コメント、ダミーデータ（`samples/`） |
 
+区分の判定は `tools/precheck/precheck.py` が、上の表を写したパターンで機械的に行う（表を直したら、スクリプトの `HIGH_PATTERNS` も合わせる）。スクリプトの区分は下限で、パターンに当たらなくても中身が高に当たるなら、高として扱う（`--risk high`）。
+
 ## 2. コミット前の手順（区分ごと）
+
+ビルド・テスト・lint・E2E は `python tools/precheck/precheck.py` でまとめて走らせる。区分に合わせて必要なものだけを走らせ、すべて通ると、そのときの差分（作業中の変更の全体）を記録する。確認の途中でファイルが変わったら記録しない。コミットのフック（`.claude/hooks/check-commit.py`）は、コミットするファイルが中・高なら、記録のない差分や、確認のあとに変えた差分のコミットを止める。高なら、コミットメッセージ（`-F` のときはそのファイル）に「確かめ方・リスク・戻し方」がないコミットも止める。ステージした中身が作業中の中身と違うファイルがあるときも止める（確認したのは作業中の中身のため）。確認の仕組み自体が壊れていたり、git がエラーになったりしたら、通さずに止める。
 
 | 区分 | 手順 |
 | --- | --- |
 | 低 | CI に任せる。レビューは不要 |
-| 中 | ビルド・テスト・lint を通し、その出力を見せる → `/code-review` |
+| 中 | ビルド・テスト・lint を通し（画面を変えたら `npm run e2e` も走らせ、PC とスマホの画像を見る）、その出力を見せる → `/code-review` |
 | 高 | 中の手順 → `allergen-safety-reviewer`（アレルゲン・献立・Claude の出力に触れる場合） → コミットメッセージに「確かめ方・リスク・戻し方」を書く |
 
 - ログイン・HTTPS・公開の設定など、外から攻撃されうる部分に触れたときは、デプロイ前に `/security-review` も使う
@@ -30,10 +34,10 @@
 重い順。上の3つは区分にかかわらず「重要」とする。
 
 1. **子どもの安全**：`CLAUDE.md` の「アレルゲンの扱い」と `docs/requirements/03-allergen-safety.md`（SR-01〜22）。「不明」「参考」を安全と扱う経路、Claude の出力や要望の文章で判定が変わる経路がないか
-2. **公開してはいけないもの**：実データ・画像・API キー・IP アドレス・子どもの情報（フック HK-CC-02 が止めるが、ログ出力や Claude への送信は止められないので見る）
+2. **公開してはいけないもの**：実データ・画像・API キー・IP アドレス・子どもの情報（フック HK-CC-02 が止めるが、ログ出力や Claude への送信は止められないので見る）。フックや `precheck.py` などの確認の仕組みは、エラー・想定外の入力・読めないファイルのときに**止める側に倒れる**か（素通りさせない。2回のレビューで同じ指摘が出たため足した）
 3. **計算の正しさ**：金額・1人あたり金額・予算・パック数・重複の期間（`.claude/rules/biz-logic.md`）。境界（0件・ちょうど期限の日）
 4. **要件との一致**：変更に関係する `FR-`・`SR-`・`NFR-` の受け入れ条件を満たしているか
-5. **テスト**：Biz のロジックの変更に xUnit のテストがあるか
+5. **テスト**：Biz のロジックの変更に xUnit のテストがあるか。画面の変更に E2E があるか（判定・計算をクライアントに書いていないか）
 
 見ないもの：書き方の好み（lint と `.claude/rules/` に任せる）、要件にない機能の提案。
 
