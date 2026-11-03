@@ -292,7 +292,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .switch input:checked ~ .thumb { left: 16px; background: var(--primary); }
 
 /* タブ */
-.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--divider); overflow-x: auto; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--divider); overflow-x: auto; overflow-y: hidden; }
 .tab {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 12px 20px; font-size: 14px; font-weight: 500; color: var(--text-2);
@@ -338,7 +338,8 @@ a.step:hover { text-decoration: none; }
 
 /* モック用の案内（本番には出ない） */
 .mock-banner {
-  position: fixed; right: 12px; bottom: 12px; z-index: 60;
+  /* 画面の下の「保存」などに重ならないよう、上のバーの中に置く */
+  position: fixed; right: 200px; top: 16px; z-index: 60;
   background: #263238; color: #fff; font-size: 12px;
   padding: 6px 10px 6px 12px; border-radius: 16px; box-shadow: var(--shadow-4);
   display: flex; align-items: center; gap: 6px; opacity: .9;
@@ -376,4 +377,39 @@ a.step:hover { text-decoration: none; }
   .appbar, .drawer, .mock-banner, .no-print { display: none !important; }
   .main { margin: 0; padding: 0; }
   body { background: #fff; }
+}
+
+/* ---------- 画面の高さに収める（PC） ----------
+   <body class="fit"> の画面は、ページ全体をスクロールさせず、明細部だけをスクロールする。
+   - .fill：残りの高さを埋める縦並びの枠（カードなど）
+   - .scroll：.fill の中でスクロールする部分（表の見出しは上に残る）
+   - .fit-wide：2列の画面用。1101px 以上で効く（それより狭い PC では1列になるので、ページ全体をスクロールする）
+   スマホでは使わない（入れ子のスクロールは指で操作しにくく、画面も小さいため、ページ全体をスクロールする） */
+@media screen and (min-width: 901px) {
+  :where(body.fit) .main { height: 100vh; min-height: 0; padding-bottom: 24px; display: flex; flex-direction: column; }
+  :where(body.fit) .main > .container { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; position: relative; }
+  :where(body.fit) .fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  :where(body.fit) .scroll { flex: 1; min-height: 0; overflow: auto; }
+  :where(body.fit) .scroll .table thead th { position: sticky; top: 0; z-index: 2; }
+  :where(body.fit) .tabs { flex-shrink: 0; }
+  /* カードを並べてスクロールする部分：影が切れないよう、内側に少し余白をとる */
+  :where(body.fit) .scroll-cards { padding: 2px 8px 4px 2px; margin: -2px -8px 0 -2px; }
+  /* モックの表示の切り替えは右上に寄せて、高さをとらないようにする（モック用） */
+  body.fit .mock-switch { position: absolute; top: -16px; right: 0; margin: 0; z-index: 5; }
+  body.fit .mock-switch button, body.fit .mock-switch .tab { padding: 3px 12px; font-size: 12px; }
+}
+@media screen and (min-width: 1101px) {
+  :where(body.fit-wide) .main { height: 100vh; min-height: 0; padding-bottom: 24px; display: flex; flex-direction: column; }
+  :where(body.fit-wide) .main > .container { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; position: relative; }
+  :where(body.fit-wide) .fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  :where(body.fit-wide) .scroll { flex: 1; min-height: 0; overflow: auto; }
+  :where(body.fit-wide) .scroll .table thead th { position: sticky; top: 0; z-index: 2; }
+  :where(body.fit-wide) .tabs { flex-shrink: 0; }
+  :where(body.fit-wide) .scroll-cards { padding: 2px 8px 4px 2px; margin: -2px -8px 0 -2px; }
+}
+
+/* 献立作成の手順（SC-09）：手順の表示を見出しの右に置き、縦の場所をとらないようにする */
+.stepper.in-head { flex: 0 1 620px; padding: 8px 16px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-1); }
+@media (max-width: 900px) {
+  .stepper.in-head { flex: 1 1 100%; padding: 8px 12px; }
 }

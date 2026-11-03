@@ -26,7 +26,7 @@
   .tips { text-align: left; max-width: 420px; margin: 16px auto 0; font-size: 13px; color: var(--text-2); }
   .tips li { margin: 2px 0; }
 
-  .judge { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 16px; align-items: start; }
+  .check-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 16px; align-items: start; }
   .photo { aspect-ratio: 4/3; border-radius: 8px; background: repeating-linear-gradient(0deg, #f5f1e6 0 18px, #ece5d3 18px 19px); border: 1px solid var(--divider); padding: 18px; display: flex; flex-direction: column; gap: 8px; }
   .photo i { display: block; height: 8px; border-radius: 4px; background: #bfb59a; }
   .raw { font-size: 14px; line-height: 2; padding: 12px 14px; background: #fafbfc; border: 1px solid var(--divider); border-radius: 6px; }
@@ -61,15 +61,24 @@
   .result .big .material-symbols-outlined { font-size: 36px; }
   .aff { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--divider); border-radius: 8px; color: var(--text); margin-top: 8px; }
   .aff:hover { text-decoration: none; background: #f7f9fc; }
+  @media screen and (min-width: 901px) {
+    /* 写真と品目の一覧を、それぞれの中だけでスクロールする。「記録」のボタンは常に見える */
+    body[data-state="judge"] [data-show~="judge"] { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    .check-layout { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+    .check-layout > .stack { min-height: 0; overflow: auto; padding: 2px 8px 4px 2px; margin: -2px -8px 0 -2px; }
+    .check-layout > .card { display: flex; flex-direction: column; min-height: 0; }
+    .check-layout > .card > .card-body { flex: 1; min-height: 0; overflow: auto; }
+    .sticky-foot { position: static; }
+  }
   @media (max-width: 900px) {
-    .judge { grid-template-columns: 1fr; }
+    .check-layout { grid-template-columns: 1fr; }
     .photo { aspect-ratio: 16/7; }
     .sticky-foot { position: fixed; left: 0; right: 0; bottom: 0; border-radius: 0; z-index: 25; box-shadow: 0 -2px 8px rgba(0,0,0,.08); }
     .main { padding-bottom: 96px; }
   }
 </style>
 </head>
-<body data-nav="products" data-state="judge" data-no-banner="1">
+<body data-nav="products" class="fit" data-state="judge" data-no-banner="1">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="products.html">商品一覧</a><span class="material-symbols-outlined">chevron_right</span><a href="product-detail.html">動物ビスケット 20袋</a><span class="material-symbols-outlined">chevron_right</span>アレルゲン確認</div>
@@ -106,7 +115,7 @@
         <span class="material-symbols-outlined">info</span>
         <div class="alert-body">読み取った結果は<b>候補</b>です。写真と原材料表示を見比べて、すべての品目を「含む / 含まない」で確定してください。</div>
       </div>
-      <div class="judge">
+      <div class="check-layout">
         <div class="stack">
           <div class="card">
             <div class="card-head"><h2 class="h6">撮影した写真</h2><button class="btn btn-sm"><span class="material-symbols-outlined">refresh</span>撮り直す</button></div>

@@ -29,9 +29,14 @@
   .s-bad { background: var(--error); color: #fff; font-weight: 700; }
   .draft .snack { border: 1px dashed rgba(0,0,0,.25); }
   .wk-state { font-size: 10px; margin-left: auto; color: var(--text-2); }
+  @media screen and (min-width: 901px) {
+    .cal-scroll { display: flex; flex-direction: column; }
+    .cal { flex: 1; grid-template-rows: auto; grid-auto-rows: minmax(84px, 1fr); }
+    .cell { min-height: 0; overflow: hidden; }
+  }
 </style>
 </head>
-<body data-nav="menus">
+<body data-nav="menus" class="fit">
 <main class="main">
   <div class="container">
     <div class="page-head">
@@ -45,7 +50,8 @@
       </div>
     </div>
 
-    <div class="card">
+    <!-- PC では、月のカレンダーを画面の高さに合わせて広げる（低い画面では、カレンダーの中だけがスクロールする） -->
+    <div class="card fill">
       <div class="cal-head">
         <button class="icon-btn"><span class="material-symbols-outlined">chevron_left</span></button>
         <h2 class="h6">2026年 11月</h2>
@@ -58,7 +64,7 @@
           <span><i style="border:1px dashed rgba(0,0,0,.4)"></i>下書き</span>
         </div>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap scroll cal-scroll">
         <div class="cal" style="min-width:860px">
           <div class="dow sun">日</div><div class="dow">月</div><div class="dow">火</div><div class="dow">水</div><div class="dow">木</div><div class="dow">金</div><div class="dow sat">土</div>
 

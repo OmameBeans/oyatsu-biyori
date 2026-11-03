@@ -40,11 +40,19 @@
   .timeline .t-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
   .timeline .t-body { font-size: 13px; color: var(--text-2); margin-top: 2px; }
   .affected { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid rgba(211,47,47,.3); border-radius: 6px; background: #fff; margin-top: 8px; color: var(--text); }
+  .al-tabs { padding: 0 12px; }
+  @media screen and (min-width: 1101px) {
+    /* 左右の列を画面の高さに合わせ、それぞれの中だけをスクロールする */
+    .layout { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+    .layout > .card { display: flex; flex-direction: column; min-height: 0; }
+    .layout .card-body.scroll { padding-top: 4px; }
+    .al-panel:not([hidden]) { flex: 1; min-height: 0; overflow: auto; }
+  }
   @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
   @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr; } .allergens { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
-<body data-nav="products">
+<body data-nav="products" class="fit-wide">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="products.html">商品一覧</a><span class="material-symbols-outlined">chevron_right</span>ごま揚げせんべい 12袋</div>
@@ -69,7 +77,7 @@
       <!-- 基本情報 -->
       <div class="card">
         <div class="card-head"><h2 class="h6">基本情報</h2></div>
-        <div class="card-body">
+        <div class="card-body scroll">
           <div class="form-grid">
             <div class="field full"><label>商品名</label><input class="input" value="ごま揚げせんべい 12袋"></div>
             <div class="field full"><label>メーカー</label><input class="input" value="こもれび製菓（架空）"></div>
@@ -97,14 +105,17 @@
         <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
       </div>
 
-      <!-- アレルゲン -->
-      <div class="stack">
-        <div class="card">
+      <!-- アレルゲン：いまの状態は上に残し、品目と履歴はタブで切り替える -->
+      <div class="card" id="al-card">
           <div class="status-big">
             <span class="status status-ok" style="height:32px;font-size:14px;padding:0 14px 0 10px"><span class="material-symbols-outlined">check_circle</span>確認済み</span>
             <div class="meta">2026/11/2 14:20 ・ 確認者：ひまわり学童クラブ<br>次の再確認：2027/1/31（90日後）</div>
           </div>
-          <hr class="divider">
+          <div class="tabs al-tabs" data-tabs="#al-card">
+            <button class="tab active" data-tab="al"><span class="material-symbols-outlined">fact_check</span>アレルゲン</button>
+            <button class="tab" data-tab="hist"><span class="material-symbols-outlined">history</span>アレルゲン確認の履歴（3）</button>
+          </div>
+          <div class="tab-panel al-panel" data-panel="al">
           <div class="card-body" style="padding-top:12px">
             <div class="group-title"><span class="material-symbols-outlined" style="font-size:16px">priority_high</span>特定原材料（表示義務のある 8品目）</div>
             <div class="allergens">
@@ -129,11 +140,10 @@
             <div class="group-title" style="margin-top:20px">原材料表示（全文）</div>
             <div class="raw">うるち米（国産）、植物油脂、<mark class="soft">ごま</mark>、しょうゆ（<mark class="soft">小麦</mark>・<mark class="soft">大豆</mark>を含む）、砂糖、<mark>卵白</mark>、食塩／調味料（アミノ酸等）</div>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head"><h2 class="h6">アレルゲン確認の履歴</h2><span class="caption">記録は上書きされず、積み上がります</span></div>
-          <div class="card-body">
+          </div>
+          <div class="tab-panel al-panel" data-panel="hist" hidden>
+            <div class="caption" style="padding:12px 20px 0">記録は上書きされず、積み上がります</div>
+          <div class="card-body" style="padding-top:12px">
             <ol class="timeline">
               <li><span class="dot"></span>
                 <div class="t-head"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span><b class="num">2026/11/2 14:20</b><span class="muted">ひまわり学童クラブ</span></div>
@@ -149,7 +159,7 @@
               </li>
             </ol>
           </div>
-        </div>
+          </div>
       </div>
     </div>
   </div>

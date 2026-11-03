@@ -13,7 +13,7 @@
   .mock-switch button { border: 0; background: none; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; }
   .mock-switch button.active { background: #fff; color: var(--primary); font-weight: 500; box-shadow: var(--shadow-1); }
   body:not([data-avoid="none"]) .avoid-none { display: none; }
-  .sum { display: flex; gap: 8px 24px; flex-wrap: wrap; align-items: center; padding: 14px 20px; font-size: 14px; }
+  .sum { display: flex; gap: 8px 24px; flex-wrap: wrap; align-items: center; padding: 10px 20px; font-size: 14px; }
   .sum b { font-size: 18px; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 14px; align-items: center; }
   .filters .chip { cursor: pointer; height: 30px; padding: 0 12px; border-radius: 15px; }
@@ -47,7 +47,7 @@
   @media (min-width: 901px) { .cat-inline { display: none; } }
 </style>
 </head>
-<body data-nav="menus">
+<body data-nav="menus" class="fit">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
@@ -56,10 +56,7 @@
         <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
         <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
       </div>
-    </div>
-
-    <div class="card mb-16">
-      <div class="stepper">
+      <nav class="stepper in-head" aria-label="手順">
         <a class="step done" href="menu-step1.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">チラシ取り込み</span></a>
         <span class="step-line"></span>
         <a class="step active" href="menu-step2.html"><span class="dot">2</span><span class="label">今週の商品</span></a>
@@ -67,7 +64,7 @@
         <span class="step"><span class="dot">3</span><span class="label">要望の入力</span></span>
         <span class="step-line"></span>
         <span class="step"><span class="dot">4</span><span class="label">献立案とチャット</span></span>
-      </div>
+      </nav>
     </div>
 
     <div class="mock-switch no-print">
@@ -84,7 +81,8 @@
       <a class="btn btn-sm alert-action" href="settings.html?tab=avoid" style="color:var(--warning-text)">避ける品目を設定する</a>
     </div>
 
-    <div class="card">
+    <!-- 件数のまとめ・絞り込み・「要望の入力へ」は残し、商品の表だけをスクロールする -->
+    <div class="card fill">
       <div class="card-head">
         <h2 class="h6">今週のチラシの商品</h2>
         <a class="btn btn-sm" href="menu-step1.html"><span class="material-symbols-outlined">restart_alt</span>チラシを取り込み直す</a>
@@ -95,7 +93,7 @@
         <span><span class="judge judge-ng">🔴 使えません 3件</span></span>
         <span class="muted">今週は使わない 1件 ・ 入数を入れてください 1件</span>
       </div>
-      <div class="filters" style="padding-top:14px">
+      <div class="filters" style="padding-top:10px;padding-bottom:10px;border-bottom:1px solid var(--divider)">
         <span class="chip on">すべて 18</span>
         <span class="chip chip-outlined">🟡 要確認 6</span>
         <span class="chip chip-outlined">🔴 使えません 3</span>
@@ -104,7 +102,7 @@
         <span class="chip chip-outlined">あまい 5</span>
         <span class="chip chip-outlined">のどごし 7</span>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap scroll">
         <table class="table ptable">
           <thead><tr><th>商品</th><th class="right">価格（税込）</th><th>分類</th><th>アレルゲン</th><th class="right">今週</th></tr></thead>
           <tbody>

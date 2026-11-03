@@ -24,10 +24,15 @@
   .avoid .chip { background: var(--error-bg); color: #8e1f1f; }
   .manual { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--divider); background: #fafbfc; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
   .manual .t { flex: 1; min-width: 200px; }
+  @media screen and (min-width: 1101px) {
+    /* 左右のカードを画面の高さに合わせ、「献立を作る」は常に見えるようにする */
+    .layout { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+    .layout > .card { display: flex; flex-direction: column; min-height: 0; }
+  }
   @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
 </style>
 </head>
-<body data-nav="menus">
+<body data-nav="menus" class="fit-wide">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
@@ -36,10 +41,7 @@
         <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
         <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
       </div>
-    </div>
-
-    <div class="card mb-16">
-      <div class="stepper">
+      <nav class="stepper in-head" aria-label="手順">
         <a class="step done" href="menu-step1.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">チラシ取り込み</span></a>
         <span class="step-line"></span>
         <a class="step done" href="menu-step2.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">今週の商品</span></a>
@@ -47,13 +49,13 @@
         <a class="step active" href="menu-step3.html"><span class="dot">3</span><span class="label">要望の入力</span></a>
         <span class="step-line"></span>
         <span class="step"><span class="dot">4</span><span class="label">献立案とチャット</span></span>
-      </div>
+      </nav>
     </div>
 
     <div class="layout">
       <div class="card">
         <div class="card-head"><h2 class="h6">今週の要望</h2><span class="caption">空欄でも献立を作れます</span></div>
-        <div class="card-body stack">
+        <div class="card-body stack scroll">
           <div class="field">
             <label for="req">要望を文章で書いてください</label>
             <textarea id="req" class="textarea" placeholder="例：しょっぱいものとゼリー系を合わせて出したい。&#10;例：金曜は誕生日会なので豪華に。&#10;例：水曜は行事のため、子どもが48人。"></textarea>
@@ -88,7 +90,7 @@
 
       <aside class="card">
         <div class="card-head"><h2 class="h6">いつもの条件</h2><a class="btn btn-sm" href="settings.html">変更</a></div>
-        <div class="card-body">
+        <div class="card-body scroll">
           <dl class="kv" style="margin:0">
             <dt>人数</dt><dd class="num">55 人</dd>
             <dt>おやつを出す日</dt><dd>月〜金（5日）</dd>

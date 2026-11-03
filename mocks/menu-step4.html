@@ -33,15 +33,19 @@
   .u-item .mini-input.wide { width: 96px; text-align: left; }
   .u-item.no-edit { padding-right: 12px; }
   .u-kind { font-size: 11px; color: var(--text-2); }
-  .not-applied { margin-top: 12px; }
+  .not-applied { margin-top: 10px; padding: 8px 12px; font-size: 13px; }
+  .not-applied > .material-symbols-outlined { font-size: 20px; }
+  .understood-card .card-head { padding: 10px 20px 8px; }
+  .understood-card .card-head .h6 { font-size: 16px; }
+  .understood-card .card-body { padding-bottom: 14px; }
 
   /* 予算 */
-  .budget { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 16px 20px; }
+  .budget { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 12px 20px; }
   .budget .b-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--text-2); margin-bottom: 6px; gap: 12px; flex-wrap: wrap; }
   .budget .b-value { font-size: 20px; font-weight: 500; color: var(--text); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .budget .b-value small { font-size: 13px; color: var(--text-2); font-weight: 400; }
   .budget .b-input { width: 110px; height: 32px; font-size: 15px; padding: 0 8px; text-align: right; }
-  .swaps { border-top: 1px solid var(--divider); padding: 12px 20px 16px; background: #fafcff; border-radius: 0 0 8px 8px; }
+  .swaps { padding: 12px 20px 16px; background: #fafcff; border-radius: 8px; }
   .swap { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; border: 1px solid var(--divider); border-radius: 8px; margin-top: 8px; }
   .swap .s-text { flex: 1; min-width: 0; }
   .swap .s-text .caption { display: block; }
@@ -49,12 +53,22 @@
   .swap .s-total small { display: block; font-weight: 400; font-size: 12px; color: var(--text-2); }
 
   /* 警告のまとめ */
-  .warn-sum { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 20px; }
+  .warn-sum { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 20px; }
   .w-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 500; background: #f1f3f6; color: var(--text); white-space: nowrap; }
   .w-chip .material-symbols-outlined { font-size: 16px; color: var(--warning); }
 
   /* 献立とチャット */
-  .work { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; margin-top: 16px; }
+  .work { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+  .work-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .work-scroll { display: flex; flex-direction: column; gap: 16px; }
+  @media screen and (min-width: 901px) {
+    /* 予算と警告のまとめ・チャット・下のボタンは残し、日ごとの献立だけをスクロールする */
+    .container > .state-plan { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .work { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+    .work-main { min-height: 0; }
+    .work-scroll { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 4px 2px; margin: -2px -8px 0 -2px; }
+    .work > .chat { position: static; height: auto; min-height: 0; }
+  }
   .days { display: flex; flex-direction: column; gap: 12px; }
   .day { overflow: hidden; }
   .day-head { display: flex; align-items: center; gap: 8px 12px; padding: 10px 16px; border-bottom: 1px solid var(--divider); background: #fafbfc; flex-wrap: wrap; }
@@ -137,7 +151,8 @@
     .budget { grid-template-columns: 1fr; gap: 14px; padding: 14px 16px; }
     .mobile-tabs { display: flex; background: #fff; border-radius: 8px 8px 0 0; margin-top: 16px; box-shadow: var(--shadow-1); }
     .mobile-tabs .tab { flex: 1; justify-content: center; }
-    .work { grid-template-columns: 1fr; margin-top: 0; }
+    .work { grid-template-columns: 1fr; }
+    body[data-mtab="chat"] .work { gap: 0; }
     body[data-mtab="menu"] .chat { display: none; }
     body[data-mtab="chat"] .days { display: none; }
     .chat { position: static; height: 70vh; border-radius: 0 0 8px 8px; }
@@ -153,7 +168,7 @@
   }
 </style>
 </head>
-<body data-nav="menus" data-state="plan" data-mtab="menu" data-no-banner="1">
+<body data-nav="menus" class="fit" data-state="plan" data-mtab="menu" data-no-banner="1">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
@@ -165,10 +180,7 @@
           <span class="chip chip-fixed" style="height:20px;background:var(--success-bg);color:var(--success)">確定</span>
           　途中でやめても、ここまでの内容は自動で保存されます</p>
       </div>
-    </div>
-
-    <div class="card mb-16">
-      <div class="stepper">
+      <nav class="stepper in-head" aria-label="手順">
         <a class="step done" href="menu-step1.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">チラシ取り込み</span></a>
         <span class="step-line"></span>
         <a class="step done" href="menu-step2.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">今週の商品</span></a>
@@ -176,7 +188,7 @@
         <a class="step done" href="menu-step3.html"><span class="dot"><span class="material-symbols-outlined">check</span></span><span class="label">要望の入力</span></a>
         <span class="step-line"></span>
         <a class="step active" href="menu-step4.html"><span class="dot">4</span><span class="label">献立案とチャット</span></a>
-      </div>
+      </nav>
     </div>
 
     <div class="mock-switch no-print">
@@ -211,239 +223,249 @@
     </div>
 
     <div class="state-plan">
-      <!-- 確定済みの献立を開いたとき（D-54・D-71） -->
-      <div class="alert alert-success mb-16 state-fixed">
-        <span class="material-symbols-outlined">task_alt</span>
-        <div class="alert-body"><div class="alert-title">確定済みの献立です（11/3 確定）</div>商品・個数・日の種類などを直し始めると下書きに戻り、もう一度「確定」が必要です。警告の商品にチェックを付け直すだけなら、確定のままです。</div>
-      </div>
-
-      <!-- 自分で組むとき（FR-MENU-07d） -->
-      <div class="alert alert-info mb-16 state-manual">
-        <span class="material-symbols-outlined">edit_calendar</span>
-        <div class="alert-body"><div class="alert-title">自分で組む献立です</div>日ごとに「商品を追加」から、今週のチラシの商品を入れてください。金額・アレルゲン・重複のチェックは、AI を使うときと同じように出ます。</div>
-      </div>
-
-      <!-- 要望の理解（FR-MENU-04）。人数・日の種類・見出しはその場で直せる -->
-      <div class="card mb-16 hide-manual">
-        <div class="card-head" style="padding-bottom:10px">
-          <h2 class="h6"><span class="material-symbols-outlined" style="color:var(--primary)">psychology</span> 要望をこう理解しました</h2>
-          <a class="btn btn-sm" href="menu-step3.html"><span class="material-symbols-outlined">edit</span>要望を直す</a>
-        </div>
-        <div class="card-body">
-          <div class="understood">
-            <span class="u-item no-edit"><b>毎日</b>しょっぱいもの ＋ ゼリー系<span class="u-kind">（方針）</span></span>
-            <span class="u-item"><b>水曜</b>人数 <input class="mini-input num" value="48"> 人</span>
-            <span class="u-item"><b>金曜</b>見出し <input class="mini-input wide" value="誕生日会"></span>
-            <span class="u-item no-edit"><b>金曜</b>豪華にする<span class="u-kind">（方針）</span></span>
-          </div>
-          <div class="alert alert-warning not-applied">
-            <span class="material-symbols-outlined">block</span>
-            <div class="alert-body"><div class="alert-title">反映しなかった要望</div>「予算は気にしなくていい」：週の予算は要望では変えられません。変えるときは、下の「週の予算」を直してください。</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 予算（週ごと） -->
-      <div class="card">
-        <div class="budget">
-          <div>
-            <div class="b-label"><span>週の実績 / 週の予算</span><span>あと <b class="num" style="color:var(--text)">1,282 円</b></span></div>
-            <div class="b-value num mb-8">13,718 <small>/</small> <input class="input b-input num" value="15,000" aria-label="週の予算"> <small>円</small>
-              <span class="caption" style="font-size:12px">既定は 15,000 円。この週だけ変えられます</span></div>
-            <div class="meter"><span style="width:91.5%"></span></div>
-          </div>
-          <!-- 実績が予算に届かないときだけ出す（D-67） -->
-          <div class="b-action"><button class="btn btn-outlined"><span class="material-symbols-outlined">savings</span>予算に合わせる</button></div>
-        </div>
-        <div class="swaps">
-          <div class="caption">週の予算に近づける入れ替え案（アプリが計算し、AI が要望に合うものを説明しています。選ぶと献立に反映します）</div>
-          <div class="swap">
-            <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
-            <div class="s-text">月曜の「ぶどうゼリー」を「果肉入りフルーツゼリー 6個入」に<span class="caption">ゼリー系のまま、果肉入りで満足感が上がります。<span class="judge judge-ok" style="height:20px">🟢 使えます</span></span></div>
-            <span class="s-total num">→ 14,752 円<small>あと 248 円</small></span>
-            <button class="btn btn-sm btn-outlined">選ぶ</button>
-          </div>
-          <div class="swap">
-            <span class="material-symbols-outlined" style="color:var(--primary)">add_circle</span>
-            <div class="s-text">火曜に「動物ビスケット 20袋」を追加<span class="caption">火曜はしょっぱいものとゼリーなので、あまいものを1つ足せます。<span class="judge judge-warn" style="height:20px">🟡 要確認</span></span></div>
-            <span class="s-total num">→ 14,612 円<small>あと 388 円</small></span>
-            <button class="btn btn-sm btn-outlined">選ぶ</button>
-          </div>
-          <div class="swap">
-            <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
-            <div class="s-text">木曜の「ももゼリー」を「りんごジュース 24本」に<span class="caption">「ゼリー系」の要望から少し外れますが、🟡 の商品が1つ減ります。<span class="judge judge-ok" style="height:20px">🟢 使えます</span></span></div>
-            <span class="s-total num">→ 14,566 円<small>あと 434 円</small></span>
-            <button class="btn btn-sm btn-outlined">選ぶ</button>
-          </div>
-          <div class="caption mt-8">ちょうど 15,000 円になる案はありませんでした。いちばん近いのは 14,752 円（あと 248 円）です。</div>
-        </div>
-      </div>
-
-      <!-- 警告のまとめ（種類ごと） -->
-      <div class="card mt-16">
-        <div class="warn-sum">
-          <span class="subtitle" style="margin-right:4px">この献立の警告</span>
-          <span class="judge judge-ng">🔴 使えません 1件</span>
-          <span class="judge judge-warn">🟡 要確認 4件</span>
-          <span class="w-chip"><span class="material-symbols-outlined">event_repeat</span>前に出した商品 1件</span>
-          <span class="w-chip"><span class="material-symbols-outlined">inventory</span>パック数が足りない 1件</span>
-          <span class="w-chip"><span class="material-symbols-outlined">report</span>直しきれなかった問題 1件</span>
-        </div>
-      </div>
-
-      <div class="tabs mobile-tabs" data-mobile-tabs>
-        <button class="tab active" data-m="menu"><span class="material-symbols-outlined">restaurant_menu</span>献立</button>
-        <button class="tab" data-m="chat"><span class="material-symbols-outlined">chat</span>チャット</button>
-      </div>
-
       <div class="work">
-        <div class="days">
-          <!-- 月 -->
-          <article class="card day">
-            <div class="day-head">
-              <span class="d-date">11/9（月）</span>
-              <input class="input d-title" placeholder="見出し（任意）">
-              <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
-              <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
-              <span class="d-total"><b class="num">2,438 円</b>　1人あたり <span class="num">44 円</span></span>
+        <div class="work-main">
+          <!-- 予算と警告のまとめ（PC では常に見える） -->
+          <div class="card summary">
+            <!-- 予算（週ごと） -->
+            <div class="budget">
+              <div>
+                <div class="b-label"><span>週の実績 / 週の予算</span><span>あと <b class="num" style="color:var(--text)">1,282 円</b></span></div>
+                <div class="b-value num mb-8">13,718 <small>/</small> <input class="input b-input num" value="15,000" aria-label="週の予算"> <small>円</small>
+                  <span class="caption" style="font-size:12px">既定は 15,000 円。この週だけ変えられます</span></div>
+                <div class="meter"><span style="width:91.5%"></span></div>
+              </div>
+              <!-- 実績が予算に届かないときだけ出す（D-67） -->
+              <div class="b-action"><button class="btn btn-outlined" data-toggle-swaps><span class="material-symbols-outlined">savings</span>予算に合わせる</button></div>
             </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
-              <div><div class="i-name">うすしおポテトチップス 小袋15袋<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">スナック</span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 298円 × <input class="input num" value="4"> パック（60袋）<b>1,192 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+            <hr class="divider">
+            <!-- 警告のまとめ（種類ごと） -->
+            <div class="warn-sum">
+              <span class="subtitle" style="margin-right:4px">この献立の警告</span>
+              <span class="judge judge-ng">🔴 使えません 1件</span>
+              <span class="judge judge-warn">🟡 要確認 4件</span>
+              <span class="w-chip"><span class="material-symbols-outlined">event_repeat</span>前に出した商品 1件</span>
+              <span class="w-chip"><span class="material-symbols-outlined">inventory</span>パック数が足りない 1件</span>
+              <span class="w-chip"><span class="material-symbols-outlined">report</span>直しきれなかった問題 1件</span>
             </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
-              <div><div class="i-name">ぶどうゼリー 8個入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">ぶどう</span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
-            <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>要望の「しょっぱいもの＋ゼリー系」に合わせました。ポテトチップスは前回から 65日あいていて、補足ルール（60日）も守れています。</div></div>
-          </article>
+          </div>
 
-          <!-- 火 -->
-          <article class="card day">
-            <div class="day-head">
-              <span class="d-date">11/10（火）</span>
-              <input class="input d-title" placeholder="見出し（任意）">
-              <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
-              <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
-              <span class="d-total"><b class="num">2,140 円</b>　1人あたり <span class="num">39 円</span></span>
+          <!-- PC では、ここから下（日ごとの献立）だけがスクロールする -->
+          <div class="work-scroll">
+            <!-- 確定済みの献立を開いたとき（D-54・D-71） -->
+            <div class="alert alert-success state-fixed">
+              <span class="material-symbols-outlined">task_alt</span>
+              <div class="alert-body"><div class="alert-title">確定済みの献立です（11/3 確定）</div>商品・個数・日の種類などを直し始めると下書きに戻り、もう一度「確定」が必要です。警告の商品にチェックを付け直すだけなら、確定のままです。</div>
             </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
-              <div><div class="i-name">塩せんべい 20枚入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag">せんべい</span></div>
-                <div class="item-warn dup"><span class="material-symbols-outlined">event_repeat</span>25日前に出しました（しょっぱいもの：30日あける）</div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 枚 ・ 298円 × <input class="input num" value="3"> パック（60枚）<b>894 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
-              <div><div class="i-name">みかんゼリー 8個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">みかん</span></div>
-                <div class="judge-why warn">前回の確認から103日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
-            <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>しょっぱいものは、30日以内に出していないものが残り少なかったため、25日前の塩せんべいを選びました。気になる場合はチャットで「火曜のせんべいを替えて」と伝えてください。</div></div>
-          </article>
 
-          <!-- 水：届いた後の確認で 🔴 になった商品（FR-MENU-36）＋ パック数の不足 -->
-          <article class="card day has-error">
-            <div class="day-head">
-              <span class="d-date">11/11（水）</span>
-              <input class="input d-title" placeholder="見出し（任意）">
-              <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
-              <span class="d-people changed"><span class="material-symbols-outlined">group</span><input class="input num" value="48">人（要望から）</span>
-              <span class="d-total"><b class="num">1,922 円</b>　1人あたり <span class="num">40 円</span></span>
+            <!-- 自分で組むとき（FR-MENU-07d） -->
+            <div class="alert alert-info state-manual">
+              <span class="material-symbols-outlined">edit_calendar</span>
+              <div class="alert-body"><div class="alert-title">自分で組む献立です</div>日ごとに「商品を追加」から、今週のチラシの商品を入れてください。金額・アレルゲン・重複のチェックは、AI を使うときと同じように出ます。</div>
             </div>
-            <div class="item blocked">
-              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
-              <div><div class="i-name">ごま揚げせんべい 12袋</div><div class="tags"><span class="chip chip-tag">せんべい</span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 袋 ・ 258円 × <input class="input num" value="4"> パック（48袋）<b>1,032 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="alert alert-error">
-              <span class="material-symbols-outlined">dangerous</span>
-              <div class="alert-body">
-                <div class="alert-title">🔴 使えません：卵を含みます。別の商品に替えてください</div>
-                11/5 のパッケージ確認で、卵を含むと記録されました。
-                <!-- 代わりの提案（あると良い。FR-MENU-38） -->
-                <div class="alts">
-                  <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>えびせん 15袋</b>　<span class="caption num">278円 × 4 ＝ 1,112 円</span>　<span class="judge judge-warn" style="height:20px">🟡 要確認</span></div><button class="btn btn-sm btn-outlined">これにする</button></div>
-                  <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>スティックポテト サラダ味 10袋</b>　<span class="caption num">458円 × 5 ＝ 2,290 円 ・ 7日前に出した</span>　<span class="judge judge-ok" style="height:20px">🟢 使えます</span></div><button class="btn btn-sm btn-outlined">これにする</button></div>
+
+            <!-- 要望の理解（FR-MENU-04）。人数・日の種類・見出しはその場で直せる -->
+            <div class="card hide-manual understood-card">
+              <div class="card-head">
+                <h2 class="h6"><span class="material-symbols-outlined" style="color:var(--primary)">psychology</span> 要望をこう理解しました</h2>
+                <a class="btn btn-sm" href="menu-step3.html"><span class="material-symbols-outlined">edit</span>要望を直す</a>
+              </div>
+              <div class="card-body">
+                <div class="understood">
+                  <span class="u-item no-edit"><b>毎日</b>しょっぱいもの ＋ ゼリー系<span class="u-kind">（方針）</span></span>
+                  <span class="u-item"><b>水曜</b>人数 <input class="mini-input num" value="48"> 人</span>
+                  <span class="u-item"><b>金曜</b>見出し <input class="mini-input wide" value="誕生日会"></span>
+                  <span class="u-item no-edit"><b>金曜</b>豪華にする<span class="u-kind">（方針）</span></span>
+                </div>
+                <div class="alert alert-warning not-applied">
+                  <span class="material-symbols-outlined">block</span>
+                  <div class="alert-body"><b>反映しなかった要望</b>　「予算は気にしなくていい」：週の予算は要望では変えられません。変えるときは、上の「週の予算」を直してください。</div>
                 </div>
               </div>
             </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
-              <div><div class="i-name">りんごゼリー 8個入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">りんご</span></div>
-                <div class="item-warn short"><span class="material-symbols-outlined">inventory</span>パック数が全員分に足りません（40個 / 48人分）</div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="5"> パック（40個）<b>890 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
-            <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>要望どおり、人数を 48人で計算しました。</div></div>
-          </article>
 
-          <!-- 木：直しきれなかった検証の問題 -->
-          <article class="card day">
-            <div class="day-head">
-              <span class="d-date">11/12（木）</span>
-              <input class="input d-title" placeholder="見出し（任意）">
-              <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
-              <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
-              <span class="d-total"><b class="num">2,736 円</b>　1人あたり <span class="num">50 円</span></span>
+            <!-- 週の予算に近づける入れ替え案（「予算に合わせる」を押すと出る。FR-MENU-26） -->
+            <div class="card" id="swaps" hidden>
+              <div class="swaps">
+                <div class="caption">週の予算に近づける入れ替え案（アプリが計算し、AI が要望に合うものを説明しています。選ぶと献立に反映します）</div>
+                <div class="swap">
+                  <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
+                  <div class="s-text">月曜の「ぶどうゼリー」を「果肉入りフルーツゼリー 6個入」に<span class="caption">ゼリー系のまま、果肉入りで満足感が上がります。<span class="judge judge-ok" style="height:20px">🟢 使えます</span></span></div>
+                  <span class="s-total num">→ 14,752 円<small>あと 248 円</small></span>
+                  <button class="btn btn-sm btn-outlined">選ぶ</button>
+                </div>
+                <div class="swap">
+                  <span class="material-symbols-outlined" style="color:var(--primary)">add_circle</span>
+                  <div class="s-text">火曜に「動物ビスケット 20袋」を追加<span class="caption">火曜はしょっぱいものとゼリーなので、あまいものを1つ足せます。<span class="judge judge-warn" style="height:20px">🟡 要確認</span></span></div>
+                  <span class="s-total num">→ 14,612 円<small>あと 388 円</small></span>
+                  <button class="btn btn-sm btn-outlined">選ぶ</button>
+                </div>
+                <div class="swap">
+                  <span class="material-symbols-outlined" style="color:var(--primary)">swap_horiz</span>
+                  <div class="s-text">木曜の「ももゼリー」を「りんごジュース 24本」に<span class="caption">「ゼリー系」の要望から少し外れますが、🟡 の商品が1つ減ります。<span class="judge judge-ok" style="height:20px">🟢 使えます</span></span></div>
+                  <span class="s-total num">→ 14,566 円<small>あと 434 円</small></span>
+                  <button class="btn btn-sm btn-outlined">選ぶ</button>
+                </div>
+                <div class="caption mt-8">ちょうど 15,000 円になる案はありませんでした。いちばん近いのは 14,752 円（あと 248 円）です。</div>
+              </div>
             </div>
-            <div class="alert alert-warning">
-              <span class="material-symbols-outlined">report</span>
-              <div class="alert-body">AI が選んだ「チョコパイ 6個入」は今週のチラシにないため、外しました。</div>
-            </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
-              <div><div class="i-name">のりしおポップコーン 12袋<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">スナック</span></div>
-                <div class="judge-why warn">前回の確認から97日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 袋 ・ 298円 × <input class="input num" value="5"> パック（60袋）<b>1,490 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
-              <div><div class="i-name">ももゼリー 8個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">もも</span></div>
-                <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
-            <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>月曜・火曜と味が重ならないよう、のりしおのポップコーンと、新しく載ったももゼリーにしました。</div></div>
-          </article>
 
-          <!-- 金 -->
-          <article class="card day">
-            <div class="day-head">
-              <span class="d-date">11/13（金）</span>
-              <input class="input d-title" value="誕生日会">
-              <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
-              <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
-              <span class="d-total"><b class="num">4,482 円</b>　1人あたり <span class="num">81 円</span></span>
+            <div class="menu-block">
+              <div class="tabs mobile-tabs" data-mobile-tabs>
+                <button class="tab active" data-m="menu"><span class="material-symbols-outlined">restaurant_menu</span>献立</button>
+                <button class="tab" data-m="chat"><span class="material-symbols-outlined">chat</span>チャット</button>
+              </div>
+
+              <div class="days">
+                <!-- 月 -->
+                <article class="card day">
+                  <div class="day-head">
+                    <span class="d-date">11/9（月）</span>
+                    <input class="input d-title" placeholder="見出し（任意）">
+                    <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
+                    <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
+                    <span class="d-total"><b class="num">2,438 円</b>　1人あたり <span class="num">44 円</span></span>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+                    <div><div class="i-name">うすしおポテトチップス 小袋15袋<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">スナック</span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 298円 × <input class="input num" value="4"> パック（60袋）<b>1,192 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+                    <div><div class="i-name">ぶどうゼリー 8個入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">ぶどう</span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
+                  <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>要望の「しょっぱいもの＋ゼリー系」に合わせました。ポテトチップスは前回から 65日あいていて、補足ルール（60日）も守れています。</div></div>
+                </article>
+
+                <!-- 火 -->
+                <article class="card day">
+                  <div class="day-head">
+                    <span class="d-date">11/10（火）</span>
+                    <input class="input d-title" placeholder="見出し（任意）">
+                    <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
+                    <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
+                    <span class="d-total"><b class="num">2,140 円</b>　1人あたり <span class="num">39 円</span></span>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+                    <div><div class="i-name">塩せんべい 20枚入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag">せんべい</span></div>
+                      <div class="item-warn dup"><span class="material-symbols-outlined">event_repeat</span>25日前に出しました（しょっぱいもの：30日あける）</div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 枚 ・ 298円 × <input class="input num" value="3"> パック（60枚）<b>894 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+                    <div><div class="i-name">みかんゼリー 8個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">みかん</span></div>
+                      <div class="judge-why warn">前回の確認から103日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
+                  <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>しょっぱいものは、30日以内に出していないものが残り少なかったため、25日前の塩せんべいを選びました。気になる場合はチャットで「火曜のせんべいを替えて」と伝えてください。</div></div>
+                </article>
+
+                <!-- 水：届いた後の確認で 🔴 になった商品（FR-MENU-36）＋ パック数の不足 -->
+                <article class="card day has-error">
+                  <div class="day-head">
+                    <span class="d-date">11/11（水）</span>
+                    <input class="input d-title" placeholder="見出し（任意）">
+                    <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
+                    <span class="d-people changed"><span class="material-symbols-outlined">group</span><input class="input num" value="48">人（要望から）</span>
+                    <span class="d-total"><b class="num">1,922 円</b>　1人あたり <span class="num">40 円</span></span>
+                  </div>
+                  <div class="item blocked">
+                    <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+                    <div><div class="i-name">ごま揚げせんべい 12袋</div><div class="tags"><span class="chip chip-tag">せんべい</span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 袋 ・ 258円 × <input class="input num" value="4"> パック（48袋）<b>1,032 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="alert alert-error">
+                    <span class="material-symbols-outlined">dangerous</span>
+                    <div class="alert-body">
+                      <div class="alert-title">🔴 使えません：卵を含みます。別の商品に替えてください</div>
+                      11/5 のパッケージ確認で、卵を含むと記録されました。
+                      <!-- 代わりの提案（あると良い。FR-MENU-38） -->
+                      <div class="alts">
+                        <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>えびせん 15袋</b>　<span class="caption num">278円 × 4 ＝ 1,112 円</span>　<span class="judge judge-warn" style="height:20px">🟡 要確認</span></div><button class="btn btn-sm btn-outlined">これにする</button></div>
+                        <div class="alt"><span class="cat cat-salty">しょっぱい</span><div class="a-text"><b>スティックポテト サラダ味 10袋</b>　<span class="caption num">458円 × 5 ＝ 2,290 円 ・ 7日前に出した</span>　<span class="judge judge-ok" style="height:20px">🟢 使えます</span></div><button class="btn btn-sm btn-outlined">これにする</button></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+                    <div><div class="i-name">りんごゼリー 8個入<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">りんご</span></div>
+                      <div class="item-warn short"><span class="material-symbols-outlined">inventory</span>パック数が全員分に足りません（40個 / 48人分）</div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="5"> パック（40個）<b>890 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
+                  <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>要望どおり、人数を 48人で計算しました。</div></div>
+                </article>
+
+                <!-- 木：直しきれなかった検証の問題 -->
+                <article class="card day">
+                  <div class="day-head">
+                    <span class="d-date">11/12（木）</span>
+                    <input class="input d-title" placeholder="見出し（任意）">
+                    <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
+                    <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
+                    <span class="d-total"><b class="num">2,736 円</b>　1人あたり <span class="num">50 円</span></span>
+                  </div>
+                  <div class="alert alert-warning">
+                    <span class="material-symbols-outlined">report</span>
+                    <div class="alert-body">AI が選んだ「チョコパイ 6個入」は今週のチラシにないため、外しました。</div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></span>
+                    <div><div class="i-name">のりしおポップコーン 12袋<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">スナック</span></div>
+                      <div class="judge-why warn">前回の確認から97日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 袋 ・ 298円 × <input class="input num" value="5"> パック（60袋）<b>1,490 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+                    <div><div class="i-name">ももゼリー 8個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag tag-hit">ゼリー</span><span class="chip chip-tag">もも</span></div>
+                      <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 178円 × <input class="input num" value="7"> パック（56個）<b>1,246 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
+                  <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>月曜・火曜と味が重ならないよう、のりしおのポップコーンと、新しく載ったももゼリーにしました。</div></div>
+                </article>
+
+                <!-- 金 -->
+                <article class="card day">
+                  <div class="day-head">
+                    <span class="d-date">11/13（金）</span>
+                    <input class="input d-title" value="誕生日会">
+                    <select class="select d-type"><option>通常</option><option>手作り</option><option>おやつなし</option></select>
+                    <span class="d-people"><span class="material-symbols-outlined">group</span><input class="input num" value="55">人</span>
+                    <span class="d-total"><b class="num">4,482 円</b>　1人あたり <span class="num">81 円</span></span>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></span>
+                    <div><div class="i-name">いちごミニ大福 10個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag">焼き菓子</span><span class="chip chip-tag">いちご</span></div>
+                      <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 448円 × <input class="input num" value="6"> パック（60個）<b>2,688 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="item">
+                    <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
+                    <div><div class="i-name">オレンジジュース 125ml<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag">ジュース</span></div></div>
+                    <div class="i-calc num">1人 <input class="input num" value="1"> 本 ・ 598円 × <input class="input num" value="3"> パック（60本）<b>1,794 円</b></div>
+                    <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
+                  </div>
+                  <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
+                  <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>誕生日会なので、ふだんより 1人あたりの金額を上げて、いちごの大福とジュースにしました。週の予算の中に収まっています。</div></div>
+                </article>
+              </div>
             </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></span>
-              <div><div class="i-name">いちごミニ大福 10個入<span class="judge judge-warn">🟡 要確認</span></div><div class="tags"><span class="chip chip-tag">焼き菓子</span><span class="chip chip-tag">いちご</span></div>
-                <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください　<a href="allergen-check.html">確認する</a></span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 個 ・ 448円 × <input class="input num" value="6"> パック（60個）<b>2,688 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="item">
-              <span class="i-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></span>
-              <div><div class="i-name">オレンジジュース 125ml<span class="judge judge-ok">🟢 使えます</span></div><div class="tags"><span class="chip chip-tag">ジュース</span></div></div>
-              <div class="i-calc num">1人 <input class="input num" value="1"> 本 ・ 598円 × <input class="input num" value="3"> パック（60本）<b>1,794 円</b></div>
-              <div class="i-ops"><button class="icon-btn" aria-label="入れ替える" title="入れ替える"><span class="material-symbols-outlined">swap_horiz</span></button><button class="icon-btn" aria-label="削除" title="削除"><span class="material-symbols-outlined">delete</span></button></div>
-            </div>
-            <div class="add-item"><button class="btn btn-sm"><span class="material-symbols-outlined">add</span>商品を追加</button></div>
-            <div class="reason hide-manual"><span class="material-symbols-outlined">lightbulb</span><div>誕生日会なので、ふだんより 1人あたりの金額を上げて、いちごの大福とジュースにしました。週の予算の中に収まっています。</div></div>
-          </article>
+          </div>
         </div>
 
         <!-- チャット（説明文だけを履歴に残す。D-58） -->
@@ -538,6 +560,10 @@
     document.querySelectorAll("[data-mobile-tabs] .tab").forEach((x) => x.classList.toggle("active", x === t));
   }));
   if (q.get("m") === "chat") document.querySelector('[data-m="chat"]').click();
+  // 「予算に合わせる」で入れ替え案を出す・閉じる（?swaps=1 で最初から出す）
+  const swaps = document.getElementById("swaps");
+  document.querySelector("[data-toggle-swaps]").addEventListener("click", () => { swaps.hidden = !swaps.hidden; });
+  if (q.get("swaps")) swaps.hidden = false;
 </script>
 </body>
 </html>

@@ -77,6 +77,12 @@
   .missed { padding: 16px 20px; }
   .missed-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px dashed rgba(237,108,2,.5); border-radius: 8px; background: #fffaf2; margin-top: 8px; font-size: 13px; }
   .missed-item .t { flex: 1; min-width: 0; }
+  @media screen and (min-width: 901px) {
+    /* 見出しと「読み取る」「確定」などのボタンは残し、ページや商品の一覧だけをスクロールする */
+    .tab-panel:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .upload-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: minmax(0, 1fr); gap: 16px; }
+    .upload-grid > .card { display: flex; flex-direction: column; min-height: 0; margin-top: 0; }
+  }
   @media (max-width: 900px) {
     .capture-btn { height: 112px; font-size: 15px; }
     .thumbs { grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -85,7 +91,7 @@
   }
 </style>
 </head>
-<body data-nav="menus">
+<body data-nav="menus" class="fit">
 <main class="main">
   <div class="container">
     <div class="breadcrumbs"><a href="menus.html">献立一覧</a><span class="material-symbols-outlined">chevron_right</span>11/9（月）〜 11/13（金）</div>
@@ -94,10 +100,7 @@
         <h1 class="h5">11/9（月）〜 11/13（金）の献立</h1>
         <p class="caption"><span class="chip chip-outlined" style="height:20px">下書き</span>　途中でやめても、ここまでの内容は自動で保存されます</p>
       </div>
-    </div>
-
-    <div class="card mb-16">
-      <div class="stepper">
+      <nav class="stepper in-head" aria-label="手順">
         <a class="step active" href="menu-step1.html"><span class="dot">1</span><span class="label">チラシ取り込み</span></a>
         <span class="step-line"></span>
         <span class="step"><span class="dot">2</span><span class="label">今週の商品</span></span>
@@ -105,7 +108,7 @@
         <span class="step"><span class="dot">3</span><span class="label">要望の入力</span></span>
         <span class="step-line"></span>
         <span class="step"><span class="dot">4</span><span class="label">献立案とチャット</span></span>
-      </div>
+      </nav>
     </div>
 
     <div class="tabs mock-switch no-print" data-tabs="main">
@@ -117,9 +120,11 @@
 
     <!-- ① 取り込み -->
     <section class="tab-panel" data-panel="upload">
+      <!-- PC では、左に取り込みのボタン、右に取り込んだページを並べる -->
+      <div class="upload-grid">
       <div class="card">
         <div class="card-head"><h2 class="h6">チラシを取り込む</h2><span class="caption">対象週：11/9（月）〜 11/13（金）</span></div>
-        <div class="card-body">
+        <div class="card-body scroll">
           <div class="alert alert-info mb-16">
             <span class="material-symbols-outlined">photo_camera</span>
             <div class="alert-body">小さい文字が読めるよう、<b>1ページを半分ずつ近づけて</b>撮ってください。</div>
@@ -134,7 +139,7 @@
 
       <div class="card mt-16">
         <div class="card-head"><h2 class="h6">取り込んだページ <span class="caption">4枚中 3枚を読み取ります（10枚まで）</span></h2></div>
-        <div class="card-body">
+        <div class="card-body scroll">
           <div class="thumbs">
             <div class="thumb">
               <div class="paper-img"><div class="band"></div><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
@@ -164,13 +169,14 @@
           <button class="btn btn-contained btn-lg" data-goto="reading"><span class="material-symbols-outlined">document_scanner</span>読み取る</button>
         </div>
       </div>
+      </div>
     </section>
 
     <!-- ①' PDF のページ選び（FR-FLYER-01a） -->
     <section class="tab-panel" data-panel="pdf" hidden>
-      <div class="card">
+      <div class="card fill">
         <div class="card-head"><h2 class="h6">チラシ.pdf から取り込むページを選ぶ</h2><span class="caption">8ページ中 2ページを選んでいます</span></div>
-        <div class="card-body">
+        <div class="card-body scroll">
           <div class="thumbs">
             <div class="thumb"><label class="pick"><input type="checkbox" checked></label><div class="paper-img"><div class="band" style="background:linear-gradient(90deg,#66bb6a,#d4e157)"></div><div class="cells"><i></i><i></i><i></i><i></i></div></div><div class="meta">1ページ</div></div>
             <div class="thumb"><label class="pick"><input type="checkbox" checked></label><div class="paper-img"><div class="band" style="background:#bdbdbd"></div><div class="cells"><i></i><i></i></div></div><div class="meta">2ページ</div></div>
@@ -208,7 +214,8 @@
         <span class="material-symbols-outlined">info</span>
         <div class="alert-body">おやつに使えそうな商品を <b>18件</b> 見つけました。読み取った内容をチラシと見比べ、登録済みの商品と同じかどうかを選んで「確定」してください。<b>迷うときは「新しい商品として登録」</b>にしてください。</div>
       </div>
-      <div class="card">
+      <!-- 件数のまとめと「今週の商品へ」は残し、商品の一覧だけをスクロールする -->
+      <div class="card fill">
         <div class="card-head"><h2 class="h6">読み取った商品</h2>
           <button class="btn btn-outlined btn-sm"><span class="material-symbols-outlined">done_all</span>「同じ商品」をまとめて確定（5件）</button>
         </div>
@@ -219,6 +226,7 @@
           <span><b class="num" style="color:var(--warning-text)">3</b> 確かめてほしい項目</span>
           <span style="margin-left:auto;color:var(--warning-text);font-weight:500">確定していない 12件は、今週の商品に入りません</span>
         </div>
+        <div class="scroll">
         <div class="results">
           <!-- 確定済み（選び直せる。D-53） -->
           <div class="res fixed">
@@ -391,6 +399,7 @@
             <span class="material-symbols-outlined">info</span>
             <div class="alert-body"><span class="caption" style="color:inherit">（確かめが失敗したときの表示の例）</span><br>読み違いの確かめができませんでした。読み取った内容を、チラシとよく見比べてください。</div>
           </div>
+        </div>
         </div>
 
         <div class="card-actions">

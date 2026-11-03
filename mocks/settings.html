@@ -36,6 +36,10 @@
   .extra .words { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
   .log { font-size: 13px; }
   .log td { padding: 8px 12px; }
+  @media screen and (min-width: 901px) {
+    /* タブと「保存」は残し、タブの中身だけをスクロールする */
+    .tab-panel:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  }
   @media (max-width: 900px) {
     .section { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
     .dup { grid-template-columns: 1fr 120px; }
@@ -45,7 +49,7 @@
   }
 </style>
 </head>
-<body data-nav="settings">
+<body data-nav="settings" class="fit">
 <main class="main">
   <div class="container">
     <div class="page-head">
@@ -55,7 +59,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card fill">
       <div class="tabs tabs-card" data-tabs="main">
         <button class="tab active" data-tab="cond"><span class="material-symbols-outlined">tune</span>条件設定</button>
         <button class="tab" data-tab="avoid"><span class="material-symbols-outlined">no_food</span>避ける品目</button>
@@ -64,6 +68,7 @@
 
       <!-- SC-03 条件設定 -->
       <div class="tab-panel" data-panel="cond">
+        <div class="scroll">
         <div class="section">
           <div><div class="s-title">子どもの人数</div><div class="s-desc">ふだんの人数。日ごとの増減は、献立を作るときの要望で伝えます。</div></div>
           <div class="field w-160"><div class="input-adorn"><input class="input num" value="55" style="padding-left:14px"><span class="suffix">人</span></div></div>
@@ -110,11 +115,13 @@
             </div>
           </div>
         </div>
+        </div>
         <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
       </div>
 
       <!-- SC-04 避ける品目 -->
       <div class="tab-panel" data-panel="avoid" hidden>
+        <div class="scroll">
         <div class="section" style="display:block">
           <div class="alert alert-warning">
             <span class="material-symbols-outlined">warning</span>
@@ -199,11 +206,13 @@
             </tbody>
           </table>
         </div>
+        </div>
         <div class="card-actions"><button class="btn">取り消す</button><button class="btn btn-contained">保存</button></div>
       </div>
 
       <!-- SC-12 パスワード変更 -->
       <div class="tab-panel" data-panel="pw" hidden>
+        <div class="scroll">
         <div class="section">
           <div><div class="s-title">パスワード変更</div><div class="s-desc">12文字以上。ほかのサービスと同じパスワードは使わないでください。</div></div>
           <div class="stack" style="max-width:360px">
@@ -211,6 +220,7 @@
             <div class="field"><label>新しいパスワード</label><input class="input" type="password" value="xxxxxxxxxxxxxx"><div class="meter mt-8"><span style="width:75%;background:var(--success)"></span></div><span class="help">強さ：じゅうぶん</span></div>
             <div class="field"><label>新しいパスワード（確認）</label><input class="input" type="password"></div>
           </div>
+        </div>
         </div>
         <div class="card-actions"><button class="btn btn-contained">変更する</button></div>
       </div>

@@ -24,7 +24,7 @@
   .toolbar .input-adorn { flex: 1; min-width: 220px; max-width: 360px; }
   .toolbar .input { height: 40px; font-size: 14px; }
   .toolbar .input-adorn > .material-symbols-outlined { top: 10px; }
-  .pick-week { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--divider); background: #fafcff; }
+  .pick-week { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; padding-left: 16px; border-left: 1px solid var(--divider); }
   .pick-week .input { width: 180px; height: 40px; font-size: 14px; }
   .now-label { display: inline-block; margin-left: 8px; }
   .expand td { background: #fafbfc !important; padding-top: 4px; }
@@ -34,8 +34,10 @@
   .mini-day.off { opacity: .6; }
   .ops { display: inline-flex; gap: 4px; align-items: center; }
   .m-cards { display: none; }
+  .stats .stat { padding: 12px 16px; }
   @media (max-width: 900px) {
     .stats { grid-template-columns: 1fr; gap: 8px; }
+    .pick-week { margin-left: 0; padding-left: 0; border-left: 0; }
     .stat { padding: 12px 14px; }
     .stat .value { font-size: 20px; }
     .stat .ico { width: 36px; height: 36px; }
@@ -47,7 +49,7 @@
   }
 </style>
 </head>
-<body data-nav="menus">
+<body data-nav="menus" class="fit">
 <main class="main">
   <div class="container">
     <div class="page-head">
@@ -89,15 +91,8 @@
       </a>
     </div>
 
-    <div class="card" id="weeks">
-      <!-- 一覧に出ていない週（過去の週を含む）も作れる。選んだ週に献立があれば開く（D-49） -->
-      <div class="pick-week">
-        <span class="material-symbols-outlined" style="color:var(--primary)">event</span>
-        <span style="font-weight:500">週を選んで献立を作る</span>
-        <input class="input" type="date" value="2026-10-05" aria-label="週の中の日付">
-        <button class="btn btn-outlined btn-sm">この週を開く</button>
-        <span class="caption">その日を含む週（月曜始まり）を開きます</span>
-      </div>
+    <!-- PC では、この一覧の中だけがスクロールする -->
+    <div class="card fill" id="weeks">
       <div class="toolbar">
         <!-- 商品名での検索（FR-LIST-02）はあると良い -->
         <div class="input-adorn">
@@ -105,10 +100,17 @@
           <input class="input" placeholder="商品名で過去の献立を探す（例：ポテト）">
         </div>
         <span class="caption">新しい週が上に表示されます</span>
+        <!-- 一覧に出ていない週（過去の週を含む）も作れる。選んだ週に献立があれば開く（D-49） -->
+        <div class="pick-week">
+          <span class="material-symbols-outlined" style="color:var(--primary)">event</span>
+          <span style="font-weight:500">週を選んで献立を作る</span>
+          <input class="input" type="date" value="2026-10-05" aria-label="週の中の日付" title="その日を含む週（月曜始まり）を開きます">
+          <button class="btn btn-outlined btn-sm">この週を開く</button>
+        </div>
       </div>
 
       <!-- PC：表 -->
-      <div class="table-wrap desk-table">
+      <div class="table-wrap desk-table scroll">
         <table class="table">
           <thead>
             <tr><th style="width:36px"></th><th>対象週</th><th>状態</th><th class="right">週の実績 / 週の予算</th><th>警告</th><th>メモ</th><th class="right">操作</th></tr>

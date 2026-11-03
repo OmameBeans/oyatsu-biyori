@@ -35,7 +35,7 @@
   }
 </style>
 </head>
-<body data-nav="products">
+<body data-nav="products" class="fit">
 <main class="main">
   <div class="container">
     <div class="page-head">
@@ -48,7 +48,8 @@
 
     <div class="safety-note mb-16"><span class="material-symbols-outlined">verified_user</span>アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください。</div>
 
-    <div class="card">
+    <!-- PC では、表の中だけがスクロールする（見出しの行とページ送りは残る） -->
+    <div class="card fill">
       <div class="toolbar">
         <div class="input-adorn">
           <span class="material-symbols-outlined">search</span>
@@ -63,7 +64,7 @@
         </div>
         <label class="checkbox"><input type="checkbox" checked>「使わない」商品も表示</label>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap scroll">
         <table class="table ptable">
           <thead><tr><th>商品名</th><th>メーカー</th><th>分類</th><th>アレルゲンの状態</th><th>最終確認日</th><th></th></tr></thead>
           <tbody>

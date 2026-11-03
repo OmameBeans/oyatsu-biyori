@@ -27,6 +27,7 @@ paths:
 - 幅による切り替えは MUI のブレークポイント（`sx` の `{ xs: ..., md: ... }`、`useMediaQuery`）で行う
 - 一覧は、スマホでも崩れないように MUI の `List` や `Card` を基本にする。PC では横に並べるなどして広い画面を活かす
 - ボタンなどはスマホで押しやすい大きさにする（PC でも困らない）
+- PC（`md` 以上）では画面全体を縦にスクロールさせず、見出し・絞り込み・ボタンを固定して、一覧や明細の部分だけをスクロールする（表の見出しは `stickyHeader`）。スマホではページ全体をスクロールする（[05 §4](../../docs/requirements/05-screens.md)。見本は `mocks/` の `body.fit`）
 - 画像の取り込み（チラシ・パッケージ）は、「カメラで撮る」と「ファイルを選ぶ」の2つのボタンを並べる（SC-08、SC-09 の手順1）
   - 「カメラで撮る」：`<input type="file" accept="image/*" capture="environment">`。スマホで背面カメラを直接起動する
   - 「ファイルを選ぶ」：`capture` を付けない `<input type="file">`。アルバムや PC のファイルから選べる。`accept` はチラシなら `image/*,application/pdf`、パッケージなら `image/*`
