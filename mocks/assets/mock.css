@@ -198,6 +198,20 @@ p { margin: 0; }
 .status-ref, .status-recheck { background: var(--warning-bg); color: var(--warning-text); border: 1px solid rgba(237,108,2,.35); }
 .status-unknown { background: var(--error-bg); color: var(--error); border: 1px solid rgba(211,47,47,.3); }
 
+/* アレルゲンの3つの表示（03 の 6）：色は判定の区分で決め、絵文字と文字の両方で示す。
+   献立の画面はこちらを使う（上の .status は、まだ直していない画面のモック用） */
+.judge { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px 0 8px; border-radius: 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.judge-ng { background: var(--error-bg); color: var(--error); border: 1px solid rgba(211,47,47,.3); }
+.judge-warn { background: var(--warning-bg); color: var(--warning-text); border: 1px solid rgba(237,108,2,.35); }
+.judge-ok { background: var(--success-bg); color: var(--success); border: 1px solid rgba(46,125,50,.3); }
+.judge-why { font-size: 12px; line-height: 1.6; margin-top: 4px; }
+.judge-why .next { display: block; color: var(--text-2); }
+.judge-ng + .judge-why, .judge-why.ng { color: #8e1f1f; }
+.judge-warn + .judge-why, .judge-why.warn { color: var(--warning-text); }
+.maker-note { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: var(--text-2); margin-top: 2px; }
+.maker-note .material-symbols-outlined { font-size: 14px; }
+.badge-recheck { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 12px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--warning-bg); color: var(--warning-text); border: 1px solid rgba(237,108,2,.35); }
+
 /* おやつの分類 */
 .cat { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 4px; font-size: 12px; font-weight: 500; white-space: nowrap; }
 .cat .material-symbols-outlined { font-size: 15px; }

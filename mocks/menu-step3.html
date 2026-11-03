@@ -22,6 +22,8 @@
   .kv dd { margin: 0; text-align: right; font-weight: 500; }
   .avoid { display: flex; gap: 6px; flex-wrap: wrap; }
   .avoid .chip { background: var(--error-bg); color: #8e1f1f; }
+  .manual { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--divider); background: #fafbfc; font-size: 13px; color: var(--text-2); flex-wrap: wrap; }
+  .manual .t { flex: 1; min-width: 200px; }
   @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -54,26 +56,33 @@
         <div class="card-body stack">
           <div class="field">
             <label for="req">要望を文章で書いてください</label>
-            <textarea id="req" class="textarea" placeholder="例：しょっぱいものとゼリー系を合わせて出したい。&#10;例：金曜は誕生日会なので豪華に。&#10;例：水曜は行事のため、子どもが40人。"></textarea>
+            <textarea id="req" class="textarea" placeholder="例：しょっぱいものとゼリー系を合わせて出したい。&#10;例：金曜は誕生日会なので豪華に。&#10;例：水曜は行事のため、子どもが48人。"></textarea>
           </div>
           <div class="no-name"><span class="material-symbols-outlined icon-fill">person_off</span>子どもの名前は書かないでください。</div>
+          <div class="alert alert-info">
+            <span class="material-symbols-outlined">info</span>
+            <div class="alert-body">要望の文章では、避ける品目（アレルギー）の条件は変えられません。避ける品目は「設定」で変更します。</div>
+          </div>
+          <!-- よく使う要望（あると良い） -->
           <div>
-            <div class="caption mb-8">よく使う要望（押すと入力欄に追加されます）</div>
+            <div class="caption mb-8">よく使う要望（押すと入力欄に入ります）</div>
             <div class="examples">
               <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>しょっぱいもの＋ゼリー系</span>
               <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>金曜は誕生日会なので豪華に</span>
               <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>○曜は子どもが○人</span>
-              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>手で持って食べられるもの</span>
+              <span class="chip chip-outlined"><span class="material-symbols-outlined">add</span>○曜はおやつなし</span>
             </div>
-          </div>
-          <div class="alert alert-info">
-            <span class="material-symbols-outlined">info</span>
-            <div class="alert-body">要望の文章で、避ける品目（アレルギー）の条件を変えることはできません。避ける品目は「設定」で変更します。</div>
           </div>
         </div>
         <div class="card-actions">
           <a class="btn" href="menu-step2.html" style="margin-right:auto"><span class="material-symbols-outlined">arrow_back</span>戻る</a>
           <a class="btn btn-contained btn-lg" href="menu-step4.html?tab=making"><span class="material-symbols-outlined">auto_awesome</span>献立を作る</a>
+        </div>
+        <!-- Claude を使わない入口（FR-MENU-07d・NFR-OPS-03） -->
+        <div class="manual">
+          <span class="material-symbols-outlined">edit_calendar</span>
+          <div class="t">AI を使わずに、日ごとの枠だけの献立を作って、自分で商品を入れることもできます。チェックと警告は同じように出ます。</div>
+          <a class="btn btn-outlined btn-sm" href="menu-step4.html?tab=manual">自分で組む（AI を使わない）</a>
         </div>
       </div>
 
@@ -84,9 +93,7 @@
             <dt>人数</dt><dd class="num">55 人</dd>
             <dt>おやつを出す日</dt><dd>月〜金（5日）</dd>
             <dt>週の予算</dt><dd class="num">15,000 円</dd>
-            <dt class="caption" style="grid-column:1/-1;margin-top:-6px">11月の予算 60,000 円 ÷ 4</dt>
-            <dt>1人1日あたり</dt><dd class="num">約 54 円</dd>
-            <dt>使える商品</dt><dd class="num">15 件</dd>
+            <dt class="caption" style="grid-column:1/-1;margin-top:-6px">献立案の画面で、この週だけ変えられます</dt>
           </dl>
           <hr class="divider" style="margin:16px 0">
           <div class="caption mb-8">避ける品目（必ず守ります）</div>
@@ -100,6 +107,7 @@
             <dt>あまいもの</dt><dd>30日</dd>
             <dt>のどごし</dt><dd class="muted">設定なし</dd>
           </dl>
+          <div class="caption mt-8">補足ルール：ポテトチップスは味違いでも同じ商品として60日あける</div>
         </div>
       </aside>
     </div>

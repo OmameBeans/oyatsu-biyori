@@ -34,6 +34,8 @@
   .thumb .meta .material-symbols-outlined { font-size: 16px; color: var(--text-2); }
   .thumb .rm { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; background: rgba(255,255,255,.95); box-shadow: var(--shadow-1); }
   .thumb .off-label { position: absolute; inset: 0 0 37px; display: grid; place-items: center; }
+  .thumb .pick { position: absolute; top: 8px; left: 8px; }
+  .thumb .pick input { width: 20px; height: 20px; accent-color: var(--primary); }
   .reading { max-width: 640px; margin: 24px auto; text-align: center; }
   .phase { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; }
   .phase .material-symbols-outlined { font-size: 22px; }
@@ -43,26 +45,43 @@
   .phase.now .material-symbols-outlined { color: var(--primary); animation: spin 1.2s linear infinite; }
   .phase.wait { color: var(--text-3); }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 読み取り結果：商品ごとのカード */
+  .results { display: flex; flex-direction: column; }
+  .res { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 260px; gap: 12px 20px; padding: 16px 20px; border-bottom: 1px solid var(--divider); }
+  .res.fixed { background: #f7faf7; }
+  .res .src { font-size: 12px; color: var(--text-2); }
+  .res .name { font-size: 15px; font-weight: 700; }
+  .fields { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; margin-top: 8px; }
+  .fields dt { color: var(--text-2); }
+  .fields dd { margin: 0; }
+  .fields .edit { color: var(--primary); font-size: 12px; margin-left: 6px; cursor: pointer; }
+  .flag { display: inline-flex; align-items: flex-start; gap: 4px; font-size: 12px; color: var(--warning-text); background: var(--warning-bg); border-radius: 4px; padding: 2px 6px; margin-top: 4px; }
+  .flag .material-symbols-outlined { font-size: 15px; margin-top: 2px; }
+  .allergen-read { font-size: 13px; margin-top: 8px; }
+  .allergen-read b { font-weight: 700; }
+  .allergen-read.none b { color: var(--warning-text); }
   .match { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; }
   .match .material-symbols-outlined { font-size: 18px; }
   .match-same { color: var(--success); }
   .match-variant { color: var(--primary); }
   .match-new { color: var(--warning-text); }
   .reason { font-size: 12px; color: var(--text-2); margin-top: 2px; }
-  .select-sm { height: 34px; font-size: 13px; padding: 0 8px; width: auto; }
-  .results-table .c-name { min-width: 230px; }
-  .results-table .c-act { white-space: nowrap; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .choose { display: flex; flex-direction: column; gap: 6px; }
+  .choose label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+  .choose input { accent-color: var(--primary); }
+  .conflict { grid-column: 1 / -1; }
   .summary-bar { display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 20px; background: #fafbfc; border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); font-size: 13px; }
   .summary-bar b { font-size: 16px; }
+  .missed { padding: 16px 20px; }
+  .missed-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px dashed rgba(237,108,2,.5); border-radius: 8px; background: #fffaf2; margin-top: 8px; font-size: 13px; }
+  .missed-item .t { flex: 1; min-width: 0; }
   @media (max-width: 900px) {
     .capture-btn { height: 112px; font-size: 15px; }
     .thumbs { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .results-table thead { display: none; }
-    .results-table tr { display: grid; grid-template-columns: 1fr auto; padding: 12px 16px; border-bottom: 1px solid var(--divider); gap: 4px 12px; }
-    .results-table td { border: 0; padding: 0; white-space: normal; min-width: 0 !important; }
-    .results-table td.c-name { grid-column: 1; grid-row: 1; }
-    .results-table td.c-price { grid-column: 2; grid-row: 1; text-align: right; }
-    .results-table td.c-match, .results-table td.c-cat, .results-table td.c-act { grid-column: 1 / -1; }
+    .res { grid-template-columns: 1fr; padding: 14px 16px; }
+    .missed-item { flex-wrap: wrap; }
   }
 </style>
 </head>
@@ -91,6 +110,7 @@
 
     <div class="tabs mock-switch no-print" data-tabs="main">
       <button class="tab active" data-tab="upload">① 取り込み</button>
+      <button class="tab" data-tab="pdf">①' PDF のページ選び</button>
       <button class="tab" data-tab="reading">② 読み取り中</button>
       <button class="tab" data-tab="result">③ 読み取り結果</button>
     </div>
@@ -100,16 +120,20 @@
       <div class="card">
         <div class="card-head"><h2 class="h6">チラシを取り込む</h2><span class="caption">対象週：11/9（月）〜 11/13（金）</span></div>
         <div class="card-body">
+          <div class="alert alert-info mb-16">
+            <span class="material-symbols-outlined">photo_camera</span>
+            <div class="alert-body">小さい文字が読めるよう、<b>1ページを半分ずつ近づけて</b>撮ってください。</div>
+          </div>
           <div class="capture">
             <button class="capture-btn primary"><span class="material-symbols-outlined">photo_camera</span>カメラで撮る</button>
-            <button class="capture-btn"><span class="material-symbols-outlined">upload_file</span>ファイルを選ぶ<span class="caption" style="font-weight:400">画像・PDF</span></button>
+            <button class="capture-btn"><span class="material-symbols-outlined">upload_file</span>ファイルを選ぶ<span class="caption" style="font-weight:400">画像（JPEG・PNG・HEIC）・PDF</span></button>
           </div>
           <div class="drop hide-sm"><span class="material-symbols-outlined">move_to_inbox</span>　ここにチラシの画像や PDF をドラッグ＆ドロップしても追加できます</div>
         </div>
       </div>
 
       <div class="card mt-16">
-        <div class="card-head"><h2 class="h6">取り込んだページ <span class="caption">4枚中 3枚を読み取ります</span></h2></div>
+        <div class="card-head"><h2 class="h6">取り込んだページ <span class="caption">4枚中 3枚を読み取ります（10枚まで）</span></h2></div>
         <div class="card-body">
           <div class="thumbs">
             <div class="thumb">
@@ -135,8 +159,28 @@
           </div>
         </div>
         <div class="card-actions">
-          <a class="btn" href="menus.html">献立一覧に戻る</a>
+          <a class="btn" href="menus.html" style="margin-right:auto">献立一覧に戻る</a>
+          <button class="btn" data-goto="result"><span class="material-symbols-outlined">edit</span>読み取らずに手で入力する</button>
           <button class="btn btn-contained btn-lg" data-goto="reading"><span class="material-symbols-outlined">document_scanner</span>読み取る</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ①' PDF のページ選び（FR-FLYER-01a） -->
+    <section class="tab-panel" data-panel="pdf" hidden>
+      <div class="card">
+        <div class="card-head"><h2 class="h6">チラシ.pdf から取り込むページを選ぶ</h2><span class="caption">8ページ中 2ページを選んでいます</span></div>
+        <div class="card-body">
+          <div class="thumbs">
+            <div class="thumb"><label class="pick"><input type="checkbox" checked></label><div class="paper-img"><div class="band" style="background:linear-gradient(90deg,#66bb6a,#d4e157)"></div><div class="cells"><i></i><i></i><i></i><i></i></div></div><div class="meta">1ページ</div></div>
+            <div class="thumb"><label class="pick"><input type="checkbox" checked></label><div class="paper-img"><div class="band" style="background:#bdbdbd"></div><div class="cells"><i></i><i></i></div></div><div class="meta">2ページ</div></div>
+            <div class="thumb off"><label class="pick"><input type="checkbox"></label><div class="paper-img"><div class="band" style="background:#90a4ae"></div><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="meta">3ページ（日用品）</div></div>
+            <div class="thumb off"><label class="pick"><input type="checkbox"></label><div class="paper-img"><div class="band" style="background:#90a4ae"></div><div class="cells"><i></i><i></i><i></i><i></i></div></div><div class="meta">4ページ（日用品）</div></div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="btn" data-goto="upload">やめる</button>
+          <button class="btn btn-contained" data-goto="upload">選んだページを追加</button>
         </div>
       </div>
     </section>
@@ -147,11 +191,12 @@
         <div class="reading" style="padding:24px 20px">
           <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary)">document_scanner</span>
           <h2 class="h6 mt-8">チラシを読み取っています</h2>
-          <p class="muted mb-16">3枚で 30秒ほどかかります。この画面を閉じても、読み取りは続きます。</p>
+          <p class="muted mb-16">3枚で 1分ほどかかります。この画面を閉じても、読み取りは続きます。戻ると結果が出ています。</p>
           <div class="progress mb-16"><span style="width:62%"></span></div>
           <div class="phase done"><span class="material-symbols-outlined">check_circle</span>撮影 1 から 14件の商品を見つけました</div>
           <div class="phase done"><span class="material-symbols-outlined">check_circle</span>撮影 2 から 9件の商品を見つけました</div>
           <div class="phase now"><span class="material-symbols-outlined">progress_activity</span>チラシ.pdf 1ページを読み取っています…</div>
+          <div class="phase wait"><span class="material-symbols-outlined">radio_button_unchecked</span>読み違いがないか確かめる</div>
           <div class="phase wait"><span class="material-symbols-outlined">radio_button_unchecked</span>登録済みの商品と同じかどうか調べる</div>
         </div>
       </div>
@@ -161,75 +206,193 @@
     <section class="tab-panel" data-panel="result" hidden>
       <div class="alert alert-info mb-16">
         <span class="material-symbols-outlined">info</span>
-        <div class="alert-body">おやつに使えそうな商品を <b>18件</b> 見つけました。登録済みの商品と同じかどうかを確かめて、「確定」してください。迷うときは「新しい商品として登録」にしてください。</div>
+        <div class="alert-body">おやつに使えそうな商品を <b>18件</b> 見つけました。読み取った内容をチラシと見比べ、登録済みの商品と同じかどうかを選んで「確定」してください。<b>迷うときは「新しい商品として登録」</b>にしてください。</div>
       </div>
       <div class="card">
         <div class="card-head"><h2 class="h6">読み取った商品</h2>
-          <button class="btn btn-outlined btn-sm hide-sm"><span class="material-symbols-outlined">done_all</span>「同じ商品」をまとめて確定</button>
+          <button class="btn btn-outlined btn-sm"><span class="material-symbols-outlined">done_all</span>「同じ商品」をまとめて確定（5件）</button>
         </div>
         <div class="summary-bar">
           <span><b class="num">11</b> 同じ商品</span>
-          <span><b class="num">3</b> 味違い</span>
-          <span><b class="num">4</b> 新しい商品</span>
-          <span style="margin-left:auto" class="muted">確定済み <b class="num" style="color:var(--text)">6</b> / 18</span>
+          <span><b class="num">2</b> 味違い・内容量違い</span>
+          <span><b class="num">5</b> 新しい商品</span>
+          <span><b class="num" style="color:var(--warning-text)">3</b> 確かめてほしい項目</span>
+          <span style="margin-left:auto;color:var(--warning-text);font-weight:500">確定していない 12件は、今週の商品に入りません</span>
         </div>
-        <div class="table-wrap">
-          <table class="table results-table">
-            <thead><tr><th>チラシの表記</th><th class="right">価格（税込）</th><th>同じ商品かどうか</th><th>おやつの分類</th><th class="right">操作</th></tr></thead>
-            <tbody>
-              <tr>
-                <td class="c-name"><b>うすしおポテトチップス 小袋15袋</b><div class="caption">撮影 1</div></td>
-                <td class="c-price right num">298 円</td>
-                <td class="c-match"><span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span><div class="reason">登録済み「うすしおポテトチップス 小袋15袋」と名前・入数が一致</div></td>
-                <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-                <td class="c-act right"><span class="chip chip-primary"><span class="material-symbols-outlined">check</span>確定済み</span></td>
-              </tr>
-              <tr>
-                <td class="c-name"><b>ぶどうゼリー 8個入</b><div class="caption">撮影 1</div></td>
-                <td class="c-price right num">178 円</td>
-                <td class="c-match"><span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span><div class="reason">登録済み「ぶどうゼリー 8個入」と一致</div></td>
-                <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
-                <td class="c-act right"><span class="chip chip-primary"><span class="material-symbols-outlined">check</span>確定済み</span></td>
-              </tr>
-              <tr>
-                <td class="c-name"><b>ピーチゼリー 8個入</b><div class="caption">撮影 2</div></td>
-                <td class="c-price right num">178 円</td>
-                <td class="c-match"><span class="match match-variant"><span class="material-symbols-outlined">alt_route</span>味違い</span><div class="reason">「ぶどうゼリー 8個入」と同じシリーズで、味だけが違うようです</div></td>
-                <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
-                <td class="c-act right">
-                  <select class="select select-sm"><option>味違いとして登録</option><option>同じ商品</option><option>新しい商品として登録</option></select>
-                  <button class="btn btn-contained btn-sm">確定</button>
-                </td>
-              </tr>
-              <tr>
-                <td class="c-name"><b>のりしおポップコーン 12袋</b><div class="caption">撮影 2</div></td>
-                <td class="c-price right num">298 円</td>
-                <td class="c-match"><span class="match match-variant"><span class="material-symbols-outlined">alt_route</span>味違い</span><div class="reason">「しお味ポップコーン 12袋」と入数が同じで、味の表記が違います</div></td>
-                <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-                <td class="c-act right">
-                  <select class="select select-sm"><option>味違いとして登録</option><option>同じ商品</option><option>新しい商品として登録</option></select>
-                  <button class="btn btn-contained btn-sm">確定</button>
-                </td>
-              </tr>
-              <tr>
-                <td class="c-name"><b>いちごミニ大福 10個入</b><div class="caption">チラシ.pdf 1ページ</div></td>
-                <td class="c-price right num">448 円</td>
-                <td class="c-match"><span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span><div class="reason">似た商品が見つかりませんでした。アレルゲンは「不明」で登録されます</div></td>
-                <td class="c-cat">
-                  <select class="select select-sm"><option>あまい</option><option>しょっぱい</option><option>のどごし</option><option>対象外</option></select>
-                </td>
-                <td class="c-act right"><button class="btn btn-contained btn-sm">新しい商品として登録</button></td>
-              </tr>
-              <tr>
-                <td class="c-name"><b>キッチンペーパー 4ロール</b><div class="caption">撮影 2</div></td>
-                <td class="c-price right num">258 円</td>
-                <td class="c-match"><span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span><div class="reason">食品ではないようです</div></td>
-                <td class="c-cat"><span class="cat cat-none">対象外</span></td>
-                <td class="c-act right"><button class="btn btn-sm">取り込まない</button></td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="results">
+          <!-- 確定済み（選び直せる。D-53） -->
+          <div class="res fixed">
+            <div>
+              <div class="src">撮影 1 ・ 注文番号 1203</div>
+              <div class="name">うすしおポテトチップス 小袋15袋</div>
+              <dl class="fields">
+                <dt>内容量</dt><dd>12g×15袋</dd>
+                <dt>税込価格</dt><dd class="num">298 円</dd>
+                <dt>入数</dt><dd>15（1袋を1人分）</dd>
+              </dl>
+              <div class="allergen-read">チラシのアレルゲン表記：<b>表記なし</b></div>
+            </div>
+            <div>
+              <span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span>
+              <div class="reason">登録済み「うすしおポテトチップス 小袋15袋」と名前・内容量が一致</div>
+              <div class="tags"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span><span class="chip chip-tag">スナック</span></div>
+            </div>
+            <div class="choose">
+              <span class="chip chip-primary" style="align-self:flex-start"><span class="material-symbols-outlined">check</span>確定済み：同じ商品</span>
+              <button class="btn btn-sm" style="align-self:flex-start">選び直す</button>
+            </div>
+          </div>
+
+          <!-- 味違い：検証の印つき -->
+          <div class="res">
+            <div>
+              <div class="src">撮影 2 ・ 注文番号 2210</div>
+              <div class="name">ももゼリー 8個入</div>
+              <dl class="fields">
+                <dt>内容量</dt><dd>25g×8個<span class="edit">直す</span></dd>
+                <dt>税込価格</dt><dd class="num">178 円<span class="edit">直す</span></dd>
+                <dt>入数</dt><dd>8<span class="caption">（候補：8個入なので 8人分）</span><span class="edit">直す</span></dd>
+              </dl>
+              <div class="flag"><span class="material-symbols-outlined">flag</span>税抜 175円 と 税込 178円 が合いません。チラシの価格を見比べてください</div>
+              <div class="allergen-read">チラシのアレルゲン表記：<b>表記なし</b></div>
+            </div>
+            <div>
+              <span class="match match-variant"><span class="material-symbols-outlined">alt_route</span>味違い</span>
+              <div class="reason">「ぶどうゼリー 8個入」と同じシリーズで、味だけが違うようです。味違いは別の商品として登録し、アレルゲンの確認は引き継ぎません</div>
+              <div class="tags"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span><span class="chip chip-tag">ゼリー</span><span class="chip chip-tag">もも</span><span class="edit caption" style="color:var(--primary)">直す</span></div>
+            </div>
+            <div class="choose">
+              <label><input type="radio" name="r2"> 同じ商品</label>
+              <label><input type="radio" name="r2"> 味違い・内容量違いとして登録</label>
+              <label><input type="radio" name="r2" checked> 新しい商品として登録</label>
+              <label><input type="radio" name="r2"> 取り込まない</label>
+              <button class="btn btn-contained btn-sm" style="align-self:flex-start">確定</button>
+            </div>
+          </div>
+
+          <!-- 新しい商品：表記が「なし」と読まれた -->
+          <div class="res">
+            <div>
+              <div class="src">チラシ.pdf 1ページ ・ 注文番号 3051</div>
+              <div class="name">いちごミニ大福 10個入</div>
+              <dl class="fields">
+                <dt>内容量</dt><dd>300g（10個）<span class="edit">直す</span></dd>
+                <dt>税込価格</dt><dd class="num">448 円<span class="edit">直す</span></dd>
+                <dt>入数</dt><dd>10<span class="caption">（候補：10個なので 10人分）</span><span class="edit">直す</span></dd>
+              </dl>
+              <div class="allergen-read none">チラシのアレルゲン表記：<b>表記なし</b>（読み落としのことがあります。チラシと見比べてください）</div>
+            </div>
+            <div>
+              <span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span>
+              <div class="reason">似た商品が見つかりませんでした。チラシの情報として登録します（献立では 🟡 要確認）</div>
+              <div class="tags"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span><span class="chip chip-tag">焼き菓子</span><span class="chip chip-tag">いちご</span><span class="edit caption" style="color:var(--primary)">直す</span></div>
+            </div>
+            <div class="choose">
+              <label><input type="radio" name="r3"> 同じ商品</label>
+              <label><input type="radio" name="r3"> 味違い・内容量違いとして登録</label>
+              <label><input type="radio" name="r3" checked> 新しい商品として登録</label>
+              <label><input type="radio" name="r3"> 取り込まない</label>
+              <button class="btn btn-contained btn-sm" style="align-self:flex-start">確定</button>
+            </div>
+          </div>
+
+          <!-- 入数の候補が2つあるもの -->
+          <div class="res">
+            <div>
+              <div class="src">撮影 2 ・ 注文番号 2415</div>
+              <div class="name">ミニ動物ビスケット</div>
+              <dl class="fields">
+                <dt>内容量</dt><dd>40g（2袋×12個包装）<span class="edit">直す</span></dd>
+                <dt>税込価格</dt><dd class="num">298 円<span class="edit">直す</span></dd>
+                <dt>入数</dt><dd><select class="select" style="height:30px;font-size:13px;width:auto;padding:0 6px"><option>24（個包装1つを1人分）</option><option>2（袋1つを1人分）</option></select></dd>
+              </dl>
+              <div class="flag"><span class="material-symbols-outlined">flag</span>個包装と袋のどちらを1人分にするか、選んでください</div>
+              <div class="allergen-read">チラシのアレルゲン表記：<b>乳・小麦</b></div>
+            </div>
+            <div>
+              <span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span>
+              <div class="reason">「動物ビスケット 20袋」と名前が似ていますが、内容量の表記が違います（判定：別商品）</div>
+              <div class="tags"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span><span class="chip chip-tag">焼き菓子</span></div>
+            </div>
+            <div class="choose">
+              <label><input type="radio" name="r4"> 同じ商品（動物ビスケット 20袋）</label>
+              <label><input type="radio" name="r4"> 味違い・内容量違いとして登録</label>
+              <label><input type="radio" name="r4" checked> 新しい商品として登録</label>
+              <label><input type="radio" name="r4"> 取り込まない</label>
+              <button class="btn btn-contained btn-sm" style="align-self:flex-start">確定</button>
+            </div>
+          </div>
+
+          <!-- 確認済みの商品で、チラシの表記が食い違う（FR-FLYER-09・SR-20） -->
+          <div class="res">
+            <div>
+              <div class="src">撮影 1 ・ 注文番号 1188</div>
+              <div class="name">しょうゆせんべい 20枚入</div>
+              <dl class="fields">
+                <dt>内容量</dt><dd>20枚</dd>
+                <dt>税込価格</dt><dd class="num">298 円</dd>
+                <dt>入数</dt><dd>20</dd>
+              </dl>
+              <div class="allergen-read">チラシのアレルゲン表記：<b>小麦・えび</b></div>
+            </div>
+            <div>
+              <span class="match match-same"><span class="material-symbols-outlined icon-fill">link</span>同じ商品</span>
+              <div class="reason">登録済み「しょうゆせんべい 20枚入」と名前・内容量が一致</div>
+              <div class="tags"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span><span class="chip chip-tag">せんべい</span></div>
+            </div>
+            <div class="choose">
+              <label><input type="radio" name="r5" checked> 同じ商品</label>
+              <label><input type="radio" name="r5"> 味違い・内容量違いとして登録</label>
+              <label><input type="radio" name="r5"> 新しい商品として登録</label>
+              <label><input type="radio" name="r5"> 取り込まない</label>
+              <button class="btn btn-contained btn-sm" style="align-self:flex-start">確定</button>
+            </div>
+            <div class="alert alert-warning conflict">
+              <span class="material-symbols-outlined">compare_arrows</span>
+              <div class="alert-body">
+                <div class="alert-title">パッケージでの確認と、チラシの表記が食い違っています</div>
+                8/20 のパッケージ確認では「えび」を含まないと記録していますが、チラシには「えび」とあります。商品が変わった可能性があります。届いたら、パッケージの原材料表示で確認し直してください。
+              </div>
+            </div>
+          </div>
+
+          <!-- 対象外 -->
+          <div class="res">
+            <div>
+              <div class="src">撮影 2 ・ 注文番号 4402</div>
+              <div class="name">キッチンペーパー 4ロール</div>
+              <dl class="fields"><dt>税込価格</dt><dd class="num">258 円</dd></dl>
+            </div>
+            <div>
+              <span class="match match-new"><span class="material-symbols-outlined">fiber_new</span>新しい商品</span>
+              <div class="reason">食品ではないようです</div>
+              <div class="tags"><span class="cat cat-none">対象外</span></div>
+            </div>
+            <div class="choose">
+              <label><input type="radio" name="r6"> 新しい商品として登録</label>
+              <label><input type="radio" name="r6" checked> 取り込まない</label>
+              <button class="btn btn-contained btn-sm" style="align-self:flex-start">確定</button>
+            </div>
+          </div>
         </div>
+
+        <!-- 読み落としの指摘と手入力（FR-FLYER-03g・03h、D-73） -->
+        <div class="missed">
+          <h3 class="subtitle">読み落としているかもしれない商品</h3>
+          <div class="caption">読み取りの確かめで見つかったものです。チラシにあれば、手で入力して追加してください。</div>
+          <div class="missed-item">
+            <span class="material-symbols-outlined" style="color:var(--warning)">search</span>
+            <div class="t">撮影 2 の右下に「乳酸菌飲料 65ml×10本」らしい商品があります。アレルゲン表記「（乳）」も見落としているかもしれません</div>
+            <button class="btn btn-outlined btn-sm"><span class="material-symbols-outlined">add</span>手で入力する</button>
+          </div>
+          <button class="btn btn-sm mt-16"><span class="material-symbols-outlined">add</span>ほかの商品を手で追加する</button>
+          <!-- 読み取りの確かめが失敗したときは、上の代わりに次を出す -->
+          <div class="alert alert-warning mt-16">
+            <span class="material-symbols-outlined">info</span>
+            <div class="alert-body"><span class="caption" style="color:inherit">（確かめが失敗したときの表示の例）</span><br>読み違いの確かめができませんでした。読み取った内容を、チラシとよく見比べてください。</div>
+          </div>
+        </div>
+
         <div class="card-actions">
           <span class="caption" style="margin-right:auto;align-self:center">確定していない 12件は、今週の商品に入りません</span>
           <a class="btn btn-contained btn-lg" href="menu-step2.html">今週の商品へ<span class="material-symbols-outlined">arrow_forward</span></a>
@@ -240,7 +403,7 @@
 </main>
 <script src="assets/mock.js"></script>
 <script>
-  // 「読み取る」で②へ切り替える（モック用）
+  // ボタンでモックの表示を切り替える（モック用）
   document.querySelectorAll("[data-goto]").forEach((b) =>
     b.addEventListener("click", () => document.querySelector(`.tab[data-tab="${b.dataset.goto}"]`).click()));
 </script>

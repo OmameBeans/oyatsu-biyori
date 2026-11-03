@@ -9,25 +9,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
 <link rel="stylesheet" href="assets/mock.css">
 <style>
-  .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .sum .stat .value { font-size: 22px; }
-  .filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 14px; }
+  .mock-switch { margin-bottom: 16px; background: #e8edf3; border-radius: 8px; padding: 4px; display: inline-flex; gap: 2px; }
+  .mock-switch button { border: 0; background: none; border-radius: 6px; padding: 6px 14px; font: inherit; font-size: 13px; color: var(--text-2); cursor: pointer; }
+  .mock-switch button.active { background: #fff; color: var(--primary); font-weight: 500; box-shadow: var(--shadow-1); }
+  body:not([data-avoid="none"]) .avoid-none { display: none; }
+  .sum { display: flex; gap: 8px 24px; flex-wrap: wrap; align-items: center; padding: 14px 20px; font-size: 14px; }
+  .sum b { font-size: 18px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 14px; align-items: center; }
   .filters .chip { cursor: pointer; height: 30px; padding: 0 12px; border-radius: 15px; }
   .filters .chip.on { background: var(--primary); color: #fff; }
+  .filters .sep { width: 1px; height: 20px; background: var(--divider); margin: 0 4px; }
   .pname b { display: block; }
   .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
   .note { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
   .note .material-symbols-outlined { font-size: 16px; }
-  .note-block { color: var(--error); font-weight: 700; }
   .note-dup { color: var(--warning-text); }
+  .need-input { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .need-input .input { width: 90px; height: 32px; font-size: 13px; padding: 0 8px; }
   tr.blocked td { background: #fff8f8; }
   tr.blocked .pname b { color: var(--text-2); }
   tr.skipped td { color: var(--text-3); }
-  tr.skipped .status, tr.skipped .cat { opacity: .5; }
-  .use { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
+  tr.skipped .judge, tr.skipped .cat { opacity: .5; }
+  .skip { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+  .skip input { width: 18px; height: 18px; accent-color: var(--primary); }
   @media (max-width: 900px) {
-    .sum { grid-template-columns: 1fr; gap: 8px; }
-    .sum .stat { padding: 10px 14px; }
     .ptable thead { display: none; }
     .ptable tr { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 12px 16px; border-bottom: 1px solid var(--divider); }
     .ptable td { padding: 0; border: 0; }
@@ -35,9 +40,8 @@
     .ptable td.c-price { grid-column: 2; grid-row: 1; text-align: right; }
     .ptable tr.blocked { background: #fff8f8; }
     .ptable tr.blocked td { background: transparent !important; }
-    .ptable tr.blocked td.c-act { display: none; }
-    .ptable td.c-status { grid-column: 1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-    .ptable td.c-act { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; }
+    .ptable td.c-status { grid-column: 1 / -1; }
+    .ptable td.c-act { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; }
     .ptable td.c-cat { display: none; }
   }
   @media (min-width: 901px) { .cat-inline { display: none; } }
@@ -66,21 +70,18 @@
       </div>
     </div>
 
+    <div class="mock-switch no-print">
+      <button data-avoid="set" class="active">避ける品目あり</button>
+      <button data-avoid="none">避ける品目が未設定</button>
+    </div>
+
     <div class="safety-note mb-16"><span class="material-symbols-outlined">verified_user</span>アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください。</div>
 
-    <div class="grid sum mb-16">
-      <div class="card stat">
-        <span class="ico" style="background:var(--primary-light);color:var(--primary)"><span class="material-symbols-outlined">shopping_basket</span></span>
-        <div><div class="value num">15<span class="caption"> 件</span></div><div class="label">使える商品（うち要確認 4件）</div></div>
-      </div>
-      <div class="card stat">
-        <span class="ico" style="background:var(--error-bg);color:var(--error)"><span class="material-symbols-outlined">block</span></span>
-        <div><div class="value num">2<span class="caption"> 件</span></div><div class="label">避ける品目を含む（献立に入りません）</div></div>
-      </div>
-      <div class="card stat">
-        <span class="ico" style="background:#eceff1;color:#546e7a"><span class="material-symbols-outlined">do_not_disturb_on</span></span>
-        <div><div class="value num">1<span class="caption"> 件</span></div><div class="label">今週は使わない</div></div>
-      </div>
+    <!-- 避ける品目が1つもないとき（03 の 6.3） -->
+    <div class="alert alert-warning mb-16 avoid-none">
+      <span class="material-symbols-outlined">warning</span>
+      <div class="alert-body"><div class="alert-title">避ける品目が設定されていません</div>このままでは、アレルギーのある品目を避けられません。設定で避ける品目を登録してください。</div>
+      <a class="btn btn-sm alert-action" href="settings.html?tab=avoid" style="color:var(--warning-text)">避ける品目を設定する</a>
     </div>
 
     <div class="card">
@@ -88,89 +89,145 @@
         <h2 class="h6">今週のチラシの商品</h2>
         <a class="btn btn-sm" href="menu-step1.html"><span class="material-symbols-outlined">restart_alt</span>チラシを取り込み直す</a>
       </div>
-      <div class="filters">
+      <!-- 件数のまとめ。🟢 と混ざらないよう「使える」とは書かない -->
+      <div class="sum" style="border-top:1px solid var(--divider);border-bottom:1px solid var(--divider);background:#fafbfc">
+        <span>献立に入れられる商品 <b class="num">13</b> 件（うち <span class="judge judge-warn">🟡 要確認 6件</span>）</span>
+        <span><span class="judge judge-ng">🔴 使えません 3件</span></span>
+        <span class="muted">今週は使わない 1件 ・ 入数を入れてください 1件</span>
+      </div>
+      <div class="filters" style="padding-top:14px">
         <span class="chip on">すべて 18</span>
-        <span class="chip chip-outlined">要確認 4</span>
-        <span class="chip chip-outlined">避ける品目を含む 2</span>
-        <span class="chip chip-outlined">しょっぱい 7</span>
-        <span class="chip chip-outlined">あまい 6</span>
-        <span class="chip chip-outlined">のどごし 5</span>
+        <span class="chip chip-outlined">🟡 要確認 6</span>
+        <span class="chip chip-outlined">🔴 使えません 3</span>
+        <span class="sep"></span>
+        <span class="chip chip-outlined">しょっぱい 6</span>
+        <span class="chip chip-outlined">あまい 5</span>
+        <span class="chip chip-outlined">のどごし 7</span>
       </div>
       <div class="table-wrap">
         <table class="table ptable">
-          <thead><tr><th>商品</th><th class="right">価格（税込）</th><th>分類</th><th>アレルゲンの状態</th><th class="right">今週</th></tr></thead>
+          <thead><tr><th>商品</th><th class="right">価格（税込）</th><th>分類</th><th>アレルゲン</th><th class="right">今週</th></tr></thead>
           <tbody>
             <tr>
-              <td class="c-name pname"><b>うすしおポテトチップス 小袋15袋</b><div class="tags"><span class="chip chip-tag">うすしお</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
+              <td class="c-name pname"><b>うすしおポテトチップス 小袋15袋</b><div class="tags"><span class="chip chip-tag">スナック</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
               <td class="c-price right num">298 円</td>
               <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-ok">🟢 使えます</span><div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>スティックポテト サラダ味 10袋</b><div class="tags"><span class="chip chip-tag">サラダ味</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
+              <td class="c-name pname"><b>スティックポテト サラダ味 10袋</b><div class="tags"><span class="chip chip-tag">スナック</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
               <td class="c-price right num">458 円</td>
               <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span>
+              <td class="c-status"><span class="judge judge-ok">🟢 使えます</span><div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
                 <div class="note note-dup mt-8"><span class="material-symbols-outlined">event_repeat</span>7日前に出した（しょっぱいもの：30日あける）</div></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>のりしおポップコーン 12袋</b><div class="tags"><span class="chip chip-tag">のりしお</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
+              <td class="c-name pname"><b>のりしおポップコーン 12袋</b><div class="tags"><span class="chip chip-tag">スナック</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
               <td class="c-price right num">298 円</td>
               <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-              <td class="c-status"><span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span><div class="caption">最終確認から 97日</div><div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">前回の確認から97日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>えびせん 15袋</b><div class="tags"><span class="chip chip-tag">えび</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
+              <td class="c-name pname"><b>えびせん 15袋</b><div class="tags"><span class="chip chip-tag">せんべい</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
               <td class="c-price right num">278 円</td>
               <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
-              <td class="c-status"><span class="status status-unknown"><span class="material-symbols-outlined">error</span>不明</span><div class="caption">新しく登録した商品</div><div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>動物ビスケット 20袋</b><div class="tags"><span class="chip chip-tag">どうぶつ</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
+              <td class="c-name pname"><b>動物ビスケット 20袋</b><div class="tags"><span class="chip chip-tag">焼き菓子</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
               <td class="c-price right num">298 円</td>
               <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
-              <td class="c-status"><span class="status status-ref"><span class="material-symbols-outlined">help</span>参考</span><div class="caption">チラシの情報のみ</div><div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">チラシの情報だけです<span class="next">届いたらパッケージの原材料表示を撮って確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>ぶどうゼリー 8個入</b><div class="tags"><span class="chip chip-tag">ぶどう</span><span class="cat cat-smooth cat-inline">のどごし</span></div></td>
-              <td class="c-price right num">178 円</td>
-              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-name pname"><b>いちごミニ大福 10個入</b><div class="tags"><span class="chip chip-tag">焼き菓子</span><span class="chip chip-tag">いちご</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
+              <td class="c-price right num">448 円</td>
+              <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
             </tr>
             <tr>
-              <td class="c-name pname"><b>みかんゼリー 8個入</b><div class="tags"><span class="chip chip-tag">みかん</span><span class="cat cat-smooth cat-inline">のどごし</span></div></td>
+              <td class="c-name pname"><b>ぶどうゼリー 8個入</b><div class="tags"><span class="chip chip-tag">ゼリー</span><span class="chip chip-tag">ぶどう</span><span class="cat cat-smooth cat-inline">のどごし</span></div></td>
               <td class="c-price right num">178 円</td>
               <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
-              <td class="c-status"><span class="status status-recheck"><span class="material-symbols-outlined">history</span>要再確認</span><div class="caption">最終確認から 103日</div><div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
-              <td class="c-act right"><label class="use">使う<span class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-ok">🟢 使えます</span><div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><b>みかんゼリー 8個入</b><div class="tags"><span class="chip chip-tag">ゼリー</span><span class="chip chip-tag">みかん</span><span class="cat cat-smooth cat-inline">のどごし</span></div></td>
+              <td class="c-price right num">178 円</td>
+              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">前回の確認から103日たちました<span class="next">パッケージの原材料表示を撮って、もう一度確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
+            </tr>
+            <tr>
+              <td class="c-name pname"><b>ももゼリー 8個入</b><div class="tags"><span class="chip chip-tag">ゼリー</span><span class="chip chip-tag">もも</span><span class="cat cat-smooth cat-inline">のどごし</span></div></td>
+              <td class="c-price right num">178 円</td>
+              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+              <td class="c-status"><span class="judge judge-warn">🟡 要確認</span>
+                <div class="judge-why warn">チラシにアレルゲンの表記がありません<span class="next">届いたらパッケージの原材料表示を撮って確認してください</span></div>
+                <div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div>
+                <div class="mt-8"><a class="btn btn-outlined btn-sm" href="allergen-check.html"><span class="material-symbols-outlined">photo_camera</span>確認する</a></div></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox">今週は使わない</label></td>
+            </tr>
+            <!-- 入数が未入力：候補に入らない。その場で入力できる（FR-MENU-07c） -->
+            <tr>
+              <td class="c-name pname"><b>オレンジジュース 125ml</b><div class="tags"><span class="chip chip-tag">ジュース</span><span class="cat cat-smooth cat-inline">のどごし</span></div>
+                <div class="need-input"><span class="note note-dup"><span class="material-symbols-outlined">edit</span>入数を入れてください</span><input class="input num" placeholder="例：20"><span class="caption">本（1パックで何人分か）</span><button class="btn btn-sm btn-outlined">保存</button></div></td>
+              <td class="c-price right num">598 円</td>
+              <td class="c-cat"><span class="cat cat-smooth"><span class="material-symbols-outlined">water_drop</span>のどごし</span></td>
+              <td class="c-status"><span class="judge judge-ok">🟢 使えます</span><div class="maker-note"><span class="material-symbols-outlined">info</span>メーカーへの確認が必要</div></td>
+              <td class="c-act right"><span class="caption">入数を入れると候補になります</span></td>
             </tr>
             <tr class="skipped">
-              <td class="c-name pname"><b>星形ラムネ 30袋</b><div class="tags"><span class="chip chip-tag">ほし</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
+              <td class="c-name pname"><b>星形ラムネ 30袋</b><div class="tags"><span class="chip chip-tag">キャンディ</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
               <td class="c-price right num">348 円</td>
               <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span></td>
-              <td class="c-act right"><label class="use">今週は使わない<span class="switch"><input type="checkbox"><span class="track"></span><span class="thumb"></span></span></label></td>
+              <td class="c-status"><span class="judge judge-ok">🟢 使えます</span></td>
+              <td class="c-act right"><label class="skip"><input type="checkbox" checked>今週は使わない</label></td>
             </tr>
             <tr class="blocked">
-              <td class="c-name pname"><b>ミニどら焼き 10個入</b><div class="tags"><span class="chip chip-tag">あんこ</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
+              <td class="c-name pname"><b>ミニどら焼き 10個入</b><div class="tags"><span class="chip chip-tag">焼き菓子</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
               <td class="c-price right num">498 円</td>
               <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span>
-                <div class="note note-block mt-8"><span class="material-symbols-outlined icon-fill">block</span>献立に入らない（卵を含む）</div></td>
+              <td class="c-status"><span class="judge judge-ng">🔴 使えません</span>
+                <div class="judge-why ng">卵を含みます<span class="next">献立には入れられません</span></div></td>
               <td class="c-act right"><span class="caption">—</span></td>
             </tr>
             <tr class="blocked">
               <td class="c-name pname"><b>チョコウエハース 12袋</b><div class="tags"><span class="chip chip-tag">チョコ</span><span class="cat cat-sweet cat-inline">あまい</span></div></td>
               <td class="c-price right num">398 円</td>
               <td class="c-cat"><span class="cat cat-sweet"><span class="material-symbols-outlined">cake</span>あまい</span></td>
-              <td class="c-status"><span class="status status-ok"><span class="material-symbols-outlined">check_circle</span>確認済み</span>
-                <div class="note note-block mt-8"><span class="material-symbols-outlined icon-fill">block</span>献立に入らない（ヘーゼルナッツを含む）</div></td>
+              <td class="c-status"><span class="judge judge-ng">🔴 使えません</span>
+                <div class="judge-why ng">原材料に「ヘーゼルナッツ」があります<span class="next">献立には入れられません。アレルゲン確認で「含まない」にしても、この表示は消えません</span></div></td>
+              <td class="c-act right"><span class="caption">—</span></td>
+            </tr>
+            <tr class="blocked">
+              <td class="c-name pname"><b>ごま揚げせんべい 12袋</b><div class="tags"><span class="chip chip-tag">せんべい</span><span class="cat cat-salty cat-inline">しょっぱい</span></div></td>
+              <td class="c-price right num">258 円</td>
+              <td class="c-cat"><span class="cat cat-salty"><span class="material-symbols-outlined">grain</span>しょっぱい</span></td>
+              <td class="c-status"><span class="judge judge-ng">🔴 使えません</span>
+                <div class="judge-why ng">卵を含みます<span class="next">献立には入れられません</span></div></td>
               <td class="c-act right"><span class="caption">—</span></td>
             </tr>
           </tbody>
@@ -184,5 +241,12 @@
   </div>
 </main>
 <script src="assets/mock.js"></script>
+<script>
+  // モックの状態切り替え（避ける品目あり / 未設定）
+  document.querySelectorAll(".mock-switch button").forEach((b) => b.addEventListener("click", () => {
+    document.body.dataset.avoid = b.dataset.avoid;
+    document.querySelectorAll(".mock-switch button").forEach((x) => x.classList.toggle("active", x === b));
+  }));
+</script>
 </body>
 </html>

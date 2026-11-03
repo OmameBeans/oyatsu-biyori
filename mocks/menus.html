@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=block" rel="stylesheet">
 <link rel="stylesheet" href="assets/mock.css">
 <style>
-  .stats { grid-template-columns: repeat(4, 1fr); }
+  .stats { grid-template-columns: 1.4fr 1fr 1fr; }
+  .stat.first { outline: 2px solid rgba(237,108,2,.45); }
   .week { font-weight: 500; }
   .week small { display: block; font-weight: 400; color: var(--text-2); font-size: 12px; }
   .state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; }
@@ -18,18 +19,23 @@
   .state-draft { color: var(--warning-text); }
   .state-fixed { color: var(--success); }
   .amount small { display: block; color: var(--text-2); font-size: 12px; }
+  .warns { display: flex; gap: 4px; flex-wrap: wrap; }
   .toolbar { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--divider); flex-wrap: wrap; }
   .toolbar .input-adorn { flex: 1; min-width: 220px; max-width: 360px; }
   .toolbar .input { height: 40px; font-size: 14px; }
   .toolbar .input-adorn > .material-symbols-outlined { top: 10px; }
+  .pick-week { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--divider); background: #fafcff; }
+  .pick-week .input { width: 180px; height: 40px; font-size: 14px; }
   .now-label { display: inline-block; margin-left: 8px; }
   .expand td { background: #fafbfc !important; padding-top: 4px; }
   .mini-days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
   .mini-day { background: #fff; border: 1px solid var(--divider); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
   .mini-day b { display: block; font-size: 12px; color: var(--text-2); font-weight: 500; }
+  .mini-day.off { opacity: .6; }
+  .ops { display: inline-flex; gap: 4px; align-items: center; }
   .m-cards { display: none; }
   @media (max-width: 900px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stats { grid-template-columns: 1fr; gap: 8px; }
     .stat { padding: 12px 14px; }
     .stat .value { font-size: 20px; }
     .stat .ico { width: 36px; height: 36px; }
@@ -49,6 +55,7 @@
         <h1 class="h5">献立一覧</h1>
         <p class="muted">週ごとの献立の状態です。「献立を作る」「開く」から献立作成に進みます。</p>
       </div>
+      <!-- 印刷（FR-LIST-04）はあると良い・カレンダー（FR-LIST-03）は余裕があれば -->
       <button class="btn hide-sm"><span class="material-symbols-outlined">print</span>確定献立を印刷</button>
       <div class="view-toggle">
         <a class="on" href="menus.html"><span class="material-symbols-outlined" style="font-size:18px">view_list</span>一覧</a>
@@ -56,29 +63,25 @@
       </div>
     </div>
 
-    <!-- 最優先：食べられないと分かった商品を使う献立（FR-MENU-36） -->
+    <!-- 最優先：届いた商品の確認で 🔴 使えません になった商品を使う献立（FR-MENU-36） -->
     <div class="alert alert-error alert-filled mb-16">
       <span class="material-symbols-outlined">report</span>
       <div class="alert-body">
-        <div class="alert-title">11/11（水）の献立に、避ける品目（卵）を含む商品があります</div>
-        届いた商品「ごま揚げせんべい」の原材料表示に「卵白」がありました。献立を開いて、別の商品に差し替えてください。
+        <div class="alert-title">🔴 11/11（水）の献立に、避ける品目（卵）を含む商品があります</div>
+        「ごま揚げせんべい」のパッケージ確認で、卵を含むと記録されました。献立を開いて、別の商品に替えてください。
       </div>
       <a class="btn alert-action" href="menu-step4.html" style="background:#fff;color:var(--error)">献立を開く</a>
     </div>
 
-    <!-- 対応が必要なこと -->
+    <!-- 対応が必要なこと（SC-10）。件数を押すと商品一覧をその絞り込みで開く -->
     <div class="grid stats mb-16">
-      <a class="card stat" href="products.html?status=recheck" style="color:inherit;text-decoration:none">
-        <span class="ico" style="background:var(--warning-bg);color:var(--warning)"><span class="material-symbols-outlined">history</span></span>
-        <div><div class="value num">3<span class="caption"> 件</span></div><div class="label">要再確認の商品</div></div>
+      <a class="card stat first" href="products.html?filter=menu-check" style="color:inherit;text-decoration:none">
+        <span class="ico" style="background:var(--warning-bg);color:var(--warning)"><span class="material-symbols-outlined">photo_camera</span></span>
+        <div><div class="value num">6<span class="caption"> 件</span></div><div class="label">今日以降の献立で使う、パッケージで確認する商品</div></div>
       </a>
-      <a class="card stat" href="products.html?status=ref" style="color:inherit;text-decoration:none">
-        <span class="ico" style="background:var(--warning-bg);color:var(--warning)"><span class="material-symbols-outlined">help</span></span>
-        <div><div class="value num">2<span class="caption"> 件</span></div><div class="label">参考（要確認）の商品</div></div>
-      </a>
-      <a class="card stat" href="products.html?status=unknown" style="color:inherit;text-decoration:none">
-        <span class="ico" style="background:var(--error-bg);color:var(--error)"><span class="material-symbols-outlined">block</span></span>
-        <div><div class="value num">2<span class="caption"> 件</span></div><div class="label">不明の商品</div></div>
+      <a class="card stat" href="products.html?filter=other-check" style="color:inherit;text-decoration:none">
+        <span class="ico" style="background:#eceff1;color:#546e7a"><span class="material-symbols-outlined">inventory_2</span></span>
+        <div><div class="value num">9<span class="caption"> 件</span></div><div class="label">そのほかの、パッケージで確認する商品</div></div>
       </a>
       <a class="card stat" href="#weeks" style="color:inherit;text-decoration:none">
         <span class="ico" style="background:var(--primary-light);color:var(--primary)"><span class="material-symbols-outlined">edit_note</span></span>
@@ -87,7 +90,16 @@
     </div>
 
     <div class="card" id="weeks">
+      <!-- 一覧に出ていない週（過去の週を含む）も作れる。選んだ週に献立があれば開く（D-49） -->
+      <div class="pick-week">
+        <span class="material-symbols-outlined" style="color:var(--primary)">event</span>
+        <span style="font-weight:500">週を選んで献立を作る</span>
+        <input class="input" type="date" value="2026-10-05" aria-label="週の中の日付">
+        <button class="btn btn-outlined btn-sm">この週を開く</button>
+        <span class="caption">その日を含む週（月曜始まり）を開きます</span>
+      </div>
       <div class="toolbar">
+        <!-- 商品名での検索（FR-LIST-02）はあると良い -->
         <div class="input-adorn">
           <span class="material-symbols-outlined">search</span>
           <input class="input" placeholder="商品名で過去の献立を探す（例：ポテト）">
@@ -99,7 +111,7 @@
       <div class="table-wrap desk-table">
         <table class="table">
           <thead>
-            <tr><th style="width:36px"></th><th>対象週</th><th>状態</th><th class="right">週の実績 / 週の予算</th><th>メモ</th><th class="right">操作</th></tr>
+            <tr><th style="width:36px"></th><th>対象週</th><th>状態</th><th class="right">週の実績 / 週の予算</th><th>警告</th><th>メモ</th><th class="right">操作</th></tr>
           </thead>
           <tbody>
             <tr>
@@ -108,33 +120,41 @@
               <td><span class="state state-none"><span class="material-symbols-outlined">radio_button_unchecked</span>未作成</span></td>
               <td class="right num muted">—</td>
               <td class="muted">—</td>
+              <td class="muted">—</td>
               <td class="right"><a class="btn btn-outlined btn-sm" href="menu-step1.html"><span class="material-symbols-outlined">add</span>献立を作る</a></td>
             </tr>
             <tr>
               <td><button class="icon-btn" style="width:28px;height:28px"><span class="material-symbols-outlined">expand_more</span></button></td>
               <td class="week">11/9（月）〜 11/13（金）<small>来週</small></td>
               <td><span class="state state-draft"><span class="material-symbols-outlined">edit_note</span>下書き</span></td>
-              <td class="right amount num">13,896 円<small>/ 15,000 円</small></td>
-              <td><span class="status status-unknown"><span class="material-symbols-outlined">error</span>避ける品目を含む 1件</span></td>
-              <td class="right"><a class="btn btn-contained btn-sm" href="menu-step4.html">開く</a></td>
+              <td class="right amount num">13,718 円<small>/ 15,000 円</small></td>
+              <td><div class="warns"><span class="judge judge-ng">🔴 使えません 1件</span><span class="judge judge-warn">🟡 要確認 4件</span></div></td>
+              <td class="muted">誕生日会</td>
+              <td class="right"><span class="ops">
+                <a class="btn btn-contained btn-sm" href="menu-step4.html">開く</a>
+                <button class="icon-btn" style="width:32px;height:32px" aria-label="下書きを削除" title="下書きを削除（確認のダイアログが出ます）"><span class="material-symbols-outlined">delete</span></button>
+              </span></td>
             </tr>
             <tr class="row-current">
               <td><button class="icon-btn" style="width:28px;height:28px"><span class="material-symbols-outlined">expand_less</span></button></td>
-              <td class="week">11/2（月）〜 11/6（金）<span class="chip chip-primary now-label">今週</span><small>11/3（火）は祝日</small></td>
+              <td class="week">11/2（月）〜 11/6（金）<span class="chip chip-primary now-label">今週</span></td>
               <td><span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span></td>
               <td class="right amount num">11,620 円<small>/ 15,000 円</small></td>
+              <!-- 確定後に判定が警告の範囲で変わった商品。カードでチェックを付け直すと消える（D-71） -->
+              <td><div class="warns"><span class="badge-recheck">確認し直し 2件</span></div></td>
               <td class="muted">—</td>
               <td class="right"><a class="btn btn-outlined btn-sm" href="menu-step4.html">開く</a></td>
             </tr>
             <tr class="expand">
               <td></td>
-              <td colspan="5">
+              <td colspan="6">
+                <!-- 中身の展開（FR-LIST-01）はあると良い。祝日はアプリで判断せず、「おやつなし」と日の見出しで表す -->
                 <div class="mini-days">
                   <div class="mini-day"><b>11/2（月）</b>スティックポテト<br>ぶどうゼリー</div>
-                  <div class="mini-day" style="opacity:.55"><b>11/3（火）</b>祝日のため休み</div>
+                  <div class="mini-day off"><b>11/3（火）文化の日</b>おやつなし</div>
                   <div class="mini-day"><b>11/4（水）</b>動物ビスケット<br>りんごジュース</div>
                   <div class="mini-day"><b>11/5（木）</b>野菜クラッカー<br>みかんゼリー</div>
-                  <div class="mini-day"><b>11/6（金）</b>ミニどら焼き<br>麦茶</div>
+                  <div class="mini-day"><b>11/6（金）</b>しお味ポップコーン<br>麦茶</div>
                 </div>
               </td>
             </tr>
@@ -143,6 +163,7 @@
               <td class="week">10/26（月）〜 10/30（金）</td>
               <td><span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span></td>
               <td class="right amount num">14,960 円<small>/ 15,000 円</small></td>
+              <td class="muted">—</td>
               <td class="muted">ハロウィン会</td>
               <td class="right"><a class="btn btn-outlined btn-sm" href="menu-step4.html">開く</a></td>
             </tr>
@@ -150,16 +171,9 @@
               <td><button class="icon-btn" style="width:28px;height:28px"><span class="material-symbols-outlined">expand_more</span></button></td>
               <td class="week">10/19（月）〜 10/23（金）</td>
               <td><span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span></td>
-              <td class="right amount num">14,420 円<small>/ 15,000 円</small></td>
+              <td class="right amount num">15,320 円<small>/ 15,000 円</small></td>
               <td class="muted">—</td>
-              <td class="right"><a class="btn btn-outlined btn-sm" href="menu-step4.html">開く</a></td>
-            </tr>
-            <tr>
-              <td><button class="icon-btn" style="width:28px;height:28px"><span class="material-symbols-outlined">expand_more</span></button></td>
-              <td class="week">10/12（月）〜 10/16（金）</td>
-              <td><span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span></td>
-              <td class="right amount num">13,980 円<small>/ 15,000 円</small></td>
-              <td class="muted">10/12（月）は祝日</td>
+              <td class="muted">—</td>
               <td class="right"><a class="btn btn-outlined btn-sm" href="menu-step4.html">開く</a></td>
             </tr>
           </tbody>
@@ -169,19 +183,21 @@
       <!-- スマホ：カード -->
       <div class="m-cards">
         <div class="m-card">
-          <div class="info"><div class="week">11/16（月）〜 11/20（金）</div><span class="state state-none"><span class="material-symbols-outlined">radio_button_unchecked</span>未作成</span></div>
+          <div class="info"><div class="week">11/16（月）〜 11/20（金）<span class="caption">　再来週</span></div><span class="state state-none"><span class="material-symbols-outlined">radio_button_unchecked</span>未作成</span></div>
           <a class="btn btn-outlined btn-sm" href="menu-step1.html">献立を作る</a>
         </div>
         <div class="m-card">
           <div class="info"><div class="week">11/9（月）〜 11/13（金）<span class="caption">　来週</span></div>
-            <span class="state state-draft"><span class="material-symbols-outlined">edit_note</span>下書き</span><span class="caption num">　13,896 / 15,000 円</span>
-            <div class="mt-8"><span class="status status-unknown"><span class="material-symbols-outlined">error</span>避ける品目を含む 1件</span></div>
+            <span class="state state-draft"><span class="material-symbols-outlined">edit_note</span>下書き</span><span class="caption num">　13,718 / 15,000 円</span>
+            <div class="warns mt-8"><span class="judge judge-ng">🔴 使えません 1件</span><span class="judge judge-warn">🟡 要確認 4件</span></div>
           </div>
           <a class="btn btn-contained btn-sm" href="menu-step4.html">開く</a>
         </div>
         <div class="m-card" style="background:var(--primary-50)">
           <div class="info"><div class="week">11/2（月）〜 11/6（金）<span class="chip chip-primary now-label">今週</span></div>
-            <span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span><span class="caption num">　11,620 / 15,000 円</span></div>
+            <span class="state state-fixed"><span class="material-symbols-outlined icon-fill">check_circle</span>確定</span><span class="caption num">　11,620 / 15,000 円</span>
+            <div class="warns mt-8"><span class="badge-recheck">確認し直し 2件</span></div>
+          </div>
           <a class="btn btn-outlined btn-sm" href="menu-step4.html">開く</a>
         </div>
         <div class="m-card">
