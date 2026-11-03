@@ -1,0 +1,167 @@
+{
+  "_note": "架空のチラシの元データ（TD-01・HK-DEMO-01〜02）。商品・メーカー・生協の名前はすべて架空。python tools/build-samples/build.py で HTML・画像・PDF・正解データを作る",
+  "id": "flyer-01",
+  "publisher": "ひだまり生協",
+  "issue": "10月 第2回",
+  "section": "お菓子・飲みもの",
+  "subsection": "ベビー・キッズ向けおやつ・飲料",
+  "items": [
+    {
+      "code": "8101", "age": "7カ月頃から", "origin": "製造新潟。原料米：国産。", "next": "10月2日", "maker": "ひだまり米菓", "shelf": "5カ月",
+      "name": "ぴよぴよ やさいせんべい", "volume": "45g", "priceExcludingTax": 148,
+      "stickers": ["次回より値上げ"],
+      "description": "かぼちゃとにんじんを練りこんだ、口どけのよいおせんべい。標準2枚入×12個包装入り。1個包装15kcal、食塩相当量0.06g。",
+      "allergenLabel": null, "piecesPerPackCandidates": [12, 24], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#f6c445", "icon": "🍘" },
+      "_trap": "内容量は「45g」だけで、個包装の数は説明文にしかない"
+    },
+    {
+      "code": "8102", "age": "3歳から", "origin": "製造北海道。", "next": "10月3日", "maker": "ひだまり生協", "shelf": "4カ月",
+      "name": "CO・OP ポテトチップス のりしお", "volume": "18g×6袋", "priceExcludingTax": 238,
+      "unitPrice": "1袋",
+      "description": "国産じゃがいもを薄く切って、からっと揚げました。青のりの香りがひろがります。1袋（18g）98kcal、食塩相当量0.1g。",
+      "allergenLabel": null, "piecesPerPackCandidates": [6], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#3f9b5a", "icon": "🥔" },
+      "_trap": "照合：既存の「CO・OP ポテトチップス うすしお」の味違い"
+    },
+    {
+      "code": "8103", "age": "1歳半から", "origin": "製造群馬。", "next": "10月2日", "maker": "もりのこ製菓", "shelf": "8カ月",
+      "name": "くまのポッケ ミルクビスケット", "volume": "120g（10袋）", "priceExcludingTax": 328,
+      "description": "くまのポッケのかおが楽しい、ミルク風味のひとくちビスケット。1袋（12g）58kcal、食塩相当量0.05g。",
+      "allergenLabel": ["乳", "小麦"], "piecesPerPackCandidates": [10], "snackCategory": "あまいもの",
+      "package": { "color": "#c98b55", "icon": "🐻" }
+    },
+    {
+      "code": "8104", "age": "3歳から", "origin": "製造埼玉。", "next": "10月4日", "maker": "ことり堂", "shelf": "6カ月",
+      "name": "ことりのさくさくショコラ", "volume": "8個", "priceExcludingTax": 298,
+      "description": "ココアビスケットで、なめらかなチョコクリームをはさみました。1個（標準11g）58kcal、食塩相当量0.03g。",
+      "allergenLabel": ["乳", "小麦", "大豆"], "piecesPerPackCandidates": [8], "snackCategory": "あまいもの",
+      "package": { "color": "#7a4a32", "icon": "🐦" },
+      "_trap": "デモの山場：原材料にヘーゼルナッツペーストを含むが、チラシには探す言葉が出てこない。取り込み直後は「参考」で献立に入り、パッケージの撮影で初めて見つかる（TD-01）"
+    },
+    {
+      "code": "8105", "age": "2歳から", "origin": "製造愛知。", "next": "10月2日", "maker": "ひだまり生協", "shelf": "6カ月",
+      "name": "CO・OP さくさくクッキー", "volume": "5袋入", "priceExcludingTax": 198,
+      "description": "バターの香りの、さっくり軽いクッキーです。1袋（2枚）62kcal、食塩相当量0.04g。",
+      "allergenLabel": ["卵", "乳", "小麦"], "piecesPerPackCandidates": [5], "snackCategory": "あまいもの",
+      "package": { "color": "#e9a23b", "icon": "🍪" },
+      "_trap": "照合：既存の「さくさくクッキー 10袋入」の内容量違い"
+    },
+    {
+      "code": "8106", "age": "1歳頃から", "origin": "製造山形。原料米：国産。", "next": "10月3日", "maker": "にこにこフーズ", "shelf": "10カ月",
+      "name": "にこにこ 小魚あられ", "volume": "4g×3袋", "priceExcludingTax": 206,
+      "description": "国産米にしらすを加えた、口どけしやすいノンフライのあられです。1袋（4g）15kcal、食塩相当量0.02g。",
+      "allergenLabel": null, "piecesPerPackCandidates": [3], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#5aa6d6", "icon": "🐟" }
+    },
+    {
+      "code": "8107", "age": "1歳半から", "origin": "製造長野。", "next": "10月4日", "maker": "うさぎ乳業", "shelf": "6カ月",
+      "name": "うさぎのミミ いちごゼリー", "volume": "6個入", "priceExcludingTax": 258,
+      "description": "果汁20%の、ぷるんとしたいちごゼリー。1個（70g）52kcal。",
+      "allergenLabel": null, "piecesPerPackCandidates": [6], "snackCategory": "のどごしのいいもの",
+      "package": { "color": "#ef7f9a", "icon": "🐰" }
+    },
+    {
+      "code": "8108", "age": "7カ月頃から", "origin": "製造兵庫。", "next": "10月2日", "maker": "ひだまり生協", "shelf": "6カ月",
+      "name": "CO・OP たまごボーロ", "volume": "18g×4袋", "priceExcludingTax": 168,
+      "unitPrice": "1袋",
+      "description": "口の中でやさしくとける、ころころボーロです。1袋（18g）70kcal、食塩相当量0.01g。",
+      "allergenLabel": ["卵", "乳"], "piecesPerPackCandidates": [4], "snackCategory": "あまいもの",
+      "package": { "color": "#f3d36b", "icon": "🥚" }
+    },
+    {
+      "code": "8109", "age": "2歳から", "origin": "製造岐阜。", "next": "10月3日", "maker": "やまぶき屋", "shelf": "3カ月",
+      "name": "もちもち きなこ棒", "volume": "12本", "priceExcludingTax": 198,
+      "description": "きなこと水あめを練った、昔ながらのやさしい甘さ。1本（8g）32kcal。",
+      "allergenLabel": ["大豆"], "piecesPerPackCandidates": [12], "snackCategory": "あまいもの",
+      "package": { "color": "#c9a56a", "icon": "🍡" }
+    },
+    {
+      "code": "8110", "age": "1歳から", "origin": "製造茨城。", "next": "10月2日", "maker": "ぐんぐん製菓", "shelf": "8カ月",
+      "name": "ぐんぐん 野菜スティック", "volume": "15g×4袋", "priceExcludingTax": 208,
+      "unitPrice": "1袋",
+      "description": "ほうれん草とトマトを練りこんで焼き上げた、ぽりぽり食感のスティック。1袋（15g）64kcal、食塩相当量0.08g。",
+      "allergenLabel": ["小麦"], "piecesPerPackCandidates": [4], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#6fb84a", "icon": "🥕" }
+    },
+    {
+      "code": "8111", "age": "1カ月頃から（うすめて）", "origin": "製造長野。", "next": "10月4日", "maker": "ひだまり生協", "shelf": "8カ月",
+      "name": "CO・OP 麦茶（国産六条大麦）", "volume": "125ml×18", "priceExcludingTax": 720,
+      "unitPrice": "1本", "bulk": "箱でお届け",
+      "description": "国産の六条大麦を使った、香ばしい麦茶。ノンカフェイン。1本（125ml）0kcal。",
+      "allergenLabel": null, "piecesPerPackCandidates": [18], "snackCategory": "対象外",
+      "package": { "color": "#b5793a", "icon": "🍵" }
+    },
+    {
+      "code": "8112", "age": "7カ月頃から", "origin": "製造長野。", "next": "10月3日", "maker": "みどり果樹園", "shelf": "8カ月",
+      "name": "りんごとにんじん 100", "volume": "100ml×3", "priceExcludingTax": 180,
+      "unitPrice": "1本",
+      "description": "国産にんじんとりんごをミックスした、すっきりした味わいのジュース。果汁50%・野菜汁50%。1本（100ml）44kcal。",
+      "allergenLabel": null, "piecesPerPackCandidates": [3], "snackCategory": "のどごしのいいもの",
+      "package": { "color": "#f08a3c", "icon": "🍎" }
+    },
+    {
+      "code": "8113", "age": "1歳から", "origin": "製造北海道。", "next": "10月2日", "maker": "うさぎ乳業", "shelf": "18日",
+      "name": "のむヨーグルト いちご", "volume": "125ml×6", "priceExcludingTax": 398,
+      "unitPrice": "1本", "chilled": true,
+      "description": "生乳を使った、まろやかなのむヨーグルト。いちご果汁入り。1本（125ml）86kcal。",
+      "allergenLabel": ["乳"], "piecesPerPackCandidates": [6], "snackCategory": "のどごしのいいもの",
+      "package": { "color": "#f4a7b9", "icon": "🍓" }
+    },
+    {
+      "code": "8114", "age": "新生児から", "origin": "製造山梨。", "next": "10月4日", "maker": "やまの水", "shelf": "1年",
+      "name": "こどものおいしい水", "volume": "2ℓ", "priceExcludingTax": 138,
+      "bulk": "6点注文で箱お届け",
+      "description": "粉ミルクづくりにも使える、やわらかい口あたりの軟水です。",
+      "allergenLabel": null, "piecesPerPackCandidates": [], "snackCategory": "対象外",
+      "package": { "color": "#8fd0f0", "icon": "💧" },
+      "_trap": "内容量から入数の候補が出せない（1パックで何人分かは職員が決める）"
+    },
+    {
+      "code": "8115", "age": "1歳半から", "origin": "製造群馬。", "next": "10月3日", "maker": "もりのこ乳業", "shelf": "6カ月",
+      "name": "くまのポッケ フルーツオレ", "volume": "200ml×12", "priceExcludingTax": 998,
+      "unitPrice": "1本", "bulk": "箱でお届け", "stickers": ["次回より値上げ"],
+      "description": "3種のくだもの果汁とミルクをあわせた、やさしい甘さのドリンク。1本（200ml）112kcal。",
+      "allergenLabel": ["乳"], "piecesPerPackCandidates": [12], "snackCategory": "のどごしのいいもの",
+      "package": { "color": "#f2b552", "icon": "🐻" }
+    },
+    {
+      "code": "8116", "age": "1歳半から", "origin": "製造静岡。", "next": "10月2日", "maker": "ふわり洋菓子", "shelf": "60日",
+      "name": "ふわふわ スフレケーキ", "volume": "6個", "priceExcludingTax": 348,
+      "description": "しっとりふんわり焼き上げた、ひとくちサイズのスフレ。1個（20g）72kcal。",
+      "allergenLabel": ["卵", "乳", "小麦"], "piecesPerPackCandidates": [6], "snackCategory": "あまいもの",
+      "package": { "color": "#f7d9a0", "icon": "🍰" }
+    },
+    {
+      "code": "8117", "age": "1歳半から", "origin": "製造栃木。", "next": "10月4日", "maker": "ぽりぽり堂", "shelf": "6カ月",
+      "name": "ぽりぽり えだまめスナック", "volume": "8g×4袋", "priceExcludingTax": 158,
+      "unitPrice": "1袋",
+      "description": "えだまめの粉を練りこんで、軽く焼き上げたスナック。1袋（8g）38kcal、食塩相当量0.05g。",
+      "allergenLabel": ["大豆"], "piecesPerPackCandidates": [4], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#8cc63f", "icon": "🌱" }
+    },
+    {
+      "code": "8118", "age": "3歳から", "origin": "製造大阪。", "next": "10月3日", "maker": "ことり堂", "shelf": "1年",
+      "name": "ことりのピピ ラムネ", "volume": "4g×10袋", "priceExcludingTax": 178,
+      "description": "しゅわっととける、ぶどう味のラムネ。ビタミンC入り。1袋（4g）15kcal。",
+      "allergenLabel": null, "piecesPerPackCandidates": [10], "snackCategory": "あまいもの",
+      "package": { "color": "#9a7fd1", "icon": "🐤" }
+    },
+    {
+      "code": "8119", "age": "2歳から", "origin": "製造新潟。", "next": "11月1日", "maker": "ひだまり米菓", "shelf": "6カ月",
+      "name": "おさかな チーズおかき 4連パック", "volume": "14g×4パック", "priceExcludingTax": 180,
+      "unitPrice": "1パック",
+      "description": "おさかなの形のおかきに、チーズパウダーをまぶしました。1パック（14g）67kcal、食塩相当量0.2g。",
+      "allergenLabel": ["乳", "小麦"], "piecesPerPackCandidates": [4], "snackCategory": "しょっぱいもの",
+      "package": { "color": "#4f86c6", "icon": "🐠" }
+    },
+    {
+      "code": "8120", "age": "3歳から", "origin": "製造宮崎。", "next": "10月2日", "maker": "やまぶき屋", "shelf": "4カ月",
+      "name": "さつまいも かりんとう", "volume": "70g", "priceExcludingTax": 218,
+      "description": "九州産さつまいもを使った、かりっと香ばしいかりんとう。食べきりサイズの個包装が10個入っています。",
+      "allergenLabel": ["小麦"], "piecesPerPackCandidates": [10], "snackCategory": "あまいもの",
+      "package": { "color": "#a8553a", "icon": "🍠" },
+      "_trap": "内容量は「70g」だけで、個包装の数は説明文にしかない"
+    }
+  ]
+}

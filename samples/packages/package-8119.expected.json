@@ -1,0 +1,23 @@
+{
+  "_note": "build.py が package-8119.json から作った正解データ。直接編集しない。foundInIngredients は、アレルゲン表示には出ず原材料名の全文で見つかる品目",
+  "source": "package-8119.json",
+  "flyerCode": "8119",
+  "images": [
+    "package-8119-front.png",
+    "package-8119-side-1.png",
+    "package-8119-side-2.png"
+  ],
+  "ingredientsText": "うるち米（国産）、植物油脂、チーズパウダー（乳製品、食塩）、でん粉、しょうゆ（大豆・小麦を含む）、砂糖、食塩、こんぶエキス／調味料（アミノ酸等）、着色料（カロチノイド）、（一部に小麦・乳成分・大豆を含む）",
+  "allergenLabelText": "一部に小麦・乳成分・大豆を含む",
+  "labelAllergens": [
+    "小麦",
+    "乳",
+    "大豆"
+  ],
+  "foundInIngredients": [],
+  "tags": [
+    "おさかな",
+    "せんべい"
+  ],
+  "_trap": "原材料名が側面1と側面2にまたがる。両方の画像をつなげて全文にする。チラシの表記（乳・小麦）にない大豆を含む"
+}

@@ -1,0 +1,25 @@
+{
+  "_note": "build.py が package-8104.json から作った正解データ。直接編集しない。foundInIngredients は、アレルゲン表示には出ず原材料名の全文で見つかる品目",
+  "source": "package-8104.json",
+  "flyerCode": "8104",
+  "images": [
+    "package-8104-front.png",
+    "package-8104-back.png"
+  ],
+  "ingredientsText": "小麦粉（国内製造）、砂糖、植物油脂、ショートニング、ココアパウダー、ヘーゼルナッツペースト、全粉乳、乳糖、食塩／膨張剤、乳化剤、香料、（一部に小麦・乳成分・大豆を含む）",
+  "allergenLabelText": "一部に小麦・乳成分・大豆を含む",
+  "labelAllergens": [
+    "小麦",
+    "乳",
+    "大豆"
+  ],
+  "foundInIngredients": [
+    "ヘーゼルナッツ"
+  ],
+  "tags": [
+    "ことり",
+    "焼き菓子",
+    "チョコ"
+  ],
+  "_trap": "「ヘーゼルナッ」と「ツペースト」の間で改行している。改行を除いてから探さないと見落とす（03 の正規化）"
+}

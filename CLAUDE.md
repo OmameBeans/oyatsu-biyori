@@ -69,6 +69,7 @@ tools/                       開発用の道具（アプリには含めない）
 - フロントの確認：`src/oyatsubiyori.client` で `npm run lint` と `npm run build`
 - 本番用の出力：`dotnet publish src/OyatsuBiyori.Server -c Release`
 - 要件定義の HTML を作り直す：`python tools/build-requirements-html/build.py`（`docs/requirements/*.md` を直したら必ず実行する。`index.html` は直接編集しない）
+- ダミーのチラシ・パッケージを作り直す：`python tools/build-samples/build.py`（`samples/flyers/*.json`・`samples/packages/*.json` を直したら実行する。画像・PDF・正解データ（`*.expected.json`）を作る。Edge か Chrome が必要）
 - 実装タスクの HTML を作り直す：`python tools/build-tasks-html/build.py`（`docs/implementation-tasks/implementation-tasks.md` を直したら実行する。出力は同じフォルダの `index.html`）
 
 ## Claude（API）の使い方

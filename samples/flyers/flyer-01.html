@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ひだまり生協 10月 第2回（架空のチラシ）</title>
+<style>
+  @page { size: 1144px 1102px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #fff;
+    color: #222;
+    font-family: "BIZ UDPGothic", "Yu Gothic", "Meiryo", sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet { width: 1144px; height: 1102px; padding: 12px; background: #fff; }
+  .head { height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #e2d8cf; }
+  .head .section { background: #8a7b70; color: #fff; font-size: 20px; font-weight: 700; padding: 8px 28px 8px 16px; border-radius: 0 22px 22px 0; }
+  .head .sub { font-size: 14px; color: #6b5e55; }
+  .head .publisher { margin-left: auto; text-align: right; font-size: 12px; color: #6b5e55; line-height: 1.4; }
+  .head .publisher b { font-size: 15px; color: #a04a2c; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 250px; }
+  .cell { position: relative; padding: 6px 8px 6px 8px; border-right: 1px dashed #c9c1ba; border-bottom: 1px dashed #c9c1ba; overflow: hidden; }
+  .cell:nth-child(5n) { border-right: none; }
+  .age { display: inline-block; color: #fff; font-size: 12px; font-weight: 700; padding: 2px 14px 2px 8px; border-radius: 0 10px 10px 0; margin-left: -8px; }
+  .age.baby { background: #ef7f8f; }
+  .age.one { background: #4fae6b; }
+  .age.two { background: #e98a2c; }
+  .age.three { background: #4d86c7; }
+  .origin { font-size: 9.5px; color: #555; margin-top: 3px; }
+  .meta { margin-top: 3px; width: 134px; }
+  .code { display: inline-block; border: 1.5px solid #333; font-size: 19px; font-weight: 700; padding: 0 4px; line-height: 1.15; letter-spacing: 0.5px; }
+  .meta .small { font-size: 9px; color: #444; line-height: 1.3; margin-top: 2px; }
+  .name { font-size: 15px; font-weight: 700; line-height: 1.2; margin-top: 2px; width: 134px; }
+  .volume { font-size: 12px; margin-top: 2px; }
+  .price { position: absolute; left: 8px; top: 160px; display: flex; align-items: flex-end; gap: 2px; }
+  .price .honntai { font-size: 10px; writing-mode: vertical-rl; line-height: 1; margin-bottom: 4px; }
+  .price .num { font-size: 31px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+  .price .yen { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+  .price .tax { font-size: 12px; margin-left: 4px; margin-bottom: 2px; }
+  .price .tax b { font-size: 15px; }
+  .unit { position: absolute; right: 8px; top: 128px; border: 1px solid #555; font-size: 10px; text-align: center; padding: 1px 4px; line-height: 1.25; background: #fff; }
+  .unit b { font-size: 13px; }
+  .pkg { position: absolute; right: 8px; top: 30px; width: 70px; height: 84px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 -10px 0 rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.25); }
+  .pkg .icon { font-size: 34px; line-height: 1; font-family: "Segoe UI Emoji", sans-serif; }
+  .pkg .label { font-size: 9px; font-weight: 700; color: #fff; text-align: center; margin-top: 4px; padding: 0 4px; text-shadow: 0 1px 1px rgba(0,0,0,0.4); line-height: 1.2; }
+  .sticker { position: absolute; right: -2px; top: 10px; z-index: 1; width: 44px; height: 44px; border-radius: 50%; background: #e23b3b; color: #fff; font-size: 9.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.15; transform: rotate(-12deg); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .bulk { position: absolute; right: 8px; top: 100px; background: #1f3e75; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 4px; line-height: 1.2; text-align: center; border-radius: 3px; width: 70px; }
+  .chilled { position: absolute; right: 26px; top: 100px; background: #2a8fc9; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 5px; border-radius: 3px; }
+  .desc { position: absolute; left: 8px; right: 8px; top: 197px; font-size: 10px; line-height: 1.4; color: #333; }
+  .foot { height: 22px; font-size: 10.5px; color: #777; padding-top: 5px; text-align: right; }
+
+</style>
+</head>
+<body class="">
+<div class="sheet">
+  <div class="head">
+    <div class="section">お菓子・飲みもの</div>
+    <div class="sub">ベビー・キッズ向けおやつ・飲料</div>
+    <div class="publisher"><b>ひだまり生協</b>　10月 第2回<br>サンプル（架空のチラシ）</div>
+  </div>
+  <div class="grid">
+    <div class="cell"><div class="age baby">7カ月頃から</div><div class="origin">製造新潟。原料米：国産。</div><div class="meta"><div class="code">8101</div><div class="small">次回予定▶10月2日　賞5カ月<br>ひだまり米菓</div></div><div class="name">ぴよぴよ やさいせんべい</div><div class="volume">45g</div><div class="pkg" style="background:#f6c445"><div class="icon">🍘</div><div class="label">ぴよぴよ</div></div><div class="sticker">次回より<br>値上げ</div><div class="price"><span class="honntai">本体</span><span class="num">148</span><span class="yen">円</span><span class="tax">(税込<b>159</b>円)</span></div><div class="desc">かぼちゃとにんじんを練りこんだ、口どけのよいおせんべい。標準2枚入×12個包装入り。1個包装15kcal、食塩相当量0.06g。</div></div>
+    <div class="cell"><div class="age three">3歳から</div><div class="origin">製造北海道。</div><div class="meta"><div class="code">8102</div><div class="small">次回予定▶10月3日　賞4カ月<br>ひだまり生協</div></div><div class="name">CO・OP ポテトチップス のりしお</div><div class="volume">18g×6袋</div><div class="pkg" style="background:#3f9b5a"><div class="icon">🥔</div><div class="label">CO・OP</div></div><div class="unit">本体<b>40</b>円<br>1袋</div><div class="price"><span class="honntai">本体</span><span class="num">238</span><span class="yen">円</span><span class="tax">(税込<b>257</b>円)</span></div><div class="desc">国産じゃがいもを薄く切って、からっと揚げました。青のりの香りがひろがります。1袋（18g）98kcal、食塩相当量0.1g。</div></div>
+    <div class="cell"><div class="age one">1歳半から</div><div class="origin">製造群馬。</div><div class="meta"><div class="code">8103</div><div class="small">次回予定▶10月2日　賞8カ月<br>もりのこ製菓</div></div><div class="name">くまのポッケ ミルクビスケット</div><div class="volume">120g（10袋）</div><div class="pkg" style="background:#c98b55"><div class="icon">🐻</div><div class="label">くまのポッケ</div></div><div class="price"><span class="honntai">本体</span><span class="num">328</span><span class="yen">円</span><span class="tax">(税込<b>354</b>円)</span></div><div class="desc">くまのポッケのかおが楽しい、ミルク風味のひとくちビスケット。1袋（12g）58kcal、食塩相当量0.05g。（乳・小麦）</div></div>
+    <div class="cell"><div class="age three">3歳から</div><div class="origin">製造埼玉。</div><div class="meta"><div class="code">8104</div><div class="small">次回予定▶10月4日　賞6カ月<br>ことり堂</div></div><div class="name">ことりのさくさくショコラ</div><div class="volume">8個</div><div class="pkg" style="background:#7a4a32"><div class="icon">🐦</div><div class="label">ことりのさくさくショコラ</div></div><div class="price"><span class="honntai">本体</span><span class="num">298</span><span class="yen">円</span><span class="tax">(税込<b>321</b>円)</span></div><div class="desc">ココアビスケットで、なめらかなチョコクリームをはさみました。1個（標準11g）58kcal、食塩相当量0.03g。（乳・小麦・大豆）</div></div>
+    <div class="cell"><div class="age two">2歳から</div><div class="origin">製造愛知。</div><div class="meta"><div class="code">8105</div><div class="small">次回予定▶10月2日　賞6カ月<br>ひだまり生協</div></div><div class="name">CO・OP さくさくクッキー</div><div class="volume">5袋入</div><div class="pkg" style="background:#e9a23b"><div class="icon">🍪</div><div class="label">CO・OP</div></div><div class="price"><span class="honntai">本体</span><span class="num">198</span><span class="yen">円</span><span class="tax">(税込<b>213</b>円)</span></div><div class="desc">バターの香りの、さっくり軽いクッキーです。1袋（2枚）62kcal、食塩相当量0.04g。（卵・乳・小麦）</div></div>
+    <div class="cell"><div class="age one">1歳頃から</div><div class="origin">製造山形。原料米：国産。</div><div class="meta"><div class="code">8106</div><div class="small">次回予定▶10月3日　賞10カ月<br>にこにこフーズ</div></div><div class="name">にこにこ 小魚あられ</div><div class="volume">4g×3袋</div><div class="pkg" style="background:#5aa6d6"><div class="icon">🐟</div><div class="label">にこにこ</div></div><div class="price"><span class="honntai">本体</span><span class="num">206</span><span class="yen">円</span><span class="tax">(税込<b>222</b>円)</span></div><div class="desc">国産米にしらすを加えた、口どけしやすいノンフライのあられです。1袋（4g）15kcal、食塩相当量0.02g。</div></div>
+    <div class="cell"><div class="age one">1歳半から</div><div class="origin">製造長野。</div><div class="meta"><div class="code">8107</div><div class="small">次回予定▶10月4日　賞6カ月<br>うさぎ乳業</div></div><div class="name">うさぎのミミ いちごゼリー</div><div class="volume">6個入</div><div class="pkg" style="background:#ef7f9a"><div class="icon">🐰</div><div class="label">うさぎのミミ</div></div><div class="price"><span class="honntai">本体</span><span class="num">258</span><span class="yen">円</span><span class="tax">(税込<b>278</b>円)</span></div><div class="desc">果汁20%の、ぷるんとしたいちごゼリー。1個（70g）52kcal。</div></div>
+    <div class="cell"><div class="age baby">7カ月頃から</div><div class="origin">製造兵庫。</div><div class="meta"><div class="code">8108</div><div class="small">次回予定▶10月2日　賞6カ月<br>ひだまり生協</div></div><div class="name">CO・OP たまごボーロ</div><div class="volume">18g×4袋</div><div class="pkg" style="background:#f3d36b"><div class="icon">🥚</div><div class="label">CO・OP</div></div><div class="unit">本体<b>42</b>円<br>1袋</div><div class="price"><span class="honntai">本体</span><span class="num">168</span><span class="yen">円</span><span class="tax">(税込<b>181</b>円)</span></div><div class="desc">口の中でやさしくとける、ころころボーロです。1袋（18g）70kcal、食塩相当量0.01g。（卵・乳）</div></div>
+    <div class="cell"><div class="age two">2歳から</div><div class="origin">製造岐阜。</div><div class="meta"><div class="code">8109</div><div class="small">次回予定▶10月3日　賞3カ月<br>やまぶき屋</div></div><div class="name">もちもち きなこ棒</div><div class="volume">12本</div><div class="pkg" style="background:#c9a56a"><div class="icon">🍡</div><div class="label">もちもち</div></div><div class="price"><span class="honntai">本体</span><span class="num">198</span><span class="yen">円</span><span class="tax">(税込<b>213</b>円)</span></div><div class="desc">きなこと水あめを練った、昔ながらのやさしい甘さ。1本（8g）32kcal。（大豆）</div></div>
+    <div class="cell"><div class="age one">1歳から</div><div class="origin">製造茨城。</div><div class="meta"><div class="code">8110</div><div class="small">次回予定▶10月2日　賞8カ月<br>ぐんぐん製菓</div></div><div class="name">ぐんぐん 野菜スティック</div><div class="volume">15g×4袋</div><div class="pkg" style="background:#6fb84a"><div class="icon">🥕</div><div class="label">ぐんぐん</div></div><div class="unit">本体<b>52</b>円<br>1袋</div><div class="price"><span class="honntai">本体</span><span class="num">208</span><span class="yen">円</span><span class="tax">(税込<b>224</b>円)</span></div><div class="desc">ほうれん草とトマトを練りこんで焼き上げた、ぽりぽり食感のスティック。1袋（15g）64kcal、食塩相当量0.08g。（小麦）</div></div>
+    <div class="cell"><div class="age baby">1カ月頃から（うすめて）</div><div class="origin">製造長野。</div><div class="meta"><div class="code">8111</div><div class="small">次回予定▶10月4日　賞8カ月<br>ひだまり生協</div></div><div class="name">CO・OP 麦茶（国産六条大麦）</div><div class="volume">125ml×18</div><div class="pkg" style="background:#b5793a"><div class="icon">🍵</div><div class="label">CO・OP</div></div><div class="bulk">箱でお届け</div><div class="unit">本体<b>40</b>円<br>1本</div><div class="price"><span class="honntai">本体</span><span class="num">720</span><span class="yen">円</span><span class="tax">(税込<b>777</b>円)</span></div><div class="desc">国産の六条大麦を使った、香ばしい麦茶。ノンカフェイン。1本（125ml）0kcal。</div></div>
+    <div class="cell"><div class="age baby">7カ月頃から</div><div class="origin">製造長野。</div><div class="meta"><div class="code">8112</div><div class="small">次回予定▶10月3日　賞8カ月<br>みどり果樹園</div></div><div class="name">りんごとにんじん 100</div><div class="volume">100ml×3</div><div class="pkg" style="background:#f08a3c"><div class="icon">🍎</div><div class="label">りんごとにんじん</div></div><div class="unit">本体<b>60</b>円<br>1本</div><div class="price"><span class="honntai">本体</span><span class="num">180</span><span class="yen">円</span><span class="tax">(税込<b>194</b>円)</span></div><div class="desc">国産にんじんとりんごをミックスした、すっきりした味わいのジュース。果汁50%・野菜汁50%。1本（100ml）44kcal。</div></div>
+    <div class="cell"><div class="age one">1歳から</div><div class="origin">製造北海道。</div><div class="meta"><div class="code">8113</div><div class="small">次回予定▶10月2日　賞18日<br>うさぎ乳業</div></div><div class="name">のむヨーグルト いちご</div><div class="volume">125ml×6</div><div class="pkg" style="background:#f4a7b9"><div class="icon">🍓</div><div class="label">のむヨーグルト</div></div><div class="chilled">冷蔵</div><div class="unit">本体<b>66</b>円<br>1本</div><div class="price"><span class="honntai">本体</span><span class="num">398</span><span class="yen">円</span><span class="tax">(税込<b>429</b>円)</span></div><div class="desc">生乳を使った、まろやかなのむヨーグルト。いちご果汁入り。1本（125ml）86kcal。（乳）</div></div>
+    <div class="cell"><div class="age baby">新生児から</div><div class="origin">製造山梨。</div><div class="meta"><div class="code">8114</div><div class="small">次回予定▶10月4日　賞1年<br>やまの水</div></div><div class="name">こどものおいしい水</div><div class="volume">2ℓ</div><div class="pkg" style="background:#8fd0f0"><div class="icon">💧</div><div class="label">こどものおいしい水</div></div><div class="bulk">6点注文で<br>箱お届け</div><div class="price"><span class="honntai">本体</span><span class="num">138</span><span class="yen">円</span><span class="tax">(税込<b>149</b>円)</span></div><div class="desc">粉ミルクづくりにも使える、やわらかい口あたりの軟水です。</div></div>
+    <div class="cell"><div class="age one">1歳半から</div><div class="origin">製造群馬。</div><div class="meta"><div class="code">8115</div><div class="small">次回予定▶10月3日　賞6カ月<br>もりのこ乳業</div></div><div class="name">くまのポッケ フルーツオレ</div><div class="volume">200ml×12</div><div class="pkg" style="background:#f2b552"><div class="icon">🐻</div><div class="label">くまのポッケ</div></div><div class="sticker">次回より<br>値上げ</div><div class="bulk">箱でお届け</div><div class="unit">本体<b>83</b>円<br>1本</div><div class="price"><span class="honntai">本体</span><span class="num">998</span><span class="yen">円</span><span class="tax">(税込<b>1,077</b>円)</span></div><div class="desc">3種のくだもの果汁とミルクをあわせた、やさしい甘さのドリンク。1本（200ml）112kcal。（乳）</div></div>
+    <div class="cell"><div class="age one">1歳半から</div><div class="origin">製造静岡。</div><div class="meta"><div class="code">8116</div><div class="small">次回予定▶10月2日　賞60日<br>ふわり洋菓子</div></div><div class="name">ふわふわ スフレケーキ</div><div class="volume">6個</div><div class="pkg" style="background:#f7d9a0"><div class="icon">🍰</div><div class="label">ふわふわ</div></div><div class="price"><span class="honntai">本体</span><span class="num">348</span><span class="yen">円</span><span class="tax">(税込<b>375</b>円)</span></div><div class="desc">しっとりふんわり焼き上げた、ひとくちサイズのスフレ。1個（20g）72kcal。（卵・乳・小麦）</div></div>
+    <div class="cell"><div class="age one">1歳半から</div><div class="origin">製造栃木。</div><div class="meta"><div class="code">8117</div><div class="small">次回予定▶10月4日　賞6カ月<br>ぽりぽり堂</div></div><div class="name">ぽりぽり えだまめスナック</div><div class="volume">8g×4袋</div><div class="pkg" style="background:#8cc63f"><div class="icon">🌱</div><div class="label">ぽりぽり</div></div><div class="unit">本体<b>40</b>円<br>1袋</div><div class="price"><span class="honntai">本体</span><span class="num">158</span><span class="yen">円</span><span class="tax">(税込<b>170</b>円)</span></div><div class="desc">えだまめの粉を練りこんで、軽く焼き上げたスナック。1袋（8g）38kcal、食塩相当量0.05g。（大豆）</div></div>
+    <div class="cell"><div class="age three">3歳から</div><div class="origin">製造大阪。</div><div class="meta"><div class="code">8118</div><div class="small">次回予定▶10月3日　賞1年<br>ことり堂</div></div><div class="name">ことりのピピ ラムネ</div><div class="volume">4g×10袋</div><div class="pkg" style="background:#9a7fd1"><div class="icon">🐤</div><div class="label">ことりのピピ</div></div><div class="price"><span class="honntai">本体</span><span class="num">178</span><span class="yen">円</span><span class="tax">(税込<b>192</b>円)</span></div><div class="desc">しゅわっととける、ぶどう味のラムネ。ビタミンC入り。1袋（4g）15kcal。</div></div>
+    <div class="cell"><div class="age two">2歳から</div><div class="origin">製造新潟。</div><div class="meta"><div class="code">8119</div><div class="small">次回予定▶11月1日　賞6カ月<br>ひだまり米菓</div></div><div class="name">おさかな チーズおかき 4連パック</div><div class="volume">14g×4パック</div><div class="pkg" style="background:#4f86c6"><div class="icon">🐠</div><div class="label">おさかな</div></div><div class="unit">本体<b>45</b>円<br>1パック</div><div class="price"><span class="honntai">本体</span><span class="num">180</span><span class="yen">円</span><span class="tax">(税込<b>194</b>円)</span></div><div class="desc">おさかなの形のおかきに、チーズパウダーをまぶしました。1パック（14g）67kcal、食塩相当量0.2g。（乳・小麦）</div></div>
+    <div class="cell"><div class="age three">3歳から</div><div class="origin">製造宮崎。</div><div class="meta"><div class="code">8120</div><div class="small">次回予定▶10月2日　賞4カ月<br>やまぶき屋</div></div><div class="name">さつまいも かりんとう</div><div class="volume">70g</div><div class="pkg" style="background:#a8553a"><div class="icon">🍠</div><div class="label">さつまいも</div></div><div class="price"><span class="honntai">本体</span><span class="num">218</span><span class="yen">円</span><span class="tax">(税込<b>235</b>円)</span></div><div class="desc">九州産さつまいもを使った、かりっと香ばしいかりんとう。食べきりサイズの個包装が10個入っています。（小麦）</div></div>
+  </div>
+  <div class="foot">※このチラシは開発用の架空のサンプルです。実在の商品・企業・団体とは関係ありません。価格は本体価格（税込価格）です。</div>
+</div>
+</body>
+</html>
