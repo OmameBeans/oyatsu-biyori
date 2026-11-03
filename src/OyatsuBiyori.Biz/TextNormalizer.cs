@@ -87,6 +87,9 @@ public static class TextNormalizer
         var starts = new List<int>(text.Length);
         var lengths = new List<int>(text.Length);
 
+        // 直前の文字（空白・改行は飛ばし、取り除く記号は含める）。長音に似た文字を「ー」にそろえるかの判断に使う
+        var previous = '\0';
+
         var index = 0;
         while (index < text.Length)
         {
@@ -102,10 +105,16 @@ public static class TextNormalizer
                 var converted = ToHiragana(char.ToLowerInvariant(c));
 
                 // かなの直後の、長音に似た文字（全角ハイフン・ダッシュ・漢数字の「一」など）は「ー」にそろえる
-                // （「ヘ－ゼル」「ヘ一ゼル」と読み取られても「へーぜる」に当たるように。確認する側に倒す）
-                if (IsLongVowelLookalike(converted) && builder.Length > 0 && IsKanaOrLongVowel(builder[^1]))
+                // （「ヘ－ゼル」「ヘ一ゼル」と読み取られても「へーぜる」に当たるように。確認する側に倒す）。
+                // 読点などの記号を挟んだら、そろえない（「ソース、一味」の「一味」を、言葉「一味」と同じにするため）
+                if (IsLongVowelLookalike(converted) && IsKanaOrLongVowel(previous))
                 {
                     converted = 'ー';
+                }
+
+                if (!char.IsWhiteSpace(converted))
+                {
+                    previous = converted;
                 }
 
                 if (!keepSymbols && IsRemoved(converted))

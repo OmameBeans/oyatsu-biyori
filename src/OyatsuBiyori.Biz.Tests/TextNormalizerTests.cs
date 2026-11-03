@@ -73,6 +73,22 @@ public class TextNormalizerTests
         Assert.Equal(TextNormalizer.ForKeywordSearch("ペカン"), TextNormalizer.ForKeywordSearch("ヘ゜カン"));
     }
 
+    [Theory]
+    [InlineData("ウスターソース、一味唐辛子")]
+    [InlineData("ソース（一味）")]
+    public void 読点などの記号を挟んだ漢数字は長音にせず一で始まる言葉に当たる(string text)
+    {
+        var keyword = TextNormalizer.ForKeywordSearch("一味");
+
+        Assert.Contains(keyword, TextNormalizer.ForKeywordSearch(text), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 改行を挟んだ長音の書き違いは長音にそろえる()
+    {
+        Assert.Equal("へーぜるなっつ", TextNormalizer.ForKeywordSearch("ヘ\n一ゼルナッツ"));
+    }
+
     [Fact]
     public void かな以外の後ろのハイフンや漢数字は長音にしない()
     {

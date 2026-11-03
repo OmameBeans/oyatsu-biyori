@@ -93,6 +93,19 @@ public enum AllergenJudgementKind
     Safe,
 }
 
+/// <summary>探す言葉が当たった場所（判定の理由の表示用。保存しない）</summary>
+public enum KeywordHitSource
+{
+    /// <summary>商品名</summary>
+    ProductName,
+
+    /// <summary>Claude が読み取った原材料の全文</summary>
+    RawIngredientsOcr,
+
+    /// <summary>職員が確かめた原材料の全文</summary>
+    RawIngredients,
+}
+
 /// <summary>おやつの分類（アプリの固定値）</summary>
 public enum SnackType
 {

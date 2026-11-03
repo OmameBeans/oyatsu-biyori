@@ -34,6 +34,15 @@ public static class EnumDisplayExtensions
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };
 
+    /// <summary>探す言葉が当たった場所の表示名</summary>
+    public static string ToDisplayString(this KeywordHitSource value) => value switch
+    {
+        KeywordHitSource.ProductName => "商品名",
+        KeywordHitSource.RawIngredientsOcr => "原材料の全文（読み取り）",
+        KeywordHitSource.RawIngredients => "原材料の全文（職員が確認）",
+        _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
+    };
+
     /// <summary>商品の現在のステータスの表示名</summary>
     public static string ToDisplayString(this ProductAllergenStatus value) => value switch
     {
