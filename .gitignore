@@ -25,3 +25,7 @@ __pycache__/
 keys/
 publish/
 backups/
+
+# 外部から取り入れた Claude Code のスキル（自作ではないため公開しない）
+.claude/skills/screen-flow/
+.claude/skills/stack-diagram/
