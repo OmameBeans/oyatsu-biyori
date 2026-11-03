@@ -15,6 +15,9 @@ ALLOWED_MEDIA_DIRS = (
     "samples/",
     "src/oyatsubiyori.client/public/",
     "src/oyatsubiyori.client/src/assets/",
+    # スキルで作った構成図・画面遷移図（実データを含まない）
+    "docs/architecture/",
+    "docs/screen-flow/",
 )
 MEDIA_EXTENSIONS = (".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".pdf")
 DB_EXTENSIONS = (".db", ".sqlite", ".sqlite3", ".db-shm", ".db-wal")
