@@ -26,6 +26,9 @@ keys/
 publish/
 backups/
 
+# Visual Studio の発行の設定（手元のパスを含むため公開しない。本番用の出力は dotnet publish で作る）
+**/Properties/PublishProfiles/
+
 # 外部から取り入れた Claude Code のスキル（自作ではないため公開しない）
 .claude/skills/screen-flow/
 .claude/skills/stack-diagram/

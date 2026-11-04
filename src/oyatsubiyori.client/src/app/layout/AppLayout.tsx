@@ -11,6 +11,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import type { Theme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
@@ -29,6 +30,24 @@ const NAV_ITEMS = [
     { to: '/products', label: '商品一覧', icon: <Inventory2Icon /> },
     { to: '/settings', label: '設定', icon: <SettingsIcon /> },
 ] as const;
+
+/**
+ * サイドバーの項目の見た目。選ばれている項目は、幅いっぱいの薄い背景・左端の縦の線・テーマの色の文字で示す。
+ * 選ばれていない項目にも同じ幅の透明な線を付け、文字の位置がずれないようにする。
+ */
+const NAV_ITEM_SX = {
+    borderLeft: 4,
+    borderLeftColor: 'transparent',
+    '&.active': {
+        bgcolor: 'primary.light',
+        // 線は文字と同じ濃い色にし、薄い背景の上でも見分けられるようにする
+        borderLeftColor: 'primary.dark',
+        color: 'primary.dark',
+        '& .MuiListItemText-primary': { fontWeight: 700 },
+    },
+    // 選ばれている項目は背景がフォーカスの色に置き換わるので、キーボードで選んだときは枠線で示す
+    '&.Mui-focusVisible': { outline: (theme: Theme) => `2px solid ${theme.palette.primary.dark}`, outlineOffset: -2 },
+} as const;
 
 /**
  * SC-02 ホームの枠（T0-14）：左サイドバー（献立一覧・商品一覧・設定・ログアウト）。スマホは ≡ で開く。
@@ -76,7 +95,7 @@ export const AppLayout = () => {
                         to={item.to}
                         onClick={() => setIsDrawerOpen(false)}
                         disabled={status.mustChangePassword && item.to !== '/settings'}
-                        sx={{ mx: 1, borderRadius: 2, '&.active': { bgcolor: 'primary.light', color: 'primary.dark', fontWeight: 700 } }}
+                        sx={NAV_ITEM_SX}
                     >
                         <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>{item.icon}</ListItemIcon>
                         <ListItemText primary={item.label} />
@@ -86,7 +105,8 @@ export const AppLayout = () => {
             <Box sx={{ flex: 1 }} />
             <Divider />
             <List>
-                <ListItemButton onClick={handleLogout} disabled={logout.isPending} sx={{ mx: 1, borderRadius: 2 }}>
+                {/* 左の余白 8px と内側 12px で、上の項目（線 4px と内側 16px）と文字の位置をそろえる */}
+                <ListItemButton onClick={handleLogout} disabled={logout.isPending} sx={{ mx: 1, pl: 1.5, borderRadius: 2 }}>
                     <ListItemIcon sx={{ minWidth: 36 }}>
                         <LogoutIcon />
                     </ListItemIcon>
