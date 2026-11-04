@@ -405,3 +405,8 @@
 
 | ID | 優先度 | タスク | 種類 | リスク | 要件 | 安全 | 状態 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| #1 | あると良い | [サイドバーの選ばれた項目を、幅いっぱいの薄い背景と左端の縦の線で示す](https://github.com/OmameBeans/oyatsu-biyori/issues/1) | 見た目・文言 | 低 | SC-02, T0-14 |  |  |
+| #2 | あると良い | [設定画面で色のテーマを選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/2) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
+| #3 | あると良い | [PC でもサイドバーを開閉できるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/3) | 改善 | 中 | SC-02, T0-14 |  |  |
+| #4 | あると良い | [ダークモード（暗い背景）を選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/4) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
+| #5 | あると良い | [開発の環境で、API を Swagger UI から試せるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/5) | 改善 | 高 | NFR-SEC-02, NFR-SEC-10 |  |  |
