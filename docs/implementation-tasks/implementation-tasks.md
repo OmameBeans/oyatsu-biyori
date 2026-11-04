@@ -407,7 +407,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | #1 | あると良い | [サイドバーの選ばれた項目を、幅いっぱいの薄い背景と左端の縦の線で示す](https://github.com/OmameBeans/oyatsu-biyori/issues/1) | 見た目・文言 | 低 | SC-02, T0-14 |  | ✅ 2026-11-04 |
 | #2 | あると良い | [設定画面で色のテーマを選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/2) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
-| #3 | あると良い | [PC でもサイドバーを開閉できるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/3) | 改善 | 中 | SC-02, T0-14 |  |  |
+| #3 | あると良い | [PC でもサイドバーを開閉できるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/3) | 改善 | 中 | SC-02, T0-14 |  | ✅ 2026-11-04 |
 | #4 | あると良い | [ダークモード（暗い背景）を選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/4) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
 | #5 | あると良い | [開発の環境で、API を Swagger UI から試せるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/5) | 改善 | 高 | NFR-SEC-02, NFR-SEC-10 |  |  |
 | #6 | あると良い | [条件設定のフォームをカードに載せ、入力欄を読みやすくする](https://github.com/OmameBeans/oyatsu-biyori/issues/6) | 見た目・文言 | 中 | SC-03, T2-06 |  | ✅ 2026-11-04 |
