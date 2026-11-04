@@ -411,3 +411,4 @@
 | #4 | あると良い | [ダークモード（暗い背景）を選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/4) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
 | #5 | あると良い | [開発の環境で、API を Swagger UI から試せるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/5) | 改善 | 高 | NFR-SEC-02, NFR-SEC-10 |  |  |
 | #6 | あると良い | [条件設定のフォームをカードに載せ、入力欄を読みやすくする](https://github.com/OmameBeans/oyatsu-biyori/issues/6) | 見た目・文言 | 中 | SC-03, T2-06 |  |  |
+| #7 | あると良い | [マイグレーションを、本番を含めてアプリの起動時に当てるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/7) | 改善 | 高 | D-42, NFR-OPS-01a, U-03, T8-02 |  |  |
