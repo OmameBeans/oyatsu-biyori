@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
@@ -83,83 +85,89 @@ export const ConditionsTab = () => {
 
     return (
         <Box component="form" onSubmit={handleSubmit} noValidate sx={{ maxWidth: 640 }}>
-            <Stack spacing={3}>
+            <Stack spacing={2}>
                 {!settings.isReadyForMenu && <Alert severity="warning">献立を作る前に、通常の人数と既定の週の予算を入れてください。</Alert>}
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <TextField
-                        label="通常の人数"
-                        type="number"
-                        value={form.childrenCount}
-                        onChange={(event) => setForm({ ...form, childrenCount: event.target.value })}
-                        slotProps={{ input: { endAdornment: <InputAdornment position="end">人</InputAdornment> }, htmlInput: { min: 1 } }}
-                    />
-                    <TextField
-                        label="既定の週の予算（税込）"
-                        type="number"
-                        value={form.weeklyBudget}
-                        onChange={(event) => setForm({ ...form, weeklyBudget: event.target.value })}
-                        helperText="献立ごとに上書きできます"
-                        slotProps={{ input: { endAdornment: <InputAdornment position="end">円</InputAdornment> }, htmlInput: { min: 1 } }}
-                    />
-                </Stack>
-                <Box>
-                    <FormLabel component="legend">おやつを出す曜日</FormLabel>
-                    <FormGroup row>
-                        {WEEKDAYS.map((weekday) => (
-                            <FormControlLabel
-                                key={weekday}
-                                control={<Checkbox checked={form.weekdays.includes(weekday)} onChange={() => toggleWeekday(weekday)} />}
-                                label={WEEKDAY_LABEL[weekday]}
-                            />
-                        ))}
-                    </FormGroup>
-                </Box>
-                <TextField
-                    label="アレルゲンの再確認期間"
-                    type="number"
-                    value={form.recheckDays}
-                    onChange={(event) => setForm({ ...form, recheckDays: event.target.value })}
-                    helperText="パッケージで確認してから、この日数を過ぎた商品は「要確認」に戻ります"
-                    slotProps={{ input: { endAdornment: <InputAdornment position="end">日</InputAdornment> }, htmlInput: { min: 1 } }}
-                    sx={{ maxWidth: 320 }}
-                />
-                <Box>
-                    <FormLabel component="legend">同じ商品を出さない期間（分類ごと。空欄は「設定なし」）</FormLabel>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 1 }}>
-                        {DUPLICATE_TYPES.map((type) => (
+                <Card>
+                    <CardContent>
+                        <Stack spacing={3}>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <TextField
+                                    label="通常の人数"
+                                    type="number"
+                                    value={form.childrenCount}
+                                    onChange={(event) => setForm({ ...form, childrenCount: event.target.value })}
+                                    slotProps={{ input: { endAdornment: <InputAdornment position="end">人</InputAdornment> }, htmlInput: { min: 1 } }}
+                                />
+                                <TextField
+                                    label="既定の週の予算（税込）"
+                                    type="number"
+                                    value={form.weeklyBudget}
+                                    onChange={(event) => setForm({ ...form, weeklyBudget: event.target.value })}
+                                    helperText="献立ごとに上書きできます"
+                                    slotProps={{ input: { endAdornment: <InputAdornment position="end">円</InputAdornment> }, htmlInput: { min: 1 } }}
+                                />
+                            </Stack>
+                            <Box>
+                                <FormLabel component="legend">おやつを出す曜日</FormLabel>
+                                <FormGroup row>
+                                    {WEEKDAYS.map((weekday) => (
+                                        <FormControlLabel
+                                            key={weekday}
+                                            control={<Checkbox checked={form.weekdays.includes(weekday)} onChange={() => toggleWeekday(weekday)} />}
+                                            label={WEEKDAY_LABEL[weekday]}
+                                        />
+                                    ))}
+                                </FormGroup>
+                            </Box>
                             <TextField
-                                key={type}
-                                label={SNACK_TYPE_LABEL[type]}
+                                label="アレルゲンの再確認期間"
                                 type="number"
-                                value={form.duplicate[type]}
-                                placeholder="設定なし"
-                                onChange={(event) => setForm({ ...form, duplicate: { ...form.duplicate, [type]: event.target.value } })}
+                                value={form.recheckDays}
+                                onChange={(event) => setForm({ ...form, recheckDays: event.target.value })}
+                                helperText="パッケージで確認してから、この日数を過ぎた商品は「要確認」に戻ります"
                                 slotProps={{ input: { endAdornment: <InputAdornment position="end">日</InputAdornment> }, htmlInput: { min: 1 } }}
+                                sx={{ maxWidth: 320 }}
                             />
-                        ))}
-                    </Stack>
-                </Box>
-                <TextField
-                    label="重複についての補足ルール（AI に伝えます）"
-                    value={form.note}
-                    onChange={(event) => setForm({ ...form, note: event.target.value })}
-                    multiline
-                    minRows={2}
-                    helperText="子どもの名前は書かないでください"
-                />
-                <Typography variant="body2" color="text.secondary">
-                    変更は、これから作る献立から反映されます（作成済みの下書きは変わりません）。
-                </Typography>
-                {update.isError && (
-                    <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {errorMessageOf(update.error)}
-                    </Alert>
-                )}
-                <Box>
-                    <Button type="submit" variant="contained" size="large" disabled={update.isPending}>
-                        保存する
-                    </Button>
-                </Box>
+                            <Box>
+                                <FormLabel component="legend">同じ商品を出さない期間（分類ごと。空欄は「設定なし」）</FormLabel>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 1 }}>
+                                    {DUPLICATE_TYPES.map((type) => (
+                                        <TextField
+                                            key={type}
+                                            label={SNACK_TYPE_LABEL[type]}
+                                            type="number"
+                                            value={form.duplicate[type]}
+                                            placeholder="設定なし"
+                                            onChange={(event) => setForm({ ...form, duplicate: { ...form.duplicate, [type]: event.target.value } })}
+                                            slotProps={{ input: { endAdornment: <InputAdornment position="end">日</InputAdornment> }, htmlInput: { min: 1 } }}
+                                        />
+                                    ))}
+                                </Stack>
+                            </Box>
+                            <TextField
+                                label="重複についての補足ルール（AI に伝えます）"
+                                value={form.note}
+                                onChange={(event) => setForm({ ...form, note: event.target.value })}
+                                multiline
+                                minRows={2}
+                                helperText="子どもの名前は書かないでください"
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                                変更は、これから作る献立から反映されます（作成済みの下書きは変わりません）。
+                            </Typography>
+                            {update.isError && (
+                                <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
+                                    {errorMessageOf(update.error)}
+                                </Alert>
+                            )}
+                            <Box>
+                                <Button type="submit" variant="contained" size="large" disabled={update.isPending}>
+                                    保存する
+                                </Button>
+                            </Box>
+                        </Stack>
+                    </CardContent>
+                </Card>
             </Stack>
         </Box>
     );
