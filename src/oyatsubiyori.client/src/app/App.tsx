@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -14,10 +14,13 @@ import { ProductDetailPage } from '../pages/product-detail';
 import { ProductListPage } from '../pages/product-list';
 import { SettingsPage } from '../pages/settings';
 import { ApiError, registerAuthHandlers } from '../shared/api';
+import { AppearanceContext, readStoredColorTheme, writeStoredColorTheme } from '../shared/lib';
+import type { AppearanceValue } from '../shared/lib';
 import { ROUTE } from '../shared/type';
+import type { ColorTheme } from '../shared/type';
 import { LoadingFallback, PageErrorBoundary } from '../shared/ui';
 import { AppLayout } from './layout/AppLayout';
-import { theme } from './theme';
+import { COLOR_THEME_OPTIONS, createAppTheme } from './theme';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -73,14 +76,29 @@ registerAuthHandlers({
     },
 });
 
-/** アプリ全体（テーマ・サーバー状態・通知・ルーティング） */
-export const App = () => (
-    <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <QueryClientProvider client={queryClient}>
-            <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} autoHideDuration={4000}>
-                <RouterProvider router={router} />
-            </SnackbarProvider>
-        </QueryClientProvider>
-    </ThemeProvider>
-);
+/**
+ * アプリ全体（テーマ・サーバー状態・通知・ルーティング）。
+ * 色のテーマ（#2）はこの端末のブラウザに保存し、最初の表示から保存した色で出す（ログイン前の画面も同じ）。
+ */
+export const App = () => {
+    const [colorTheme, setColorThemeState] = useState<ColorTheme>(readStoredColorTheme);
+    const setColorTheme = useCallback((next: ColorTheme) => {
+        setColorThemeState(next);
+        writeStoredColorTheme(next);
+    }, []);
+    const theme = useMemo(() => createAppTheme({ colorTheme }), [colorTheme]);
+    const appearance = useMemo<AppearanceValue>(() => ({ colorTheme, colorThemeOptions: COLOR_THEME_OPTIONS, setColorTheme }), [colorTheme, setColorTheme]);
+
+    return (
+        <AppearanceContext value={appearance}>
+            <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <QueryClientProvider client={queryClient}>
+                    <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} autoHideDuration={4000}>
+                        <RouterProvider router={router} />
+                    </SnackbarProvider>
+                </QueryClientProvider>
+            </ThemeProvider>
+        </AppearanceContext>
+    );
+};

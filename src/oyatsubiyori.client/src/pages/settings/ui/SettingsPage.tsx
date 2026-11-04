@@ -3,15 +3,16 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import { useAuthStatus } from '../../../entities/auth';
 import { PageErrorBoundary, PageLayout } from '../../../shared/ui';
+import { AppearanceTab } from './AppearanceTab';
 import { AvoidedTab } from './AvoidedTab';
 import { ConditionsTab } from './ConditionsTab';
 import { PasswordTab } from './PasswordTab';
 
-const TABS = ['conditions', 'avoided', 'password'] as const;
+const TABS = ['conditions', 'avoided', 'password', 'appearance'] as const;
 type SettingsTab = (typeof TABS)[number];
 
 /**
- * 設定（SC-03 条件設定・SC-04 避ける品目・SC-12 パスワード変更のタブ。T2-06）。タブは URL の ?tab= で持つ。
+ * 設定（SC-03 条件設定・SC-04 避ける品目・SC-12 パスワード変更・見た目（#2）のタブ。T2-06）。タブは URL の ?tab= で持つ。
  */
 export const SettingsPage = () => {
     const { data: status } = useAuthStatus();
@@ -27,6 +28,7 @@ export const SettingsPage = () => {
                     <Tab value="conditions" label="条件設定" disabled={status.mustChangePassword} />
                     <Tab value="avoided" label="避ける品目" disabled={status.mustChangePassword} />
                     <Tab value="password" label="パスワード変更" />
+                    <Tab value="appearance" label="見た目" disabled={status.mustChangePassword} />
                 </Tabs>
             }
         >
@@ -34,6 +36,7 @@ export const SettingsPage = () => {
                 {tab === 'conditions' && <ConditionsTab />}
                 {tab === 'avoided' && <AvoidedTab />}
                 {tab === 'password' && <PasswordTab />}
+                {tab === 'appearance' && <AppearanceTab />}
             </PageErrorBoundary>
         </PageLayout>
     );

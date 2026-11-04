@@ -85,3 +85,130 @@ test.describe('SC-03・SC-04・SC-12 設定', () => {
         await captureScreen(page, testInfo, 'sc-12-password');
     });
 });
+
+/** 色のテーマの表示名（設定の「見た目」タブのラジオボタンの名前。#2） */
+const COLOR_THEME_LABELS = ['オレンジ（いつもの色）', 'あお', 'むらさき', 'グレー'] as const;
+
+/** primary の色が出ているところの色を読む：選ばれたタブの文字の色と、「見た目」タブのラジオの色 */
+const readPrimaryColors = async (page: Page) => ({
+    tab: await page.getByRole('tab', { name: '見た目', exact: true }).evaluate((el) => getComputedStyle(el).color),
+    radio: await page.getByRole('radio', { checked: true }).evaluate((el) => getComputedStyle(el.parentElement ?? el).color),
+});
+
+/** PC のサイドバーの選ばれた項目（設定）の線と背景の色。スマホはサイドバーが閉じているので読まない */
+const readSidebarColors = async (page: Page) => {
+    const selected = page.getByRole('navigation', { name: 'メニュー', exact: true }).getByRole('link', { name: '設定', exact: true });
+    return {
+        border: await selected.evaluate((el) => getComputedStyle(el).borderLeftColor),
+        background: await selected.evaluate((el) => getComputedStyle(el).backgroundColor),
+    };
+};
+
+test.describe('#2 見た目（色のテーマ）', () => {
+    test('#2 色のテーマを選ぶと、再読み込みなしで色が変わり、再読み込みしても残る', async ({ page }, testInfo) => {
+        const isPc = testInfo.project.name === 'pc';
+        await page.goto('/settings?tab=appearance');
+        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        const before = await readPrimaryColors(page);
+        const sidebarBefore = isPc ? await readSidebarColors(page) : null;
+
+        await page.getByRole('radio', { name: 'あお' }).check();
+        await expect(page.getByRole('radio', { name: 'あお' })).toBeChecked();
+        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).not.toBeChecked();
+        await expect.poll(async () => (await readPrimaryColors(page)).tab).not.toBe(before.tab);
+        const after = await readPrimaryColors(page);
+        expect(after.radio).not.toBe(before.radio);
+        if (sidebarBefore) {
+            const sidebarAfter = await readSidebarColors(page);
+            expect(sidebarAfter.border).not.toBe(sidebarBefore.border);
+            expect(sidebarAfter.background).not.toBe(sidebarBefore.background);
+        }
+        await expectNoHorizontalOverflow(page, [page.getByRole('radio', { name: 'グレー' })]);
+        await captureScreen(page, testInfo, 'sc-03-appearance');
+
+        await page.reload();
+        await expect(page.getByRole('radio', { name: 'あお' })).toBeChecked();
+        expect(await readPrimaryColors(page)).toEqual(after);
+    });
+
+    test('#2 ブラウザに保存できなくても、既定の色で画面が出て、テーマを選べる', async ({ page }) => {
+        await page.addInitScript(() => {
+            const fail = () => {
+                throw new Error('保存は使えません（E2E）');
+            };
+            Storage.prototype.getItem = fail;
+            Storage.prototype.setItem = fail;
+        });
+        await page.goto('/settings?tab=appearance');
+        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        const before = await readPrimaryColors(page);
+        await page.getByRole('radio', { name: 'むらさき' }).check();
+        await expect(page.getByRole('radio', { name: 'むらさき' })).toBeChecked();
+        await expect.poll(async () => (await readPrimaryColors(page)).tab).not.toBe(before.tab);
+    });
+
+    test('#2 どのテーマでも 🔴🟡🟢 の色は変わらない（テーマごとに商品一覧の画像を撮る）', async ({ page }, testInfo) => {
+        /** バッジの文字の色と、バッジ（文字の親）の背景・枠の色 */
+        const readBadgeColors = async (text: string) =>
+            page
+                .getByText(text, { exact: true })
+                .first()
+                .evaluate((el) => {
+                    const badge = getComputedStyle(el.parentElement ?? el);
+                    return [getComputedStyle(el).color, badge.backgroundColor, badge.borderColor].join(' / ');
+                });
+        let baseline: string[] | null = null;
+        for (const [index, label] of COLOR_THEME_LABELS.entries()) {
+            await page.goto('/settings?tab=appearance');
+            await page.getByRole('radio', { name: label }).check();
+            await expect(page.getByRole('radio', { name: label })).toBeChecked();
+            await page.goto('/products');
+            await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
+            const colors = [await readBadgeColors('🔴 使えません'), await readBadgeColors('🟡 要確認'), await readBadgeColors('🟢 使えます')];
+            if (baseline === null) {
+                baseline = colors;
+            } else {
+                expect(colors).toEqual(baseline);
+            }
+            // PC は一覧の部分だけがスクロールするので、画面を縦に伸ばして 🔴🟡🟢 がすべて1枚に入るようにする（撮ったら元の大きさに戻す）
+            const viewport = page.viewportSize();
+            if (testInfo.project.name === 'pc' && viewport) {
+                await page.setViewportSize({ width: viewport.width, height: 2400 });
+            }
+            await captureScreen(page, testInfo, `theme-${index + 1}-products`);
+            if (testInfo.project.name === 'pc' && viewport) {
+                await page.setViewportSize(viewport);
+            }
+        }
+    });
+});
+
+test.describe('#2 見た目（ログイン前の画面）', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('#2 保存した色のテーマで、ランディングとログインの画面が崩れずに出る', async ({ page }, testInfo) => {
+        /** primary を使う要素の色：ランディングの「ログイン」ボタンの背景と、ログイン画面の「おやつ日和について」のリンクの文字 */
+        const readLandingColor = () => page.getByRole('link', { name: 'ログイン' }).evaluate((el) => getComputedStyle(el).backgroundColor);
+        const readLoginColor = () => page.getByRole('link', { name: 'おやつ日和について' }).evaluate((el) => getComputedStyle(el).color);
+
+        // 保存なし（既定の色）で開いたときの色
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: '安全への考え方' })).toBeVisible();
+        const landingDefault = await readLandingColor();
+        await page.goto('/login');
+        await expect(page.getByRole('button', { name: 'ログイン' })).toBeVisible();
+        const loginDefault = await readLoginColor();
+
+        // むらさきを保存してから開くと、その色で出る
+        await page.evaluate(() => window.localStorage.setItem('oyatsu-biyori.color-theme', 'purple'));
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: '安全への考え方' })).toBeVisible();
+        await expect(page.getByRole('link', { name: 'ログイン' })).toBeVisible();
+        expect(await readLandingColor()).not.toBe(landingDefault);
+        await captureScreen(page, testInfo, 'theme-landing');
+        await page.goto('/login');
+        await expect(page.getByRole('button', { name: 'ログイン' })).toBeVisible();
+        expect(await readLoginColor()).not.toBe(loginDefault);
+        await captureScreen(page, testInfo, 'theme-login');
+    });
+});
