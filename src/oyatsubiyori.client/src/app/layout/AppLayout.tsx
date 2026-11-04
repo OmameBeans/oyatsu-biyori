@@ -24,7 +24,8 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { useSnackbar } from 'notistack';
 import { useAuthStatus, useLogout } from '../../entities/auth';
 import { errorMessageOf } from '../../shared/api';
-import { ROUTE } from '../../shared/type';
+import { readPreference, writePreference } from '../../shared/lib';
+import { PREFERENCE_KEY, ROUTE } from '../../shared/type';
 import { PageErrorBoundary, SafetyNotice } from '../../shared/ui';
 
 const DRAWER_WIDTH = 220;
@@ -36,26 +37,14 @@ const DRAWER_WIDTH = 220;
 const MINI_DRAWER_WIDTH = 64;
 /** MUI の Drawer（permanent）の paper の右の枠線の幅。paper は border-box なので、中身の幅はこの分だけ狭い */
 const DRAWER_PAPER_BORDER_WIDTH = 1;
-/** PC のサイドバーを閉じているか（"true" / "false"）を、この端末のブラウザに保存するキー。画面の好みだけで、データは入れない */
-const COLLAPSED_STORAGE_KEY = 'oyatsu-biyori.sidebar-collapsed';
+/** 開閉の状態として保存する値（"true"：閉じている / "false"：開いている） */
+const isCollapsedValue = (value: unknown): value is 'true' | 'false' => value === 'true' || value === 'false';
 
 /** 保存した開閉の状態を読む。保存がない・読めない（ブラウザの設定で使えないなど）ときは、開いた状態で始める */
-const readIsCollapsed = (): boolean => {
-    try {
-        return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true';
-    } catch {
-        return false;
-    }
-};
+const readIsCollapsed = (): boolean => readPreference(PREFERENCE_KEY.SIDEBAR_COLLAPSED, isCollapsedValue, 'false') === 'true';
 
-/** 開閉の状態を保存する。保存できなくても、開閉はこの画面の中では効く */
-const writeIsCollapsed = (isCollapsed: boolean) => {
-    try {
-        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, String(isCollapsed));
-    } catch {
-        // 保存できないブラウザでは、再読み込みすると開いた状態に戻る
-    }
-};
+/** 開閉の状態を保存する。保存できなくても、開閉はこの画面の中では効く（再読み込みすると開いた状態に戻る） */
+const writeIsCollapsed = (isCollapsed: boolean) => writePreference(PREFERENCE_KEY.SIDEBAR_COLLAPSED, String(isCollapsed));
 
 /**
  * 帯のときだけ、項目に名前のツールチップを付ける。押せない項目（マウスの動きを受け取らない）でも出るように span で包む。

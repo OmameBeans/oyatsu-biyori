@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { captureScreen } from './helpers';
+import { COLOR_MODE } from '../src/shared/type/colorMode';
+import type { ColorMode } from '../src/shared/type/colorMode';
+import { COLOR_THEME } from '../src/shared/type/colorTheme';
+import type { ColorTheme } from '../src/shared/type/colorTheme';
+import { PREFERENCE_KEY } from '../src/shared/type/preferenceKey';
+import { captureScreen, expectReadable } from './helpers';
 
 /**
  * 横スクロールが出ないこと：ページ全体の幅が画面の幅を超えず（スマホ）、渡した要素の右端が main の右端の中にある。
@@ -89,10 +94,13 @@ test.describe('SC-03・SC-04・SC-12 設定', () => {
 /** 色のテーマの表示名（設定の「見た目」タブのラジオボタンの名前。#2） */
 const COLOR_THEME_LABELS = ['オレンジ（いつもの色）', 'あお', 'むらさき', 'グレー'] as const;
 
-/** primary の色が出ているところの色を読む：選ばれたタブの文字の色と、「見た目」タブのラジオの色 */
+/** primary の色が出ているところの色を読む：選ばれたタブの文字の色と、「見た目」タブの「色のテーマ」で選ばれたラジオの色 */
 const readPrimaryColors = async (page: Page) => ({
     tab: await page.getByRole('tab', { name: '見た目', exact: true }).evaluate((el) => getComputedStyle(el).color),
-    radio: await page.getByRole('radio', { checked: true }).evaluate((el) => getComputedStyle(el.parentElement ?? el).color),
+    radio: await page
+        .getByRole('radiogroup', { name: '色のテーマ' })
+        .getByRole('radio', { checked: true })
+        .evaluate((el) => getComputedStyle(el.parentElement ?? el).color),
 });
 
 /** PC のサイドバーの選ばれた項目（設定）の線と背景の色。スマホはサイドバーが閉じているので読まない */
@@ -103,6 +111,16 @@ const readSidebarColors = async (page: Page) => {
         background: await selected.evaluate((el) => getComputedStyle(el).backgroundColor),
     };
 };
+
+/** 🔴🟡🟢 のバッジの文字の色と、バッジ（文字の親）の背景・枠の色 */
+const readBadgeColorsOf = async (page: Page, text: string) =>
+    page
+        .getByText(text, { exact: true })
+        .first()
+        .evaluate((el) => {
+            const badge = getComputedStyle(el.parentElement ?? el);
+            return [getComputedStyle(el).color, badge.backgroundColor, badge.borderColor].join(' / ');
+        });
 
 test.describe('#2 見た目（色のテーマ）', () => {
     test('#2 色のテーマを選ぶと、再読み込みなしで色が変わり、再読み込みしても残る', async ({ page }, testInfo) => {
@@ -148,15 +166,6 @@ test.describe('#2 見た目（色のテーマ）', () => {
     });
 
     test('#2 どのテーマでも 🔴🟡🟢 の色は変わらない（テーマごとに商品一覧の画像を撮る）', async ({ page }, testInfo) => {
-        /** バッジの文字の色と、バッジ（文字の親）の背景・枠の色 */
-        const readBadgeColors = async (text: string) =>
-            page
-                .getByText(text, { exact: true })
-                .first()
-                .evaluate((el) => {
-                    const badge = getComputedStyle(el.parentElement ?? el);
-                    return [getComputedStyle(el).color, badge.backgroundColor, badge.borderColor].join(' / ');
-                });
         let baseline: string[] | null = null;
         for (const [index, label] of COLOR_THEME_LABELS.entries()) {
             await page.goto('/settings?tab=appearance');
@@ -164,7 +173,11 @@ test.describe('#2 見た目（色のテーマ）', () => {
             await expect(page.getByRole('radio', { name: label })).toBeChecked();
             await page.goto('/products');
             await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
-            const colors = [await readBadgeColors('🔴 使えません'), await readBadgeColors('🟡 要確認'), await readBadgeColors('🟢 使えます')];
+            const colors = [
+                await readBadgeColorsOf(page, '🔴 使えません'),
+                await readBadgeColorsOf(page, '🟡 要確認'),
+                await readBadgeColorsOf(page, '🟢 使えます'),
+            ];
             if (baseline === null) {
                 baseline = colors;
             } else {
@@ -200,7 +213,7 @@ test.describe('#2 見た目（ログイン前の画面）', () => {
         const loginDefault = await readLoginColor();
 
         // むらさきを保存してから開くと、その色で出る
-        await page.evaluate(() => window.localStorage.setItem('oyatsu-biyori.color-theme', 'purple'));
+        await page.evaluate(({ key, theme }) => window.localStorage.setItem(key, theme), { key: PREFERENCE_KEY.COLOR_THEME, theme: COLOR_THEME.PURPLE });
         await page.goto('/');
         await expect(page.getByRole('heading', { name: '安全への考え方' })).toBeVisible();
         await expect(page.getByRole('link', { name: 'ログイン' })).toBeVisible();
@@ -210,5 +223,214 @@ test.describe('#2 見た目（ログイン前の画面）', () => {
         await expect(page.getByRole('button', { name: 'ログイン' })).toBeVisible();
         expect(await readLoginColor()).not.toBe(loginDefault);
         await captureScreen(page, testInfo, 'theme-login');
+    });
+});
+
+/** 画面の背景（body）の色 */
+const readBackground = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+/** 色が暗いか（rgb の明るさの目安が半分より下）。ダークの背景になったかを見る */
+const isDarkColor = (color: string) => {
+    const [r, g, b] = (color.match(/\d+/g) ?? []).map(Number);
+    return 0.299 * r + 0.587 * g + 0.114 * b < 128;
+};
+
+/**
+ * ブラウザの上の帯の色（<meta name="theme-color">）。meta は画面に出ない要素で、役割や文言では探せないので CSS のセレクタで探す。
+ * App が useEffect で書き換えるので、値を確かめるときは toHaveAttribute で待つ
+ */
+const browserBar = (page: Page) => page.locator('meta[name="theme-color"]');
+
+/** 見た目の設定をこの端末のブラウザに保存する（保存は同じオリジンのページを開いてから行う）。このあと開いた画面から効く */
+const storeAppearance = async (page: Page, appearance: { mode: ColorMode; theme?: ColorTheme }) => {
+    await page.evaluate(
+        ({ keys, mode, theme }) => {
+            window.localStorage.setItem(keys.COLOR_MODE, mode);
+            if (theme) {
+                window.localStorage.setItem(keys.COLOR_THEME, theme);
+            }
+        },
+        { keys: PREFERENCE_KEY, ...appearance },
+    );
+};
+
+/** 色のテーマの保存する値（並びは COLOR_THEME_LABELS と同じ） */
+const COLOR_THEME_IDS = Object.values(COLOR_THEME);
+
+test.describe('#4 見た目（明るさ）', () => {
+    test('#4 「ダーク」を選ぶと、再読み込みなしで背景が暗くなり、再読み込みしても残る', async ({ page }, testInfo) => {
+        await page.emulateMedia({ colorScheme: 'light' });
+        await page.goto('/settings?tab=appearance');
+        const modeGroup = page.getByRole('radiogroup', { name: '明るさ' });
+        await expect(modeGroup.getByRole('radio', { name: 'ライト' })).toBeChecked();
+        const lightBackground = await readBackground(page);
+        expect(isDarkColor(lightBackground)).toBe(false);
+        const lightBar = await browserBar(page).getAttribute('content');
+        if (!lightBar) throw new Error('theme-color が読めません');
+
+        await modeGroup.getByRole('radio', { name: 'ダーク' }).check();
+        await expect(modeGroup.getByRole('radio', { name: 'ダーク' })).toBeChecked();
+        await expect.poll(() => readBackground(page)).not.toBe(lightBackground);
+        const darkBackground = await readBackground(page);
+        expect(isDarkColor(darkBackground)).toBe(true);
+        // ブラウザの上の帯は、ライトはテーマの色、ダークは背景の色
+        await expect(browserBar(page)).not.toHaveAttribute('content', lightBar);
+        // 色のテーマの選択はそのまま
+        await expect(page.getByRole('radiogroup', { name: '色のテーマ' }).getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        await expectNoHorizontalOverflow(page, [modeGroup.getByRole('radio', { name: 'システム（端末の設定に合わせる）' })]);
+        await captureScreen(page, testInfo, 'dark-sc-03-appearance');
+
+        await page.reload();
+        await expect(modeGroup.getByRole('radio', { name: 'ダーク' })).toBeChecked();
+        expect(await readBackground(page)).toBe(darkBackground);
+
+        // ライトに戻すと、元の背景に戻る
+        await modeGroup.getByRole('radio', { name: 'ライト' }).check();
+        await expect.poll(() => readBackground(page)).toBe(lightBackground);
+        await expect(browserBar(page)).toHaveAttribute('content', lightBar);
+    });
+
+    test('#4 「システム」は端末の設定（ライト・ダーク）に合わせ、端末の設定が変わるとすぐ切り替わる', async ({ page }) => {
+        await page.emulateMedia({ colorScheme: 'light' });
+        await page.goto('/settings?tab=appearance');
+        const modeGroup = page.getByRole('radiogroup', { name: '明るさ' });
+        await modeGroup.getByRole('radio', { name: 'システム（端末の設定に合わせる）' }).check();
+        await expect(modeGroup.getByRole('radio', { name: 'システム（端末の設定に合わせる）' })).toBeChecked();
+        await expect.poll(async () => isDarkColor(await readBackground(page))).toBe(false);
+
+        await page.emulateMedia({ colorScheme: 'dark' });
+        await expect.poll(async () => isDarkColor(await readBackground(page))).toBe(true);
+        await page.reload();
+        await expect(modeGroup.getByRole('radio', { name: 'システム（端末の設定に合わせる）' })).toBeChecked();
+        expect(isDarkColor(await readBackground(page))).toBe(true);
+
+        await page.emulateMedia({ colorScheme: 'light' });
+        await expect.poll(async () => isDarkColor(await readBackground(page))).toBe(false);
+    });
+
+    test('#4 ブラウザに保存できなくても、ライトで画面が出て、明るさを選べる', async ({ page }) => {
+        await page.addInitScript(() => {
+            const fail = () => {
+                throw new Error('保存は使えません（E2E）');
+            };
+            Storage.prototype.getItem = fail;
+            Storage.prototype.setItem = fail;
+        });
+        await page.emulateMedia({ colorScheme: 'dark' });
+        await page.goto('/settings?tab=appearance');
+        const modeGroup = page.getByRole('radiogroup', { name: '明るさ' });
+        await expect(modeGroup.getByRole('radio', { name: 'ライト' })).toBeChecked();
+        expect(isDarkColor(await readBackground(page))).toBe(false);
+        await modeGroup.getByRole('radio', { name: 'ダーク' }).check();
+        await expect.poll(async () => isDarkColor(await readBackground(page))).toBe(true);
+    });
+
+    test('#4 ダークでも、どの色のテーマでも 🔴🟡🟢 の色は同じ（テーマごとに商品一覧の画像を撮る）', async ({ page }, testInfo) => {
+        let baseline: string[] | null = null;
+        for (const [index, theme] of COLOR_THEME_IDS.entries()) {
+            await page.goto('/settings?tab=appearance');
+            await storeAppearance(page, { mode: COLOR_MODE.DARK, theme });
+            await page.goto('/products');
+            await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
+            expect(isDarkColor(await readBackground(page))).toBe(true);
+            const colors = [
+                await readBadgeColorsOf(page, '🔴 使えません'),
+                await readBadgeColorsOf(page, '🟡 要確認'),
+                await readBadgeColorsOf(page, '🟢 使えます'),
+            ];
+            if (baseline === null) {
+                baseline = colors;
+            } else {
+                expect(colors).toEqual(baseline);
+            }
+            // 注意書き・🔴 の理由・次にすることは、ダークでも背景と 4.5:1 以上で読める
+            for (const text of [
+                page.getByText('アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください'),
+                page.getByText('アレルゲンの情報がありません', { exact: true }).first(),
+                page.getByText('パッケージの原材料表示を撮って確認してください', { exact: true }).first(),
+            ]) {
+                await expectReadable(text);
+            }
+            const viewport = page.viewportSize();
+            if (testInfo.project.name === 'pc' && viewport) {
+                await page.setViewportSize({ width: viewport.width, height: 2400 });
+            }
+            await captureScreen(page, testInfo, `dark-theme-${index + 1}-products`);
+            if (testInfo.project.name === 'pc' && viewport) {
+                await page.setViewportSize(viewport);
+            }
+        }
+    });
+
+    test('#4 ダークで、ログイン後の画面が崩れずに出る（画面ごとに画像を撮る）', async ({ page }, testInfo) => {
+        test.setTimeout(120_000);
+        await page.goto('/settings?tab=appearance');
+        await storeAppearance(page, { mode: COLOR_MODE.DARK });
+
+        // 献立一覧
+        await page.goto('/menus');
+        await expect(page.getByRole('heading', { name: '献立一覧' })).toBeVisible();
+        expect(isDarkColor(await readBackground(page))).toBe(true);
+        // ダークでも、ボタンの丸み（BASE_THEME_OPTIONS の borderRadius: 999）が引き継がれている
+        const openButton = page.getByRole('region', { name: /^今週 / }).getByRole('button', { name: '開く', exact: true });
+        expect(await openButton.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('999px');
+        await captureScreen(page, testInfo, 'dark-sc-10-menu-list');
+
+        // 献立の編集（確定済みの今週の献立。日ごとのカードに 🔴🟡🟢 と注記が出る）
+        await openButton.click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
+        // URL が変わっても、次の画面の読み込みが終わるまでは一覧が残るので、見出しが替わるのを待つ
+        await expect(page.getByRole('heading', { level: 1, name: /^献立作成/ })).toBeVisible();
+        await expect(page.getByText(/週の実績 [\d,]+円 \/ 週の予算/)).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-09-step4-board');
+
+        // 商品詳細
+        await page.goto('/products');
+        await page.getByRole('region', { name: 'うさぎのミミ いちごゼリー' }).getByRole('link').click();
+        await expect(page.getByRole('heading', { name: 'うさぎのミミ いちごゼリー' })).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-07-product-detail');
+
+        // アレルゲン確認（記録はしない）
+        await page.goto('/products');
+        await page.getByRole('region', { name: 'ぽかぽか さつまいもチップス' }).getByRole('link').click();
+        await page.getByRole('link', { name: 'パッケージで確認する' }).click();
+        await expect(page.getByRole('button', { name: 'パッケージで確認して記録' })).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-08-allergen-check');
+
+        // 設定：条件設定・避ける品目（外すときの確認のダイアログ）・パスワード変更
+        await page.goto('/settings');
+        await expect(page.getByLabel('通常の人数')).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-03-conditions');
+        await page.goto('/settings?tab=avoided');
+        const hazelnut = page.getByRole('checkbox', { name: 'ヘーゼルナッツを避ける' });
+        await expect(hazelnut).toBeChecked();
+        await hazelnut.click();
+        await expect(page.getByText('この品目を避ける子がもういないことを確認しましたか？', { exact: false })).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-04-avoided-dialog');
+        await page.getByRole('button', { name: 'やめる' }).click();
+        await expect(hazelnut).toBeChecked();
+        await page.goto('/settings?tab=password');
+        await expect(page.getByLabel('今のパスワード')).toBeVisible();
+        await captureScreen(page, testInfo, 'dark-sc-12-password');
+    });
+});
+
+test.describe('#4 見た目（明るさ・ログイン前の画面）', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('#4 ダークを保存すると、ランディングとログインの画面も暗い背景で崩れずに出る', async ({ page }, testInfo) => {
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: '安全への考え方' })).toBeVisible();
+        expect(isDarkColor(await readBackground(page))).toBe(false);
+        await storeAppearance(page, { mode: COLOR_MODE.DARK });
+
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: '安全への考え方' })).toBeVisible();
+        expect(isDarkColor(await readBackground(page))).toBe(true);
+        await captureScreen(page, testInfo, 'dark-sc-13-landing');
+        await page.goto('/login');
+        await expect(page.getByRole('button', { name: 'ログイン' })).toBeVisible();
+        expect(isDarkColor(await readBackground(page))).toBe(true);
+        await captureScreen(page, testInfo, 'dark-sc-01-login');
     });
 });

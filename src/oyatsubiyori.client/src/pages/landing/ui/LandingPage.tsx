@@ -25,10 +25,11 @@ const FEATURES = [
 
 /**
  * SC-13 ランディング（ログイン不要・実データを出さない）。ボタンは常に「ログイン」で、API を呼ばない（U-31・D-69）。
+ * 背景の色はテーマの色から作る（色のテーマ・明るさに合わせて変わる。#4）。
  */
 export const LandingPage = () => (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
-        <Box sx={{ background: 'linear-gradient(160deg, #fde7d4 0%, #fbf7f2 70%)', py: { xs: 6, md: 10 } }}>
+        <Box sx={{ background: (theme) => `linear-gradient(160deg, ${theme.palette.primary.light} 0%, ${theme.palette.background.default} 70%)`, py: { xs: 6, md: 10 } }}>
             <Container maxWidth="md">
                 <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '2rem', md: '2.6rem' }, mb: 2 }}>
                     🍪 おやつ日和
@@ -82,7 +83,7 @@ export const LandingPage = () => (
                         ))}
                     </Stack>
                 </Box>
-                <Box component="section" sx={{ bgcolor: '#eef3f1', borderRadius: 4, p: { xs: 2.5, md: 4 } }}>
+                <Box component="section" sx={{ bgcolor: (theme) => theme.alpha(theme.palette.secondary.main, 0.12), borderRadius: 4, p: { xs: 2.5, md: 4 } }}>
                     <Typography variant="h2" component="h2" sx={{ mb: 2 }}>
                         安全への考え方
                     </Typography>

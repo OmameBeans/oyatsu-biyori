@@ -1,0 +1,11 @@
+/**
+ * 画面の好み（色のテーマ・明るさ・サイドバーの開閉）を、この端末のブラウザ（localStorage）に保存するときのキー。
+ * 明るさのキーは index.html の最初のスクリプトでも読む（読み込み中の画面を暗くするため。TS を import できないので文字で書いてある）。
+ * キーを変えるときは index.html も直す。E2E（e2e/）はこの定数を import して使う。
+ */
+export const PREFERENCE_KEY = {
+    COLOR_THEME: 'oyatsu-biyori.color-theme',
+    COLOR_MODE: 'oyatsu-biyori.color-mode',
+    SIDEBAR_COLLAPSED: 'oyatsu-biyori.sidebar-collapsed',
+} as const;
+export type PreferenceKey = (typeof PREFERENCE_KEY)[keyof typeof PREFERENCE_KEY];

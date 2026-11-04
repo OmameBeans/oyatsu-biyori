@@ -153,7 +153,7 @@ export const ImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisabled
                                 aria-label={`${image.label} を外す`}
                                 onClick={() => handleRemove(image.id)}
                                 disabled={isDisabled || isProcessing}
-                                sx={{ position: 'absolute', top: 2, right: 2, bgcolor: 'rgba(255,255,255,0.85)' }}
+                                sx={{ position: 'absolute', top: 2, right: 2, bgcolor: (theme) => theme.alpha(theme.palette.background.paper, 0.85) }}
                             >
                                 <CloseIcon fontSize="small" />
                             </IconButton>

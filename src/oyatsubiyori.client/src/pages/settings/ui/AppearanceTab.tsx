@@ -10,23 +10,30 @@ import RadioGroup from '@mui/material/RadioGroup';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useAppearance } from '../../../shared/lib';
-import { isColorTheme } from '../../../shared/type';
+import { isColorMode, isColorTheme } from '../../../shared/type';
 
 /**
- * 見た目（#2）：色のテーマを選ぶ。選ぶとすぐ画面の色が変わり、この端末のブラウザに保存する。
- * 変わるのはボタン・タブ・サイドバーの選ばれた項目などの色だけで、アレルゲンの 🔴🟡🟢 の色は変わらない。
+ * 見た目：色のテーマ（#2）と明るさ（#4）を選ぶ。選ぶとすぐ画面が変わり、この端末のブラウザに保存する。
+ * 色のテーマで変わるのはボタン・タブ・サイドバーの選ばれた項目などの色だけ。
+ * 明るさを変えても、アレルゲンの 🔴🟡🟢 の区分と色の対応は変わらない。
  */
 export const AppearanceTab = () => {
-    const { colorTheme, colorThemeOptions, setColorTheme } = useAppearance();
+    const { colorTheme, colorThemeOptions, setColorTheme, colorMode, colorModeOptions, setColorMode } = useAppearance();
 
-    const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const handleColorThemeChange = (event: ChangeEvent<HTMLInputElement>) => {
         if (isColorTheme(event.target.value)) {
             setColorTheme(event.target.value);
         }
     };
 
+    const handleColorModeChange = (event: ChangeEvent<HTMLInputElement>) => {
+        if (isColorMode(event.target.value)) {
+            setColorMode(event.target.value);
+        }
+    };
+
     return (
-        <Box sx={{ maxWidth: 420 }}>
+        <Stack spacing={2} sx={{ maxWidth: 420 }}>
             <Card>
                 <CardContent>
                     <FormControl>
@@ -36,7 +43,7 @@ export const AppearanceTab = () => {
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1 }}>
                             ボタンやメニューの色が変わります。この端末だけに保存されます。
                         </Typography>
-                        <RadioGroup aria-labelledby="color-theme-label" value={colorTheme} onChange={handleChange}>
+                        <RadioGroup aria-labelledby="color-theme-label" value={colorTheme} onChange={handleColorThemeChange}>
                             {colorThemeOptions.map((option) => (
                                 <FormControlLabel
                                     key={option.id}
@@ -55,6 +62,23 @@ export const AppearanceTab = () => {
                     </FormControl>
                 </CardContent>
             </Card>
-        </Box>
+            <Card>
+                <CardContent>
+                    <FormControl>
+                        <FormLabel id="color-mode-label" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                            明るさ
+                        </FormLabel>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1 }}>
+                            ダークにすると、背景が暗くなります。この端末だけに保存されます。
+                        </Typography>
+                        <RadioGroup aria-labelledby="color-mode-label" value={colorMode} onChange={handleColorModeChange}>
+                            {colorModeOptions.map((option) => (
+                                <FormControlLabel key={option.id} value={option.id} control={<Radio />} label={option.label} sx={{ minHeight: 44 }} />
+                            ))}
+                        </RadioGroup>
+                    </FormControl>
+                </CardContent>
+            </Card>
+        </Stack>
     );
 };

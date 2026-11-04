@@ -9,8 +9,22 @@
     <meta property="og:description" content="チラシを撮るだけで、1週間分のおやつ献立案。アレルゲンはアプリが必ずチェックし、最後は職員が確かめます。" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://oyatsu-biyori.com/" />
-    <meta name="theme-color" content="#f08c4a" />
+    <!-- ブラウザの上の帯の色。既定のテーマ（オレンジ・ライト）の primary.main。表示のあとは App がテーマに合わせて書き換える（app/theme.ts） -->
+    <meta name="theme-color" content="#b5541c" />
     <title>おやつ日和</title>
+    <script>
+      // 読み込み中の画面も、保存した明るさに合わせる。決めるのは color-scheme だけで、色の値は app/theme.ts にだけ書く。
+      // キーと値は shared/type の PREFERENCE_KEY.COLOR_MODE・COLOR_MODE と同じ。表示のあとは App が同じものを設定し直す
+      (function () {
+        try {
+          var mode = window.localStorage.getItem('oyatsu-biyori.color-mode');
+          var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {
+          // 保存が使えないときは、ブラウザの既定（ライト）のまま
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
