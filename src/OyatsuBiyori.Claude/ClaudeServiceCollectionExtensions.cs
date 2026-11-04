@@ -1,6 +1,7 @@
 ﻿using Anthropic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OyatsuBiyori.Biz.Interfaces;
 using OyatsuBiyori.Claude.Services;
 
 namespace OyatsuBiyori.Claude;
@@ -26,6 +27,12 @@ public static class ClaudeServiceCollectionExtensions
             };
         });
         services.AddScoped<ClaudeRequestRunner>();
+        services.AddScoped<IFlyerReader, FlyerReader>();
+        services.AddScoped<IFlyerReviewer, FlyerReviewer>();
+        services.AddScoped<IProductMatchJudge, ProductMatchJudge>();
+        services.AddScoped<IMenuPlannerAgent, MenuPlannerAgent>();
+        services.AddScoped<IBudgetFitExplainer, BudgetFitExplainer>();
+        services.AddScoped<IAllergenExtractor, AllergenExtractor>();
         return services;
     }
 }

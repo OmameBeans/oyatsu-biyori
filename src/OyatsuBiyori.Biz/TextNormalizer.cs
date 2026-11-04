@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OyatsuBiyori.Biz;
 
@@ -20,13 +21,19 @@ public static class TextNormalizer
             return string.Empty;
         }
 
-        // 記号を除く前に「CO・OP」「コープ」を除く（中黒で区切られた表記も1語として扱うため）
+        // 記号を除く前に「CO・OP」「コープ」を除く（中黒で区切られた表記も1語として扱うため）。
+        // 区切りは「・」に限らない（読み取りで「·」（U+00B7）や「•」になることがある。T3-11 の測定で実際に起きた）
         var kana = Build(text, keepSymbols: true).Text;
-        kana = kana.Replace("co・op", string.Empty, StringComparison.Ordinal)
-                   .Replace("co-op", string.Empty, StringComparison.Ordinal)
+        kana = CoopPattern.Replace(kana, string.Empty)
                    .Replace("こーぷ", string.Empty, StringComparison.Ordinal);
         return Build(kana, keepSymbols: false).Text;
     }
+
+    /// <summary>
+    /// 「CO・OP」の表記（「co」と「op」の間に、記号か空白が1文字あるか、何もない）。
+    /// 前後が英字のときは除かない（「SCOOP」などの英語の名前を崩さないため）
+    /// </summary>
+    private static readonly Regex CoopPattern = new(@"(?<![a-z])co[\p{P}\p{S}\s]?op(?![a-z])", RegexOptions.CultureInvariant);
 
     /// <summary>探す言葉の検索用の正規化</summary>
     public static string ForKeywordSearch(string? text)

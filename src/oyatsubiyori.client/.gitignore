@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# E2E（Playwright）の出力・ログイン状態・画面の画像
+e2e/.auth/
+e2e/screenshots/
+e2e/test-results/
+e2e/report/

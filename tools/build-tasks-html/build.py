@@ -85,7 +85,8 @@ def mark(value, label, cls):
 
 
 def render_cards(head, rows):
-    """「ID | タスク | 要件 | テスト | 安全」または「ID | 優先度 | タスク | 要件」の表をカードにする。"""
+    """「ID | タスク | 要件 | テスト | 安全 | 状態」または「ID | 優先度 | タスク | 要件」の表をカードにする。
+    「状態」の列（進み具合の記録）があれば、カードの下に出す（md と HTML で読める情報をそろえる）。"""
     col = {name: i for i, name in enumerate(head)}
     out = ['<div class="cards">']
     for r in rows:
@@ -109,6 +110,7 @@ def render_cards(head, rows):
             f'<header><a class="tid" href="#{tid}">{tid}</a>{badges}</header>'
             f'<div class="task">{inline(task)}</div>'
             + (f'<footer><span class="req-label">要件</span>{chips}</footer>' if chips else "")
+            + (f'<div class="status"><span class="req-label">状態</span>{inline(get("状態"))}</div>' if get("状態") else "")
             + "</article>"
         )
     out.append("</div>")

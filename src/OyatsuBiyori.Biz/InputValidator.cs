@@ -13,6 +13,9 @@ public static class InputValidator
     /// <summary>パスワードの最低の文字数（FR-AUTH-03a）</summary>
     public const int MinPasswordLength = 12;
 
+    /// <summary>再確認期間の上限（日）</summary>
+    public const int MaxRecheckDays = 365;
+
     /// <summary>条件設定（SC-03）の検証</summary>
     public static Result ValidateSettings(SettingsInput input)
     {
@@ -22,6 +25,11 @@ public static class InputValidator
         AddIfError(result, PositiveInteger(input.DefaultChildrenCount, "通常の人数"));
         AddIfError(result, PositiveInteger(input.DefaultWeeklyBudget, "既定の週の予算"));
         AddIfError(result, PositiveInteger(input.RecheckDays, "再確認期間（日）"));
+        if (input.RecheckDays > MaxRecheckDays)
+        {
+            // 長すぎる期間で「要再確認」を事実上止めないように上限を設ける
+            result.ErrorMessages.Add($"再確認期間は{MaxRecheckDays}日までにしてください");
+        }
 
         if (input.ServingWeekdays.Count == 0)
         {

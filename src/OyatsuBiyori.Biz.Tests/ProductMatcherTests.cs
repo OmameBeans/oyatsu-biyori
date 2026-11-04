@@ -33,6 +33,19 @@ public class ProductMatcherTests
         Assert.False(result.NeedsJudgement);
     }
 
+    [Fact]
+    public void コープの中黒が別の文字で読まれても_同じ商品と内容量違いを正しく分ける()
+    {
+        // 本物の Claude が「CO・OP」を「CO·OP」（U+00B7）と読んだ実例（T3-11）
+        var same = Product("CO・OP ポテトチップス のりしお", "60g");
+        var otherVolume = Product("CO・OP ポテトチップス のりしお", "80g");
+
+        var result = Match("CO·OP ポテトチップス のりしお", "60g", null, same, otherVolume);
+
+        Assert.Equal([same], result.SameProducts.Select(m => m.Product));
+        Assert.Equal([otherVolume], result.VolumeVariants.Select(m => m.Product));
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("オヤツ製菓", true)]

@@ -9,6 +9,14 @@ public class TextNormalizerTests
     [InlineData("コープ ポテトチップス　うすしお", "ぽてとちっぷすうすしお")]
     [InlineData("ﾎﾟﾃﾄﾁｯﾌﾟｽ うすしお", "ぽてとちっぷすうすしお")]
     [InlineData("CO-OP ポテトチップス", "ぽてとちっぷす")]
+    [InlineData("CO·OP ポテトチップス のりしお", "ぽてとちっぷすのりしお")]
+    [InlineData("CO•OP ポテトチップス", "ぽてとちっぷす")]
+    [InlineData("CO OP ポテトチップス", "ぽてとちっぷす")]
+    [InlineData("COOP ポテトチップス", "ぽてとちっぷす")]
+    [InlineData("ｺｰﾌﾟ ポテトチップス", "ぽてとちっぷす")]
+    [InlineData("CO・OPポテトチップス", "ぽてとちっぷす")]
+    [InlineData("SCOOP アイス", "scoopあいす")]
+    [InlineData("COOPER クッキー", "cooperくっきー")]
     [InlineData("もぐもぐクッキー（ミルク味）", "もぐもぐくっきーみるく味")]
     public void 商品照合用の正規化は表記ゆれとコープの表記をそろえる(string input, string expected)
     {
@@ -19,6 +27,15 @@ public class TextNormalizerTests
     public void 探す言葉の正規化ではコープを除かない()
     {
         Assert.Equal("こーぷ", TextNormalizer.ForKeywordSearch("コープ"));
+    }
+
+    [Theory]
+    [InlineData("CO·OP ヘーゼルナッツクッキー", "coopへーぜるなっつくっきー")]
+    [InlineData("CO・OP ヘーゼルナッツクッキー", "coopへーぜるなっつくっきー")]
+    public void 探す言葉の正規化では英字のコープを除かず_言葉はそのまま探せる(string input, string expected)
+    {
+        // 「CO・OP」の除去は商品照合だけ。探す言葉の検索には使わない（03 §5）
+        Assert.Equal(expected, TextNormalizer.ForKeywordSearch(input));
     }
 
     [Theory]

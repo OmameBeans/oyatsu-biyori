@@ -22,6 +22,9 @@ public interface IBackgroundJobService
 
     /// <summary>対象に結びついた、いちばん新しい処理の状態（見つからなければ null）</summary>
     BackgroundJobStatus? FindLatest(string kind, string ownerKey);
+
+    /// <summary>対象に結びついた、いちばん新しい「終わった」処理の状態（あとの処理が失敗しても、前の結果を見失わないため）</summary>
+    BackgroundJobStatus? FindLatestSucceeded(string kind, string ownerKey);
 }
 
 /// <summary>バックグラウンドの処理の本体</summary>

@@ -47,6 +47,17 @@ public class InputValidatorTests
         Assert.True(result.HasError);
     }
 
+    [Theory]
+    [InlineData(365, false)]
+    [InlineData(366, true)]
+    [InlineData(36500, true)]
+    public void 再確認期間は365日まで_長すぎる期間で要再確認を止めない(int days, bool hasError)
+    {
+        var result = InputValidator.ValidateSettings(ValidSettings() with { RecheckDays = days });
+
+        Assert.Equal(hasError, result.HasError);
+    }
+
     [Fact]
     public void 出す曜日は1つ以上()
     {

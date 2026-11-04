@@ -22,6 +22,12 @@ public sealed class ClaudeOptions
     /// <summary>照合の判定の1回の呼び出しのタイムアウト（秒）</summary>
     public int ProductMatchTimeoutSeconds { get; set; } = 30;
 
+    /// <summary>用途ごとのタイムアウト（秒。指定がなければ TimeoutSeconds。画像の読み取りは長めにする）</summary>
+    public Dictionary<ClaudePurpose, int> TimeoutSecondsByPurpose { get; set; } = [];
+
+    /// <summary>用途ごとの考える深さ（low / medium / high。指定がなければモデルの既定）。費用と待ち時間を抑えるため設定で変える</summary>
+    public Dictionary<ClaudePurpose, string> Efforts { get; set; } = [];
+
     /// <summary>失敗したときに再試行する回数（SDK の自動の再試行は切り、アプリで数える。D-64・D-65）</summary>
     public int MaxRetries { get; set; } = 2;
 
@@ -43,6 +49,15 @@ public sealed class ClaudeOptions
     /// <summary>用途のタイムアウト</summary>
     public TimeSpan TimeoutFor(ClaudePurpose purpose)
     {
+        if (TimeoutSecondsByPurpose.TryGetValue(purpose, out var seconds) && seconds > 0)
+        {
+            return TimeSpan.FromSeconds(seconds);
+        }
+
         return TimeSpan.FromSeconds(purpose == ClaudePurpose.ProductMatch ? ProductMatchTimeoutSeconds : TimeoutSeconds);
     }
+
+    /// <summary>用途の考える深さ（設定がなければ null＝モデルの既定）</summary>
+    public string? EffortFor(ClaudePurpose purpose) =>
+        Efforts.TryGetValue(purpose, out var effort) && !string.IsNullOrWhiteSpace(effort) ? effort.Trim().ToLowerInvariant() : null;
 }

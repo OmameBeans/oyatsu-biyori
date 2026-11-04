@@ -15,7 +15,7 @@ paths:
 - React 19 / TypeScript（`strict`、`verbatimModuleSyntax`）/ Vite
 - UI：MUI（`@mui/material`, `@mui/icons-material`）
 - サーバー状態：TanStack Query v5 / ルーティング：react-router-dom v7 / 通知：notistack / 日付：dayjs
-- 上記のライブラリは未導入。必要になった時点で導入する
+- 上記のライブラリは導入済み。PDF は pdf.js（`pdfjs-dist`）、画面の E2E は Playwright（`@playwright/test`）を使う
 - ファイルは **UTF-8** で保存する（Shift-JIS で保存しない）
 - 変更後は `src/oyatsubiyori.client` で `npm run lint` と `npm run build` が通ることを確認する
 
@@ -132,4 +132,6 @@ export const ProductList = ({ onEdit, onCheckAllergen }: ProductListProps) => {
 ## スタイル
 
 - 基本は MUI の `sx` プロップで書く
+- MUI v9 の `Stack` は `alignItems`・`justifyContent`・`flexWrap` などを props で受け取らない（型エラーになる）。`sx={{ alignItems: 'center' }}` のように `sx` に書く。`direction`・`spacing`・`useFlexGap` は props のまま
+- MUI の `Stepper`（`nonLinear` の `StepButton`）は役割が `tab` になる。E2E では `getByRole('tab', { name: '…', exact: true })` で探す
 - 複雑なレイアウトは CSS Modules（`Xxx.module.scss`）を使う。グローバルな `.css` は新しく作らない

@@ -29,6 +29,10 @@ public static class DataServiceCollectionExtensions
             options.UseSqlite(connectionString, sqlite => sqlite.MigrationsAssembly(MigrationsAssembly)));
         services.AddScoped<ITransactionManager, TransactionManager>();
         services.AddScoped<IApiUsageLogRepository, ApiUsageLogRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ISettingRepository, SettingRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IMenuRepository, MenuRepository>();
         return services;
     }
 

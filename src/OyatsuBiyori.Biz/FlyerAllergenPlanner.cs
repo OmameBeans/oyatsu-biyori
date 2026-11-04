@@ -239,7 +239,7 @@ public static class FlyerAllergenPlanner
         var words = descriptionHits.Select(h => h.MatchedText).Distinct(StringComparer.Ordinal).ToList();
         if (words.Count > 0)
         {
-            note += "／説明文で当たった言葉：" + string.Join("・", words);
+            note += "／商品名・説明文で当たった言葉：" + string.Join("・", words);
         }
 
         return note;
@@ -272,7 +272,7 @@ public sealed class FlyerLabelParseResult
 /// </summary>
 /// <param name="LabelAllergenIds">アレルゲン表記の品目（ParseLabel の結果を職員がチラシと見比べて直したもの）</param>
 /// <param name="LabelText">アレルゲン表記の原文（なければ null。source_note に残す）</param>
-/// <param name="Description">説明文（探す言葉を探すためだけに使い、保存しない）</param>
+/// <param name="Description">Claude が読んだ商品名と説明文（探す言葉を探すためだけに使い、説明文は保存しない）</param>
 /// <param name="UnresolvedLabelTerms">対応づけできず、職員もまだ品目に対応づけていない（「対応する品目なし」とも決めていない）語</param>
 public sealed record FlyerAllergenInput(IReadOnlyCollection<string> LabelAllergenIds, string? LabelText, string? Description, IReadOnlyCollection<string> UnresolvedLabelTerms);
 

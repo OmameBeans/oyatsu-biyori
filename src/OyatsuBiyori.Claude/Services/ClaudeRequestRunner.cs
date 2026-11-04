@@ -48,14 +48,47 @@ public sealed class ClaudeRequestRunner(
         CancellationToken cancellationToken)
     {
         var model = _options.ModelFor(purpose);
-        var request = BuildRequest<T>(model, systemPrompt, content);
+        var request = BuildRequest<T>(model, systemPrompt, content, EffortFor(purpose));
+        var response = await SendAsync(purpose, request, cancellationToken);
+        if (response.HasError)
+        {
+            var error = new Result<T>();
+            error.ErrorMessages.AddRange(response.ErrorMessages);
+            return error;
+        }
+
+        return Parse<T>(response.Value!);
+    }
+
+    /// <summary>用途のモデル名</summary>
+    public string ModelFor(ClaudePurpose purpose) => _options.ModelFor(purpose);
+
+    /// <summary>1回の応答の最大トークン数</summary>
+    public int MaxTokens => _options.MaxTokens;
+
+    /// <summary>用途の考える深さ（設定がなければ null）</summary>
+    public Effort? EffortFor(ClaudePurpose purpose) => _options.EffortFor(purpose) switch
+    {
+        "low" => Effort.Low,
+        "medium" => Effort.Medium,
+        "high" => Effort.High,
+        _ => null,
+    };
+
+    /// <summary>
+    /// 組み立てたリクエストを送る（エージェントのループで1回ごとに呼ぶ）。1日の上限・再試行・記録はここで行う。
+    /// 応答の中身（stop_reason など）は呼び出し側で確かめる。
+    /// </summary>
+    public async Task<Result<BetaMessage>> SendAsync(ClaudePurpose purpose, MessageCreateParams request, CancellationToken cancellationToken)
+    {
+        var model = request.Model.Raw();
         var timeout = _options.TimeoutFor(purpose);
 
         for (var attempt = 0; attempt <= _options.MaxRetries; attempt++)
         {
             if (await IsDailyLimitReachedAsync())
             {
-                return Result<T>.Error("今日は AI を使えません（1日の上限に達しました）。手で編集してください。");
+                return Result<BetaMessage>.Error("今日は AI を使えません（1日の上限に達しました）。手で編集してください。");
             }
 
             using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -72,7 +105,7 @@ public sealed class ClaudeRequestRunner(
                 _logger.LogWarning("Claude の呼び出しに失敗しました（再試行します）: {Purpose} {Attempt} {Error}", purpose, attempt + 1, ex.GetType().Name);
                 if (cancellationToken.IsCancellationRequested || attempt == _options.MaxRetries)
                 {
-                    return Result<T>.Error("AI の処理に失敗しました。少し待ってから、もう一度試してください。");
+                    return Result<BetaMessage>.Error("AI の処理に失敗しました。少し待ってから、もう一度試してください。");
                 }
 
                 continue;
@@ -81,11 +114,11 @@ public sealed class ClaudeRequestRunner(
             {
                 await RecordAsync(purpose, model, null, succeeded: false);
                 _logger.LogError(ex, "Claude の呼び出しでエラーになりました: {Purpose}", purpose);
-                return Result<T>.Error("AI の処理でエラーになりました。もう一度試しても直らない場合は、手で編集してください。");
+                return Result<BetaMessage>.Error("AI の処理でエラーになりました。もう一度試しても直らない場合は、手で編集してください。");
             }
 
-            var parsed = Parse<T>(response);
-            await RecordAsync(purpose, model, response.Usage, succeeded: !parsed.HasError);
+            var stopReason = response.StopReason?.Raw();
+            await RecordAsync(purpose, model, response.Usage, succeeded: stopReason is "end_turn" or "tool_use");
             _logger.LogInformation(
                 "Claude を呼び出しました: {Purpose} {Model} 入力 {InputTokens} 出力 {OutputTokens} キャッシュ書き込み {CacheCreation} キャッシュ読み込み {CacheRead} 終了理由 {StopReason}",
                 purpose,
@@ -94,15 +127,34 @@ public sealed class ClaudeRequestRunner(
                 response.Usage.OutputTokens,
                 response.Usage.CacheCreationInputTokens ?? 0,
                 response.Usage.CacheReadInputTokens ?? 0,
-                response.StopReason?.Raw());
-            return parsed;
+                stopReason);
+            return Result<BetaMessage>.Ok(response);
         }
 
-        return Result<T>.Error("AI の処理に失敗しました。少し待ってから、もう一度試してください。");
+        return Result<BetaMessage>.Error("AI の処理に失敗しました。少し待ってから、もう一度試してください。");
+    }
+
+    /// <summary>共通の前置きを付けたシステムプロンプト</summary>
+    public static string SystemPromptWith(string systemPrompt) => PromptStore.Common + Environment.NewLine + Environment.NewLine + systemPrompt;
+
+    /// <summary>拒否されたときに、サーバー側で別のモデルが答え直すようにする（Haiku にはない）</summary>
+    public static MessageCreateParams WithFallback(MessageCreateParams request)
+    {
+        var model = request.Model.Raw() ?? string.Empty;
+        if (model.StartsWith("claude-haiku", StringComparison.Ordinal))
+        {
+            return request;
+        }
+
+        return request with
+        {
+            Betas = [ServerSideFallbackBeta],
+            Fallbacks = new Default(),
+        };
     }
 
     /// <summary>リクエストを作る</summary>
-    private MessageCreateParams BuildRequest<T>(string model, string systemPrompt, IReadOnlyList<BetaContentBlockParam> content)
+    private MessageCreateParams BuildRequest<T>(string model, string systemPrompt, IReadOnlyList<BetaContentBlockParam> content, Effort? effort)
     {
         var request = new MessageCreateParams
         {
@@ -116,6 +168,7 @@ public sealed class ClaudeRequestRunner(
             OutputConfig = new BetaOutputConfig
             {
                 Format = new BetaJsonOutputFormat { Schema = JsonSchemas.For<T>() },
+                Effort = effort,
             },
         };
 

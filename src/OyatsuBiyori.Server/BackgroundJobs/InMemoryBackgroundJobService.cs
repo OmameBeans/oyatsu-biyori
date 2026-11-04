@@ -56,6 +56,16 @@ public sealed class InMemoryBackgroundJobService(
             .FirstOrDefault();
     }
 
+    public BackgroundJobStatus? FindLatestSucceeded(string kind, string ownerKey)
+    {
+        return _jobs.Values
+            .Where(e => e.Kind == kind && e.OwnerKey == ownerKey)
+            .Select(e => e.ToStatus())
+            .Where(s => s.State == BackgroundJobState.Succeeded)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefault();
+    }
+
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var workers = Enumerable.Range(0, WorkerCount).Select(_ => RunWorkerAsync(stoppingToken));

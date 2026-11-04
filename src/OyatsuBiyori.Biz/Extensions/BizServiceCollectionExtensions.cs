@@ -11,6 +11,13 @@ public static class BizServiceCollectionExtensions
     public static IServiceCollection AddBiz(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddScoped<ApplicationServices.SettingsApplicationService>();
+        services.AddScoped<Menus.MenuContextFactory>();
+        services.AddScoped<Menus.MenuApplicationService>();
+        services.AddScoped<Menus.MenuProposalApplicationService>();
+        services.AddScoped<FlyerImport.FlyerImportApplicationService>();
+        services.AddScoped<Products.ProductApplicationService>();
+        services.AddSingleton(new Menus.MenuProposalOptions());
         return services;
     }
 }

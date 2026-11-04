@@ -117,7 +117,7 @@ public class FlyerAllergenPlannerTests
         var check = ApplyTo(product, plan);
 
         Assert.Contains(plan.FlyerAllergens, a => a.Id == Allergen("hazelnut").Id);
-        Assert.Contains("説明文で当たった言葉：ヘーゼルナッツ", check.SourceNote);
+        Assert.Contains("商品名・説明文で当たった言葉：ヘーゼルナッツ", check.SourceNote);
         Assert.Equal(AllergenJudgementCategory.Blocked, AllergenJudge.Judge(product, Avoid("hazelnut"), Today, RecheckDays).Category);
     }
 

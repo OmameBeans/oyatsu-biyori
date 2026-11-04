@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,7 +7,14 @@
     <SpaRoot>..\oyatsubiyori.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:60233</SpaProxyServerUrl>
+    <!-- 開発時の初期アカウントなどは user-secrets に入れる（リポジトリに入れない） -->
+    <UserSecretsId>oyatsu-biyori-server</UserSecretsId>
   </PropertyGroup>
+
+  <!-- E2E の設定（ダミーのアカウント）は本番の成果物に入れない -->
+  <ItemGroup>
+    <Content Update="appsettings.E2E.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
