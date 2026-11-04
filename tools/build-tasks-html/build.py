@@ -21,6 +21,7 @@ DEST_DIR = os.path.dirname(SRC)  # HTML は md と同じフォルダに出す
 # 前後は ASCII だけで区切る（「T4-09を」のように日本語が続いても拾うため）
 ID_RE = re.compile(r"(?<![A-Za-z0-9_-])((?:T\d|TD)-\d\d|U-\d\d)(?![A-Za-z0-9_-])")
 PRIORITY = {"必須": "b-must", "あると良い": "b-nice", "余裕があれば": "b-extra"}
+ISSUES_URL = "https://github.com/OmameBeans/oyatsu-biyori/issues/"  # 13. ブラッシュアップの issue
 
 known_ids = set()  # リンク先として存在する ID（カードと表の行）
 
@@ -77,7 +78,7 @@ def inline(text, ids=True):
 
 
 def split_row(line):
-    return [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
 
 
 def mark(value, label, cls):
@@ -92,10 +93,19 @@ def render_cards(head, rows):
     for r in rows:
         get = lambda name: r[col[name]] if name in col and col[name] < len(r) else ""
         tid, task, reqs = get("ID"), get("タスク"), get("要件")
+        # 13. ブラッシュアップの「#12」は GitHub の issue の番号。アンカーは issue-12、リンクは issue へ
+        if tid.startswith("#"):
+            anchor, href = f"issue-{tid[1:]}", ISSUES_URL + tid[1:]
+        else:
+            anchor, href = tid, f"#{tid}"
         safety, test, prio = get("安全") == "○", get("テスト") == "○", get("優先度")
         badges = mark(get("安全"), "安全レビュー", "b-safety") + mark(get("テスト"), "xUnit", "b-test")
         if prio in PRIORITY:
             badges += f'<span class="badge {PRIORITY[prio]}">{html.escape(prio)}</span>'
+        if get("種類"):
+            badges += f'<span class="badge b-extra">{html.escape(get("種類"))}</span>'
+        if get("リスク"):
+            badges += f'<span class="badge b-fix">リスク {html.escape(get("リスク"))}</span>'
         # 「NFR-SEC-08, 09」「SR-03, 07」のような番号だけの続きは、前の ID と同じチップにまとめる
         parts = []
         for c in (c.strip() for c in re.split(r",\s*", reqs)):
@@ -105,9 +115,9 @@ def render_cards(head, rows):
                 parts.append(c)
         chips = "".join(f'<span class="chip">{inline(c)}</span>' for c in parts)
         out.append(
-            f'<article class="card{" is-safety" if safety else ""}" id="{tid}" data-item'
+            f'<article class="card{" is-safety" if safety else ""}" id="{anchor}" data-item'
             f' data-safety="{int(safety)}" data-test="{int(test)}">'
-            f'<header><a class="tid" href="#{tid}">{tid}</a>{badges}</header>'
+            f'<header><a class="tid" href="{href}">{html.escape(tid)}</a>{badges}</header>'
             f'<div class="task">{inline(task)}</div>'
             + (f'<footer><span class="req-label">要件</span>{chips}</footer>' if chips else "")
             + (f'<div class="status"><span class="req-label">状態</span>{inline(get("状態"))}</div>' if get("状態") else "")
