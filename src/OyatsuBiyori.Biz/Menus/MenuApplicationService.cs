@@ -68,7 +68,7 @@ public sealed class MenuApplicationService(
         {
             if (!rows.Any(r => r.WeekStart == weekStart))
             {
-                rows.Add(new MenuListRow(weekStart, null, null, null, null, 0, 0, 0, 0, null, false));
+                rows.Add(new MenuListRow(weekStart, null, null, null, null, null, 0, 0, 0, 0, null, false));
             }
         }
 
@@ -100,7 +100,8 @@ public sealed class MenuApplicationService(
             otherCount,
             menus.Count(m => m.Status == MenuStatus.Draft),
             blocked,
-            setting.DefaultChildrenCount is > 0 && setting.DefaultWeeklyBudget is > 0));
+            setting.DefaultChildrenCount is > 0 && setting.DefaultWeeklyBudget is > 0,
+            thisWeek));
     }
 
     /// <summary>「パッケージで確認する商品」か（🟡 と、情報がないため 🔴 の商品。03 §6.3）</summary>
@@ -139,7 +140,7 @@ public sealed class MenuApplicationService(
             }
         }
 
-        return new MenuListRow(menu.WeekStart, menu.Id, menu.Status, week.Total, menu.WeeklyBudget, blocked, warning, recheck, items.Count, null, week.IsOverBudget);
+        return new MenuListRow(menu.WeekStart, menu.Id, menu.Status, week.Total, menu.WeeklyBudget, week.Remaining, blocked, warning, recheck, items.Count, null, week.IsOverBudget);
     }
 
     /// <summary>
@@ -898,7 +899,8 @@ public sealed record MenuListView(
     int OtherPackageCheckCount,
     int DraftCount,
     IReadOnlyList<BlockedUsageView> BlockedUsages,
-    bool IsReadyForMenu);
+    bool IsReadyForMenu,
+    DateOnly ThisWeekStart);
 
 /// <summary>献立一覧の1週</summary>
 public sealed record MenuListRow(
@@ -907,6 +909,7 @@ public sealed record MenuListRow(
     MenuStatus? Status,
     int? Total,
     int? Budget,
+    int? Remaining,
     int BlockedCount,
     int WarningCount,
     int RecheckCount,

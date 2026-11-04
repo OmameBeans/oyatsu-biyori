@@ -4,11 +4,11 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -22,35 +22,34 @@ import {
     useRefreshFlyerImport,
     useStartFlyerReading,
 } from '../../../entities/flyer';
-import type { FlyerItem } from '../../../entities/flyer';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
 import { releaseImages } from '../../../shared/lib';
 import type { PreparedImage } from '../../../shared/lib';
 import { JOB_STATE, SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
-import { ClaudeText, ImagePicker, JobProgress } from '../../../shared/ui';
-import { verdictLabel } from '../model/labels';
-import { FlyerConfirmDialog } from './FlyerConfirmDialog';
+import { ClaudeText, JobProgress } from '../../../shared/ui';
+import { FlyerImagePicker } from './FlyerImagePicker';
+import { FlyerItemGrid } from './FlyerItemGrid';
 
 interface FlyerImportStepProps {
     menuId: string;
     listedCount: number;
     onNext: () => void;
+    /** 画面を離れると消える入力（何が消えるか。なければ null）が変わったとき。離れる前の確認に使う */
+    onUnsavedInputChange?: (unsavedInput: string | null) => void;
+    /**
+     * PC（md 以上）で、撮影の欄と読み取り中の表示の左右を内側へ寄せる幅（px）。ページのステッパーの最初と最後のラベルの端に、
+     * これらの端をそろえるために使う（見出しの行と同じ幅になる）
+     */
+    pickerInset?: { left: number; right: number } | null;
 }
 
-const CHOICE_LABEL: Record<string, string> = {
-    Same: '登録済みの商品と同じ',
-    Variant: '味違い・内容量違いとして登録',
-    New: '新しい商品として登録',
-    Skip: '取り込まない',
-};
-
 /**
- * SC-09 手順1 チラシ取り込み（T3-10）。撮影・ファイル → 読み取り（バックグラウンド。画面を閉じても続く）→ 結果の一覧で確定。
+ * SC-09 手順1 チラシ取り込み（T3-10）。撮影・ファイル → 読み取り（バックグラウンド。画面を閉じても続く）→ 結果の表で確定（行の下の詳細欄）。
  * 取り込み済みなら飛ばせる。読み取りに失敗しても、選んだ画像は残して「もう一度試す」と手入力ができる。
  */
-export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStepProps) => {
-    const { data: flyerImport } = useFlyerImport(menuId);
+export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputChange, pickerInset }: FlyerImportStepProps) => {
+    const { data: flyerImport, dataUpdatedAt: flyerImportUpdatedAt, errorUpdatedAt: flyerImportErrorAt } = useFlyerImport(menuId);
     const startReading = useStartFlyerReading(menuId);
     const confirmSame = useConfirmSameFlyerItems(menuId);
     const discard = useDiscardFlyerImport(menuId);
@@ -58,13 +57,16 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
     const { enqueueSnackbar } = useSnackbar();
     const [images, setImages] = useState<PreparedImage[]>([]);
     const [startedJobId, setStartedJobId] = useState<string | null>(null);
-    const [editing, setEditing] = useState<FlyerItem | null>(null);
     const [manualName, setManualName] = useState<string | null>(null);
+    const [isPreparingImages, setIsPreparingImages] = useState(false);
 
     const runningJob = flyerImport.job && !isJobFinished(flyerImport.job) ? flyerImport.job.id : null;
     const jobId = startedJobId ?? runningJob;
-    const { data: job, isError: isPollError, refetch } = useJobPolling<string>(jobId);
-    const isReading = !!jobId && !isJobFinished(job) && !isPollError;
+    const { data: job, dataUpdatedAt: jobUpdatedAt, isError: isPollError, refetch } = useJobPolling<string>(jobId);
+    // 読み取りが成功してから、取り込みの状態（読み取った商品）を読み直し終えるまでは、読み取り中のままにする
+    // （読み直す前の古い状態には読み取った商品がないので、撮影の欄が一瞬出てしまう）。読み直しに失敗したときは待ち続けない
+    const isAwaitingResult = job?.state === JOB_STATE.SUCCEEDED && Math.max(flyerImportUpdatedAt, flyerImportErrorAt) < jobUpdatedAt;
+    const isReading = !!jobId && (!isJobFinished(job) || isAwaitingResult) && !isPollError;
     // 失敗した読み取りは、画面を開き直しても示す（最新の処理が失敗していれば）
     const failedJob = job?.state === JOB_STATE.FAILED ? job : !startedJobId && flyerImport.job?.state === JOB_STATE.FAILED ? flyerImport.job : null;
     const session = flyerImport.session;
@@ -92,6 +94,15 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
     }, [images]);
     useEffect(() => () => releaseImages(imagesRef.current), []);
 
+    // 読み取りに送っていない画像（準備中を含む）があるかを、離れる前の確認のために親へ知らせる。
+    // 送信中・読み取り中・状態を確かめられないときは、読み取りがサーバーで続くので数えない。この手順を離れたら、もうない
+    const hasUnsentImages = (images.length > 0 || isPreparingImages) && !isReading && !startReading.isPending && !isPollError;
+    const unsavedInput = hasUnsentImages ? 'まだ読み取っていないチラシの画像' : null;
+    useEffect(() => {
+        onUnsavedInputChange?.(unsavedInput);
+    }, [unsavedInput, onUnsavedInputChange]);
+    useEffect(() => () => onUnsavedInputChange?.(null), [onUnsavedInputChange]);
+
     const handleRead = () => {
         startReading.mutate(images, {
             onSuccess: (id) => setStartedJobId(id),
@@ -102,10 +113,28 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
     // 確定前の読み取り結果がなければ、いつでも撮影の欄を出す（取り込み済みの週なら、取り込み直しになる）
     const showPicker = !isReading && !session;
 
+    const showResult = !!session && !isReading;
+
     return (
-        <Stack spacing={2}>
+        <Stack
+            spacing={2}
+            // 撮影の欄と読み取り中の表示は、PC ではステッパーの最初と最後のラベルの端に左右をそろえる。
+            // 撮影の欄は残りの高さを埋める（ページ全体はスクロールさせず、追加したチラシの一覧の中だけをスクロールする）
+            // 読み取った商品の表も、PC では残りの高さを埋めて表の中だけをスクロールする
+            sx={
+                showPicker || isReading
+                    ? {
+                          height: { md: showPicker ? '100%' : undefined },
+                          pl: { md: `${pickerInset?.left ?? 0}px` },
+                          pr: { md: `${pickerInset?.right ?? 0}px` },
+                      }
+                    : showResult
+                      ? { height: { md: '100%' } }
+                      : undefined
+            }
+        >
             {failedJob && !isReading && (
-                <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
+                <Alert severity="error" sx={{ whiteSpace: 'pre-wrap', flexShrink: 0 }}>
                     チラシの読み取りに失敗しました。{failedJob.errorMessages.join('\n')}
                 </Alert>
             )}
@@ -113,8 +142,9 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
             {!session && listedCount > 0 && !isReading && (
                 <Alert
                     severity="success"
+                    sx={{ flexShrink: 0 }}
                     action={
-                        <Button variant="contained" onClick={onNext}>
+                        <Button variant="contained" onClick={onNext} sx={{ whiteSpace: 'nowrap' }}>
                             今週の商品へ
                         </Button>
                     }
@@ -124,24 +154,41 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
             )}
 
             {showPicker && (
-                <Card>
-                    <CardContent>
-                        <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
-                            チラシを取り込む
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                            小さい文字が読めるよう、1ページを半分ずつ近づけて撮ってください。PDF はページごとに取り込みます（いらないページは × で外せます）。
-                        </Typography>
-                        <ImagePicker images={images} onChange={setImages} maxImages={10} acceptPdf isDisabled={startReading.isPending} />
+                <>
+                    <Card component="section" aria-labelledby="flyer-import-heading" sx={{ display: 'flex', flexDirection: 'column', flex: { md: '1 1 auto' }, minHeight: { md: 400 } }}>
+                        {/* 低い画面で中身が入りきらないときは、カードの中をスクロールする（Card は overflow: hidden なので、切れて見えなくならないように） */}
+                        <CardContent sx={{ flex: { md: '1 1 auto' }, minHeight: 0, overflowY: { md: 'auto' }, display: 'flex', flexDirection: 'column', gap: 2, px: { sm: 3 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}>
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.5, sm: 2 }} sx={{ alignItems: { sm: 'baseline' }, justifyContent: 'space-between', flexShrink: 0 }}>
+                                <Typography id="flyer-import-heading" variant="h3" component="h2">
+                                    チラシを取り込む
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    画像やPDFを追加すると、載っている商品を読み取ります
+                                </Typography>
+                            </Stack>
+                            <FlyerImagePicker images={images} onChange={setImages} maxImages={10} isDisabled={startReading.isPending} onProcessingChange={setIsPreparingImages} />
+                        </CardContent>
+                    </Card>
 
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
-                            <Button variant="contained" size="large" onClick={handleRead} disabled={images.length === 0 || startReading.isPending}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }} useFlexGap sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', flexWrap: 'wrap', flexShrink: 0 }}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: { sm: 'center' } }}>
+                            <Button variant="contained" size="large" onClick={handleRead} disabled={images.length === 0 || startReading.isPending} sx={{ px: 4 }}>
                                 {failedJob ? 'もう一度試す' : '読み取る'}
                             </Button>
-                            <Button onClick={() => setManualName('')}>手で入力する</Button>
+                            {images.length === 0 && (
+                                <Typography variant="body2" color="text.secondary">
+                                    チラシを追加すると読み取れます
+                                </Typography>
+                            )}
                         </Stack>
-                    </CardContent>
-                </Card>
+                        <Typography variant="body2">
+                            チラシがない場合は{' '}
+                            <Link component="button" type="button" onClick={() => setManualName('')} sx={{ fontWeight: 700, verticalAlign: 'baseline' }}>
+                                商品を手で入力する →
+                            </Link>
+                        </Typography>
+                    </Stack>
+                </>
             )}
 
             {isPollError && (
@@ -158,9 +205,9 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
                 </Card>
             )}
 
-            {session && !isReading && (
+            {session && showResult && (
                 <>
-                    <Card>
+                    <Card sx={{ flexShrink: 0 }}>
                         <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, alignItems: { md: 'center' } }}>
                             <Box sx={{ flex: 1 }}>
                                 <Typography variant="h3" component="h2">
@@ -189,14 +236,14 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
                             </Stack>
                         </CardContent>
                     </Card>
-                    {session.reviewFailed && <Alert severity="info">読み取りの検証ができませんでした。読み取った内容を、チラシと見比べて確かめてください。</Alert>}
-                    <Stack spacing={1.5}>
-                        {session.items.map((item) => (
-                            <FlyerItemCard key={item.id} item={item} onEdit={() => setEditing(item)} />
-                        ))}
-                    </Stack>
+                    {session.reviewFailed && (
+                        <Alert severity="info" sx={{ flexShrink: 0 }}>
+                            読み取りの検証ができませんでした。読み取った内容を、チラシと見比べて確かめてください。
+                        </Alert>
+                    )}
+                    <FlyerItemGrid key={session.id} menuId={menuId} items={session.items} />
                     {session.missedProducts.length > 0 && (
-                        <Card>
+                        <Card sx={{ flexShrink: 0 }}>
                             <CardContent>
                                 <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
                                     読み落としているかもしれない商品
@@ -213,7 +260,7 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
                             </CardContent>
                         </Card>
                     )}
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flexShrink: 0 }}>
                         <Button onClick={() => setManualName('')}>商品を手で入力する</Button>
                         <Button
                             color="inherit"
@@ -225,87 +272,8 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext }: FlyerImportStep
                 </>
             )}
 
-            {editing && (
-                <FlyerConfirmDialog
-                    key={editing.id}
-                    menuId={menuId}
-                    item={editing}
-                    isOpen
-                    onClose={() => setEditing(null)}
-                    onSuccess={() => {
-                        enqueueSnackbar(`「${editing.read.name}」を確定しました`, { variant: 'success' });
-                        setEditing(null);
-                    }}
-                />
-            )}
             {manualName !== null && <ManualItemDialog menuId={menuId} initialName={manualName} onClose={() => setManualName(null)} />}
         </Stack>
-    );
-};
-
-interface FlyerItemCardProps {
-    item: FlyerItem;
-    onEdit: () => void;
-}
-
-/** 取り込みの1商品（同じ商品かどうか・アレルゲン表記・指摘・確定済みの印） */
-const FlyerItemCard = ({ item, onEdit }: FlyerItemCardProps) => {
-    const read = item.read;
-    const same = item.sameProducts[0];
-    return (
-        <Card component="section" aria-label={read.name} sx={{ borderColor: item.confirmation ? 'success.light' : undefined }}>
-            <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, '&:last-child': { pb: 2 } }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
-                        <Typography sx={{ fontWeight: 700 }}>{read.name}</Typography>
-                        {item.isManual && <Chip size="small" label="手入力" />}
-                        {item.confirmation && <Chip size="small" color="success" label={`確定済み：${CHOICE_LABEL[item.confirmation.choice]}`} />}
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                        {[read.volume, read.priceIncludingTax ? `税込 ${read.priceIncludingTax}円` : '税込価格なし', read.orderNo ? `注文番号 ${read.orderNo}` : null, read.snackType ? SNACK_TYPE_LABEL[read.snackType] : null]
-                            .filter(Boolean)
-                            .join('・')}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        アレルゲン表記：{read.allergenLabelText ? `「${read.allergenLabelText}」` : <strong>表記なし</strong>}
-                        {item.unmappedTerms.length > 0 && <Typography component="span" color="error" variant="body2">（品目に当てはめられない語：{item.unmappedTerms.join('・')}）</Typography>}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        同じ商品かどうか：
-                        {same
-                            ? `登録済みの「${same.name}」と同じ${same.makerCompared ? '' : '（メーカー未確認）'}`
-                            : item.volumeVariants[0]
-                              ? `「${item.volumeVariants[0].name}」の内容量違い`
-                              : item.judgement
-                                ? `AI の判定：${verdictLabel(item.judgement.verdict)}${item.judgement.productName ? `（${item.judgement.productName}）` : ''}`
-                                : item.candidates.length > 0
-                                  ? `似ている商品があります（${item.candidates.map((c) => c.name).join('・')}）`
-                                  : '新しい商品'}
-                    </Typography>
-                    {item.judgement && <ClaudeText text={item.judgement.reason} color="text.secondary" variant="caption" />}
-                    {item.descriptionHitWords.length > 0 && (
-                        <Alert severity="warning" sx={{ mt: 1, py: 0 }}>
-                            商品名・説明文に避ける品目の言葉があります：{item.descriptionHitWords.join('・')}
-                        </Alert>
-                    )}
-                    {item.discrepancies.length > 0 && (
-                        <Alert severity={item.discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning'} sx={{ mt: 1, py: 0 }}>
-                            パッケージでの確認と食い違い：{item.discrepancies.map((d) => d.allergen.name).join('・')}
-                        </Alert>
-                    )}
-                    {item.issues.map((issue) => (
-                        <Alert key={`${issue.source}-${issue.field}-${issue.message}`} severity="warning" icon={false} sx={{ mt: 1, py: 0 }}>
-                            ⚠ {issue.field}：<ClaudeText text={issue.message} />
-                        </Alert>
-                    ))}
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Button variant={item.confirmation ? 'text' : 'contained'} onClick={onEdit}>
-                        {item.confirmation ? '選び直す' : '確かめて確定'}
-                    </Button>
-                </Box>
-            </CardContent>
-        </Card>
     );
 };
 

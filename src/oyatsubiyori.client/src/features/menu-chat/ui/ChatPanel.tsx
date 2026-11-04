@@ -15,13 +15,15 @@ import { ClaudeText, JobProgress } from '../../../shared/ui';
 interface ChatPanelProps {
     menu: MenuDetail;
     onBudgetFitRequested: () => void;
+    /** 画面を離れると消える入力（送っていない依頼。なければ null）が変わったとき。離れる前の確認に使う */
+    onUnsavedInputChange?: (unsavedInput: string | null) => void;
 }
 
 /**
  * チャットでの修正（T4-08）。依頼はバックグラウンドで組み直し、終わったら献立を読み直す。
  * 「予算に合わせて」の依頼なら、入れ替え案を出す（U-12）。失敗しても入力した依頼は消さない。
  */
-export const ChatPanel = ({ menu, onBudgetFitRequested }: ChatPanelProps) => {
+export const ChatPanel = ({ menu, onBudgetFitRequested, onUnsavedInputChange }: ChatPanelProps) => {
     const chat = useChat(menu.id);
     const refresh = useRefreshMenu(menu.id);
     const [message, setMessage] = useState('');
@@ -33,6 +35,14 @@ export const ChatPanel = ({ menu, onBudgetFitRequested }: ChatPanelProps) => {
     const { data: otherJob } = useJobPolling<MenuProposalOutcome>(otherRunningId);
     const isOtherRunning = !!otherRunningId && !isJobFinished(otherJob);
     const isRunning = (!!jobId && !isJobFinished(job)) || isOtherRunning;
+
+    // 送っていない依頼があるかを、離れる前の確認のために親へ知らせる（送ったあと・組み直しの途中は、サーバーで続くので数えない）
+    const isOwnJobRunning = chat.isPending || (!!jobId && !isJobFinished(job) && !isPollError);
+    const unsavedInput = message.trim() !== '' && !isOwnJobRunning ? '送っていないチャットの依頼' : null;
+    useEffect(() => {
+        onUnsavedInputChange?.(unsavedInput);
+    }, [unsavedInput, onUnsavedInputChange]);
+    useEffect(() => () => onUnsavedInputChange?.(null), [onUnsavedInputChange]);
 
     // 組み直しが終わったら、入力欄を空にする（描画の中で切り替える。失敗したら依頼は残す）
     const [handledJobId, setHandledJobId] = useState<string | null>(null);

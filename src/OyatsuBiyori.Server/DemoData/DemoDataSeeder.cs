@@ -25,7 +25,7 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
     /// <summary>
     /// 投入する（商品がすでにあれば何もしない）。
     /// </summary>
-    /// <param name="includeE2EDraft">E2E 用に、掲載品の写しを持つ下書き（再来週）も作る</param>
+    /// <param name="includeE2EDraft">E2E 用に、掲載品の写しを持つ下書き（再来週）と、いちごゼリーを置いた下書き（3週先。献立一覧の注意を曜日に関係なく出すため）も作る</param>
     public async Task SeedAsync(bool includeE2EDraft)
     {
         if (await _context.Products.AnyAsync())
@@ -94,6 +94,14 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
         if (includeE2EDraft)
         {
             _context.Menus.Add(DraftWithListing(weekStart.AddDays(14), products));
+
+            // 3週先の下書きの月曜に、いちごゼリー（🟡）を置く。曜日に関係なく（土日でも）
+            // 「今日以降の献立で使う、パッケージで確認する商品」が1件以上になり、献立一覧の注意が出る（SC-10 の E2E）
+            var later = ConfirmedMenu(weekStart.AddDays(21), products, [["ichigo-jelly"]]);
+            later.Status = MenuStatus.Draft;
+            later.ConfirmedAt = null;
+            later.ConfirmedBy = null;
+            _context.Menus.Add(later);
         }
 
         await _context.SaveChangesAsync();

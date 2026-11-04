@@ -31,12 +31,11 @@ test.describe('SC-01 ログイン', () => {
         await captureScreen(page, testInfo, 'sc-01-login');
     });
 
-    test('FR-AUTH-01 正しいパスワードでログインすると献立一覧へ移り、注意書きが常に出る', async ({ page }) => {
+    test('FR-AUTH-01 正しいパスワードでログインすると献立一覧へ移る', async ({ page }) => {
         await page.goto('/login');
         await page.getByLabel('ユーザー名').fill(E2E_USER.userName);
         await page.getByLabel('パスワード').fill(E2E_USER.password);
         await page.getByRole('button', { name: 'ログイン' }).click();
         await expect(page).toHaveURL(/\/menus/);
-        await expect(page.getByText('アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください')).toBeVisible();
     });
 });

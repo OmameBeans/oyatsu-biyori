@@ -26,7 +26,7 @@ import { useAuthStatus, useLogout } from '../../entities/auth';
 import { errorMessageOf } from '../../shared/api';
 import { readPreference, writePreference } from '../../shared/lib';
 import { PREFERENCE_KEY, ROUTE } from '../../shared/type';
-import { PageErrorBoundary, SafetyNotice } from '../../shared/ui';
+import { PageErrorBoundary } from '../../shared/ui';
 
 const DRAWER_WIDTH = 220;
 /**
@@ -92,7 +92,6 @@ const NAV_ITEM_SX = {
 /**
  * SC-02 ホームの枠（T0-14）：左サイドバー（献立一覧・商品一覧・設定・ログアウト）。スマホは ≡ で開く。
  * PC は上部のボタンで開閉でき、閉じるとアイコンだけの細い帯になる（開閉の状態はブラウザに保存する）。
- * 「アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください」を常に表示する。
  */
 export const AppLayout = () => {
     const { data: status } = useAuthStatus();
@@ -258,7 +257,6 @@ export const AppLayout = () => {
             </Box>
             <Box component="main" sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: { md: 'hidden' } }}>
                 <Toolbar sx={{ display: { md: 'none' } }} />
-                <SafetyNotice />
                 <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <PageErrorBoundary key={location.pathname}>
                         <Outlet />

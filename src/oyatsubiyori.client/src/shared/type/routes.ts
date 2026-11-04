@@ -3,6 +3,8 @@ export const ROUTE = {
     LANDING: '/',
     LOGIN: '/login',
     MENUS: '/menus',
+    /** 過去の献立（SC-14） */
+    MENU_HISTORY: '/menus/history',
     PRODUCTS: '/products',
     SETTINGS: '/settings',
     /** パスワード変更のタブ（初期パスワードのあいだは、ここ以外に進めない。FR-AUTH-03b） */

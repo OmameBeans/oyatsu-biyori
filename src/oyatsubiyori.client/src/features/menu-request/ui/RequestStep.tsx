@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -21,6 +21,8 @@ interface RequestStepProps {
     menu: MenuDetail;
     onStarted: () => void;
     onManual: () => void;
+    /** 画面を離れると消える入力（保存していない予算の変更。なければ null）が変わったとき。離れる前の確認に使う */
+    onUnsavedInputChange?: (unsavedInput: string | null) => void;
 }
 
 const EXAMPLE = '例：しょっぱいものとゼリー系を合わせて出したい／金曜は誕生日会なので豪華に／水曜は都民の日なので子どもが30人';
@@ -29,7 +31,7 @@ const EXAMPLE = '例：しょっぱいものとゼリー系を合わせて出し
  * SC-09 手順3 要望の入力（T4-03）。要望は入力欄を離れたとき・手順を移るとき・設定へ移る前に保存する。
  * 空欄でも「献立を作る」を押せる。「自分で組む（AI を使わない）」なら、日ごとの枠だけで手順4へ進む。
  */
-export const RequestStep = ({ menu, onStarted, onManual }: RequestStepProps) => {
+export const RequestStep = ({ menu, onStarted, onManual, onUnsavedInputChange }: RequestStepProps) => {
     const [text, setText] = useState(menu.requestText ?? '');
     const [isBudgetEditing, setIsBudgetEditing] = useState(false);
     const [budget, setBudget] = useState(String(menu.weeklyBudget));
@@ -40,6 +42,13 @@ export const RequestStep = ({ menu, onStarted, onManual }: RequestStepProps) => 
     const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
     const hasItems = menu.days.some((day) => day.items.length > 0);
+
+    // 保存していない予算の変更があるかを、離れる前の確認のために親へ知らせる（要望の文章は入力欄を離れたときに保存するので数えない）
+    const unsavedInput = isBudgetEditing && budget !== String(menu.weeklyBudget) && !updateBudget.isPending ? '保存していない予算の変更' : null;
+    useEffect(() => {
+        onUnsavedInputChange?.(unsavedInput);
+    }, [unsavedInput, onUnsavedInputChange]);
+    useEffect(() => () => onUnsavedInputChange?.(null), [onUnsavedInputChange]);
 
     // 保存の途中で「献立を作る」を押したら、保存が終わってから始める（同じ献立を同時に書き換えて衝突しないように）
     const savingRef = useRef<Promise<unknown> | null>(null);

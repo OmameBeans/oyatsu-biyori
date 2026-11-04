@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Browser, TestInfo } from '@playwright/test';
 import { COLOR_MODE } from '../src/shared/type/colorMode';
 import { PREFERENCE_KEY } from '../src/shared/type/preferenceKey';
-import { captureScreen, captureScreenAs, expectReadable } from './helpers';
+import { captureScreen, captureScreenAs, expectReadable, openFlyerItemDetail } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
 const PACKAGE_IMAGE = path.resolve(process.cwd(), '../../samples/packages/package-8104-back.png');
@@ -77,10 +77,9 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
         await page.getByRole('button', { name: '読み取る' }).click();
         await expect(page.getByText('読み取った商品 20件')).toBeVisible({ timeout: 30_000 });
-        const chocolate = page.getByRole('region', { name: 'ことりのさくさくショコラ' });
-        await chocolate.getByRole('button', { name: '確かめて確定' }).click();
-        await page.getByRole('dialog').getByLabel('新しい商品として登録').check();
-        await page.getByRole('dialog').getByRole('button', { name: '確定する' }).click();
+        const chocolate = await openFlyerItemDetail(page, 'ことりのさくさくショコラ');
+        await chocolate.getByLabel('新しい商品として登録').check();
+        await chocolate.getByRole('button', { name: '確定する' }).click();
         await expect(page.getByText('「ことりのさくさくショコラ」を確定しました')).toBeVisible();
 
         // 2. 今週の商品では 🟡 要確認（チラシの情報だけ）で、献立に入れられる

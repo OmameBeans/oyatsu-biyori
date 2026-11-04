@@ -10,7 +10,7 @@ import { AllergenCheckPage } from '../pages/allergen-check';
 import { LandingPage } from '../pages/landing';
 import { LoginPage } from '../pages/login';
 import { MenuEditPage } from '../pages/menu-edit';
-import { MenuListPage } from '../pages/menu-list';
+import { MenuHistoryPage, MenuListPage } from '../pages/menu-list';
 import { ProductDetailPage } from '../pages/product-detail';
 import { ProductListPage } from '../pages/product-list';
 import { SettingsPage } from '../pages/settings';
@@ -52,6 +52,7 @@ const router = createBrowserRouter([
         ),
         children: [
             { path: ROUTE.MENUS, element: <MenuListPage /> },
+            { path: ROUTE.MENU_HISTORY, element: <MenuHistoryPage /> },
             { path: `${ROUTE.MENUS}/:menuId`, element: <MenuEditPage /> },
             { path: ROUTE.PRODUCTS, element: <ProductListPage /> },
             { path: `${ROUTE.PRODUCTS}/:productId`, element: <ProductDetailPage /> },

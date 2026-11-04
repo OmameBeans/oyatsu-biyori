@@ -4,5 +4,5 @@ export * from './ImagePicker';
 export * from './JobProgress';
 export * from './LoadingFallback';
 export * from './PageErrorBoundary';
-export * from './SafetyNotice';
 export * from './PageLayout';
+export * from './useImagePicker';

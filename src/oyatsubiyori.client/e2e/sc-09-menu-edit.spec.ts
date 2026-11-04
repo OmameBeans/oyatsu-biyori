@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
-import { captureScreen } from './helpers';
+import type { Locator, Page } from '@playwright/test';
+import { captureScreen, captureScreenAs, openFlyerItemDetail } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
+
+/** 文字列を、正規表現の中でそのままの文字として使えるようにする */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** 献立一覧から、指定した週（今週・来週・再来週）の献立を開く */
 const openWeek = async (page: Page, label: '来週' | '再来週') => {
@@ -13,6 +17,122 @@ const openWeek = async (page: Page, label: '来週' | '再来週') => {
     await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
     await expect(page.getByRole('heading', { level: 1, name: /^献立作成/ })).toBeVisible();
 };
+
+/** 手順1（チラシ取り込み）の撮影の欄を開く。再来週はこのファイルのテストでは読み取らないので、撮影の欄が出る */
+const openFlyerPicker = async (page: Page) => {
+    await openWeek(page, '再来週');
+    await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'チラシを取り込む' })).toBeVisible();
+};
+
+/** 要素の外側にある、縦にスクロールしている枠（ページ全体を含む）の数 */
+const countScrollingAncestors = (locator: Locator) =>
+    locator.evaluate((el) => {
+        let count = 0;
+        for (let node = el.parentElement; node; node = node.parentElement) {
+            const isPage = node === document.documentElement;
+            const canScroll = isPage || /auto|scroll/.test(getComputedStyle(node).overflowY);
+            if (canScroll && node.scrollHeight > node.clientHeight + 1) {
+                count++;
+            }
+        }
+        return count;
+    });
+
+/** 要素の中の文字が描かれている範囲の左右の端（ラベルの要素は幅いっぱいに広がるので、文字の範囲を測る） */
+const textEdgesOf = (locator: Locator) =>
+    locator.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rect = range.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+    });
+
+test.describe('SC-09 献立作成 手順1 の配置', () => {
+    test('FR-FLYER-01 PC では手順1がページの高さに収まり、10枚追加しても追加したチラシの一覧の中だけがスクロールする', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホはページ全体をスクロールする');
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await openFlyerPicker(page);
+        const card = page.getByRole('region', { name: 'チラシを取り込む' });
+        const empty = card.getByText('まだ追加されていません');
+        await expect(empty).toBeVisible();
+        await expect(page.getByRole('button', { name: '読み取る' })).toBeDisabled();
+        await expect(page.getByText('チラシを追加すると読み取れます')).toBeVisible();
+        expect(await countScrollingAncestors(empty)).toBe(0);
+        await captureScreenAs(page, 'sc-09-step1-picker-1920x1080');
+
+        // タイトルの行と取り込みのカードの左右の端は、ステッパーの最初と最後のラベルの端にそろう（ずれは 2px まで）
+        const heading = page.getByRole('heading', { level: 1, name: /^献立作成/ });
+        const leave = page.getByRole('button', { name: '作成を中断して一覧へ' });
+        const misalignment = async () => {
+            const firstLabel = await textEdgesOf(page.getByText('チラシ取り込み', { exact: true }));
+            const lastLabel = await textEdgesOf(page.getByText('献立案', { exact: true }));
+            const leaveBox = await leave.boundingBox();
+            const cardBox = await card.boundingBox();
+            if (!leaveBox || !cardBox) {
+                return Infinity;
+            }
+            return Math.max(
+                Math.abs((await textEdgesOf(heading)).left - firstLabel.left),
+                Math.abs(leaveBox.x + leaveBox.width - lastLabel.right),
+                Math.abs(cardBox.x - firstLabel.left),
+                Math.abs(cardBox.x + cardBox.width - lastLabel.right),
+            );
+        };
+        await expect.poll(misalignment).toBeLessThanOrEqual(2);
+
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await expect(card).toBeVisible();
+        await expect.poll(misalignment).toBeLessThanOrEqual(2);
+        expect(await countScrollingAncestors(empty)).toBe(0);
+
+        const flyer = readFileSync(FLYER_IMAGE);
+        await page.getByTestId('file-input').setInputFiles(
+            Array.from({ length: 10 }, (_, index) => ({ name: `flyer-${index + 1}.png`, mimeType: 'image/png', buffer: flyer })),
+        );
+        await expect(card.getByText('（10 / 10枚）')).toBeVisible({ timeout: 30_000 });
+        await expect(card.getByRole('img', { name: 'flyer-10.png' })).toBeAttached();
+        await expect(page.getByRole('button', { name: '読み取る' })).toBeEnabled();
+        const list = card.getByRole('list', { name: '追加したチラシの一覧' });
+        expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+        expect(await countScrollingAncestors(list)).toBe(0);
+        await captureScreenAs(page, 'sc-09-step1-picker-1440x900-10');
+    });
+
+    test('SC-09 「作成を中断して一覧へ」は下書きとして残ることを知らせ、読み取っていない画像があるときは消えることを確かめる', async ({ page }, testInfo) => {
+        await openFlyerPicker(page);
+        await captureScreen(page, testInfo, 'sc-09-step1-picker');
+        await page.getByRole('button', { name: '作成を中断して一覧へ' }).click();
+        await expect(page).toHaveURL(/\/menus$/);
+        await expect(page.getByText(/下書きとして残っています|ここまでの内容は保存されています/)).toBeVisible();
+
+        await openFlyerPicker(page);
+        await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
+        await expect(page.getByRole('img', { name: 'flyer-01.png' })).toBeVisible();
+        await page.getByRole('button', { name: '作成を中断して一覧へ' }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByText('まだ読み取っていないチラシの画像は消えます', { exact: false })).toBeVisible();
+        await dialog.getByRole('button', { name: 'やめる' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(page.getByRole('img', { name: 'flyer-01.png' })).toBeVisible();
+
+        await page.getByRole('button', { name: '作成を中断して一覧へ' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: '消して一覧へ' }).click();
+        await expect(page).toHaveURL(/\/menus$/);
+
+        // 手順4の送っていないチャットの依頼も、消えることを確かめる
+        await openWeek(page, '再来週');
+        await page.getByRole('tab', { name: '献立案', exact: true }).click();
+        if (testInfo.project.name === 'mobile') {
+            await page.getByRole('tab', { name: 'チャット' }).click();
+        }
+        await page.getByLabel('チャットの依頼').fill('水曜はせんべいにしてください');
+        await page.getByRole('button', { name: '作成を中断して一覧へ' }).click();
+        await expect(page.getByRole('dialog').getByText('送っていないチャットの依頼は消えます', { exact: false })).toBeVisible();
+        await page.getByRole('dialog').getByRole('button', { name: 'やめる' }).click();
+        await expect(page.getByLabel('チャットの依頼')).toHaveValue('水曜はせんべいにしてください');
+    });
+});
 
 test.describe.serial('SC-09 献立作成', () => {
     test('FR-FLYER-01・05・06a チラシを読み取り、「同じ商品」をまとめて確定できる', async ({ page }, testInfo) => {
@@ -26,27 +146,45 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(page.getByText('1ページを半分ずつ近づけて撮ってください', { exact: false })).toBeVisible();
         await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
         await expect(page.getByRole('img', { name: 'flyer-01.png' })).toBeVisible();
+        // 読み取りが終わってから結果が出るまでに、撮影の欄が一瞬でも出ないこと（読み直す前の古い状態で描かない）
+        await page.evaluate(() => {
+            const state = { sawReading: false, pickerAfterReading: false };
+            (window as unknown as { flyerFlash: typeof state }).flyerFlash = state;
+            const hasHeading = (text: string) => Array.from(document.querySelectorAll('h2')).some((h) => h.textContent === text);
+            new MutationObserver(() => {
+                if (!hasHeading('チラシを取り込む')) {
+                    state.sawReading = true;
+                } else if (state.sawReading) {
+                    state.pickerAfterReading = true;
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        });
         await page.getByRole('button', { name: '読み取る' }).click();
         await expect(page.getByText('読み取った商品 20件')).toBeVisible({ timeout: 30_000 });
+        expect(await page.evaluate(() => (window as unknown as { flyerFlash: { pickerAfterReading: boolean } }).flyerFlash.pickerAfterReading)).toBe(false);
         await expect(page.getByText(/確定していない \d+件は、今週の商品に入りません/)).toBeVisible();
         await captureScreen(page, testInfo, 'sc-09-step1-flyer');
 
         await page.getByRole('button', { name: '「同じ商品」をまとめて確定' }).click();
         await expect(page.getByText(/「同じ商品」の \d+件を確定しました/)).toBeVisible();
-        await expect(page.getByText('確定済み：登録済みの商品と同じ').first()).toBeVisible();
+        await expect(page.getByRole('row', { name: /確定済み .*登録済みの商品と同じ/ }).first()).toBeVisible();
     });
 
     test('FR-FLYER-04a・SR-19 表記のない商品は「表記なし」と示し、新しい商品として確定すると今週の商品に 🟡 要確認 で入る', async ({ page }, testInfo) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
-        const card = page.getByRole('region', { name: 'ことりのピピ ラムネ' });
-        await expect(card.getByText('表記なし')).toBeVisible();
-        await card.getByRole('button', { name: /確かめて確定|選び直す/ }).click();
-        const dialog = page.getByRole('dialog');
-        await expect(dialog.getByText('表記なし（読み落としの可能性があります', { exact: false })).toBeVisible();
-        await captureScreen(page, testInfo, 'sc-09-step1-confirm-dialog');
-        await dialog.getByLabel('新しい商品として登録').check();
-        await dialog.getByRole('button', { name: '確定する' }).click();
+        const row = page.getByRole('row', { name: /ことりのピピ ラムネ/ }).first();
+        // 「表記なし」のチップと、状態の下の理由（何を確かめるか）
+        await expect(row.getByText('表記なし', { exact: true }).first()).toBeVisible();
+        // 状態の下に、何を確かめるのか（表記なし）が出る。確定済みの行にも出る
+        await expect(row.getByTitle(/表記なし/).first()).toBeVisible();
+        const detail = await openFlyerItemDetail(page, 'ことりのピピ ラムネ');
+        // 行を開くと、確かめることと、することが出る
+        await expect(detail.getByRole('alert', { name: '確かめること' }).getByText('チラシでこの商品のアレルゲン表記を探してください', { exact: false })).toBeVisible();
+        await expect(detail.getByText('表記なし（読み落としの可能性があります', { exact: false })).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step1-confirm-detail');
+        await detail.getByLabel('新しい商品として登録').check();
+        await detail.getByRole('button', { name: /^確定(する|し直す)$/ }).click();
         await expect(page.getByText('「ことりのピピ ラムネ」を確定しました')).toBeVisible();
 
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
@@ -54,6 +192,89 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(listed.getByText('🟡 要確認')).toBeVisible();
         await expect(listed.getByText('チラシにアレルゲンの表記がありません')).toBeVisible();
         await captureScreen(page, testInfo, 'sc-09-step2-listed');
+    });
+
+    test('FR-FLYER-06c 読み取った商品は状態の順に並び、初めは閉じていて、確定すると確定済みは下へ移って次の未確定の行が開く', async ({ page }, testInfo) => {
+        await openWeek(page, '来週');
+        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
+        const grid = page.getByRole('grid', { name: '読み取った商品' });
+        await expect(grid).toBeVisible();
+        const statusesInOrder = async () =>
+            (await grid.getByRole('row').allInnerTexts())
+                .map((text) => text.trim().split(/\s/)[0])
+                .filter((status) => ['警告あり', '要確認', '未確定', '確定済み'].includes(status));
+        const expectSortedByStatus = async () => {
+            const statuses = await statusesInOrder();
+            const rank = (status: string) => ['警告あり', '要確認', '未確定', '確定済み'].indexOf(status);
+            expect(statuses.map(rank)).toEqual([...statuses.map(rank)].sort((a, b) => a - b));
+            return statuses;
+        };
+        const before = await expectSortedByStatus();
+        expect(before.length).toBe(20);
+
+        // 初めはどの行も開いていない
+        await expect(grid.getByRole('button', { name: /の詳細を閉じる$/ })).toHaveCount(0);
+        test.skip(before[0] === '確定済み', '未確定の商品が残っていない');
+
+        // 一番上（未確定のもの）を開いて「取り込まない」で確定すると、次の未確定の行が開く
+        const firstToggle = grid.getByRole('button', { name: /の詳細を開く$/ }).first();
+        const openedName = (await firstToggle.getAttribute('aria-label'))!.match(/^「(.+)」の詳細を開く$/)![1];
+        await firstToggle.click();
+        const detail = page.getByRole('region', { name: `「${openedName}」を確かめる` });
+        await detail.getByLabel('取り込まない（おやつに使わない）').check();
+        await detail.getByRole('button', { name: /^確定(する|し直す)$/ }).click();
+        await expect(page.getByText(`「${openedName}」を確定しました`)).toBeVisible();
+        await expect(grid.getByRole('row', { name: new RegExp('確定済み .*' + escapeRegExp(openedName)) })).toBeVisible();
+        const after = await expectSortedByStatus();
+        expect(after.filter((status) => status === '確定済み').length).toBe(before.filter((status) => status === '確定済み').length + 1);
+        const nextExpanded = grid.getByRole('button', { name: /の詳細を閉じる$/ });
+        if (after.some((status) => status !== '確定済み')) {
+            await expect(nextExpanded).toHaveCount(1);
+            await expect(nextExpanded).not.toHaveAttribute('aria-label', `「${openedName}」の詳細を閉じる`);
+        }
+        await captureScreen(page, testInfo, 'sc-09-step1-next-opened');
+
+        // タブで絞り込むと、その状態の行だけが出る
+        await page.getByRole('tab', { name: /^確定済み \d+$/ }).click();
+        expect(new Set(await statusesInOrder())).toEqual(new Set(['確定済み']));
+        await page.getByRole('tab', { name: /^すべて \d+$/ }).click();
+        expect((await statusesInOrder()).length).toBe(20);
+    });
+
+    test('FR-FLYER-06・06c 未確定の商品を1件ずつ確かめられ、確定すると次の商品へ進み、表では確定済みになる', async ({ page }, testInfo) => {
+        await openWeek(page, '来週');
+        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
+        const grid = page.getByRole('grid', { name: '読み取った商品' });
+        await expect(grid).toBeVisible();
+        const start = page.getByRole('button', { name: /^未確定を1件ずつ確かめる（\d+件）$/ });
+        test.skip((await start.count()) === 0, '未確定の商品が残っていない');
+        const total = Number((await start.innerText()).match(/（(\d+)件）/)![1]);
+        await start.click();
+        const dialog = page.getByRole('dialog', { name: /未確定の商品を1件ずつ確かめる/ });
+        await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: '前へ' })).toBeDisabled();
+        if (total >= 2) {
+            await dialog.getByRole('button', { name: 'あとで（次へ）' }).click();
+            await expect(dialog.getByText(`2 / ${total}件目`, { exact: false })).toBeVisible();
+            await dialog.getByRole('button', { name: '前へ' }).click();
+            await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
+        }
+        const firstName = (await dialog.getByRole('heading', { level: 3 }).innerText()).trim();
+        await captureScreen(page, testInfo, 'sc-09-step1-review');
+
+        // 決めるのはボタンを押したときだけ。確定すると次の未確定の商品へ進む
+        const form = dialog.getByRole('region', { name: `「${firstName}」を確かめる` });
+        await form.getByLabel('取り込まない（おやつに使わない）').check();
+        await form.getByRole('button', { name: /^確定(する|し直す)$/ }).click();
+        await expect(page.getByText(`「${firstName}」を確定しました`)).toBeVisible();
+        if (total >= 2) {
+            await expect(dialog.getByRole('heading', { level: 3 })).not.toHaveText(firstName);
+        } else {
+            await expect(dialog.getByText('すべて確定しました')).toBeVisible();
+        }
+        await dialog.getByRole('button', { name: '表に戻る' }).first().click();
+        await expect(dialog).toHaveCount(0);
+        await expect(grid.getByRole('row', { name: new RegExp('確定済み .*' + escapeRegExp(firstName)) })).toBeVisible();
     });
 
     test('FR-MENU-07a 「今週は使わない」は切り替えるたびに保存される', async ({ page }) => {

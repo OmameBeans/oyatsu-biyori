@@ -72,3 +72,17 @@ export const expectReadable = async (locator: Locator) => {
     await expect(locator).toBeVisible();
     await expect.poll(() => contrastRatioOf(locator)).toBeGreaterThanOrEqual(4.5);
 };
+
+/**
+ * SC-09 手順1 の読み取った商品の表で、商品の行の下の詳細欄（確定のフォーム）を開いて返す。
+ * 開いていれば、そのまま返す（初めはどの行も閉じている。確定のあとは次の未確定の行が開いている）。
+ */
+export const openFlyerItemDetail = async (page: Page, name: string) => {
+    const toggle = page.getByRole('button', { name: `「${name}」の詳細を` });
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+        await toggle.click();
+    }
+    const detail = page.getByRole('region', { name: `「${name}」を確かめる` });
+    await expect(detail).toBeVisible();
+    return detail;
+};

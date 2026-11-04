@@ -27,9 +27,9 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
         await expect(page.getByRole('region', { name: 'ころころ ココナッツサブレ' })).toHaveCount(0);
     });
 
-    test('SC-10 献立一覧の件数から、今日以降の献立で使うパッケージで確認する商品の一覧を開ける', async ({ page }) => {
+    test('SC-10 献立一覧の注意から、今日以降の献立で使うパッケージで確認する商品の一覧を開ける', async ({ page }) => {
         await page.goto('/menus');
-        await page.getByRole('link', { name: /^\d+件$/ }).first().click();
+        await page.getByRole('link', { name: '商品を確認する' }).click();
         await expect(page).toHaveURL(/filter=FuturePackage/);
         await expect(page.getByRole('heading', { level: 1, name: '商品一覧' })).toBeVisible();
         await expect(page.getByText('今日以降の献立で使う、パッケージで確認する商品')).toBeVisible();

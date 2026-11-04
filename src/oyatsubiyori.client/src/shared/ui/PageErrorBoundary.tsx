@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<PropsWithChildren<BoundaryProps>, Boundary
 }
 
 /**
- * ページごとのエラーの枠（T0-10）。読み込みに失敗しても、サイドバーと注意書きは残す。
+ * ページごとのエラーの枠（T0-10）。読み込みに失敗しても、サイドバーは残す。
  * 中身は Suspense で囲む（useSuspenseQuery を使うため）。
  */
 export const PageErrorBoundary = ({ children }: PropsWithChildren) => (

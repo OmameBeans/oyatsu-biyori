@@ -13,7 +13,7 @@ paths:
 ## 環境
 
 - React 19 / TypeScript（`strict`、`verbatimModuleSyntax`）/ Vite
-- UI：MUI（`@mui/material`, `@mui/icons-material`）
+- UI：MUI（`@mui/material`, `@mui/icons-material`）。PC の一覧の表は MUI X の DataGrid（`@mui/x-data-grid`。無料版）も使える（献立一覧の「過去の献立」）
 - サーバー状態：TanStack Query v5 / ルーティング：react-router-dom v7 / 通知：notistack / 日付：dayjs
 - 上記のライブラリは導入済み。PDF は pdf.js（`pdfjs-dist`）、画面の E2E は Playwright（`@playwright/test`）を使う
 - ファイルは **UTF-8** で保存する（Shift-JIS で保存しない）
@@ -51,7 +51,6 @@ paths:
   - 色は判定の区分で決める（入れられない：`error` ／ 警告：`warning` ／ 安全：`success`）。ステータス（確認済み・参考・不明・要再確認）で色を決めない
   - **アレルゲンの文言（表示名・理由・次にすること）は共通部品（T4-01）だけから出す**。各画面に直接書かない。「参考」「要再確認」などのステータスの名前は、商品詳細の履歴以外に出さない
   - 警告の文言には、何をすればよいかを含める（「パッケージの原材料表示を撮影して確認してください」）
-- ログイン後の画面の目立つ場所に「アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください」と常に表示する
 - 週の要望とチャットの入力欄の近くに「子どもの名前は書かないでください」と表示する（Claude に送るため。NFR-SEC-05a）
 
 ## ディレクトリ構成（Feature-Sliced Design）

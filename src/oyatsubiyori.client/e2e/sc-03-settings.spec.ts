@@ -343,9 +343,8 @@ test.describe('#4 見た目（明るさ）', () => {
             } else {
                 expect(colors).toEqual(baseline);
             }
-            // 注意書き・🔴 の理由・次にすることは、ダークでも背景と 4.5:1 以上で読める
+            // 🔴 の理由・次にすることは、ダークでも背景と 4.5:1 以上で読める
             for (const text of [
-                page.getByText('アレルゲンの最終確認は、必ずパッケージの原材料表示で行ってください'),
                 page.getByText('アレルゲンの情報がありません', { exact: true }).first(),
                 page.getByText('パッケージの原材料表示を撮って確認してください', { exact: true }).first(),
             ]) {

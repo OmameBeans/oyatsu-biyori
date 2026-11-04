@@ -9,6 +9,8 @@ export interface MenuListRow {
     status: MenuStatus | null;
     total: number | null;
     budget: number | null;
+    /** 週の予算 − 週の実績（サーバーが計算。超えたら負。未作成の週は null） */
+    remaining: number | null;
     blockedCount: number;
     warningCount: number;
     recheckCount: number;
@@ -34,6 +36,8 @@ export interface MenuList {
     draftCount: number;
     blockedUsages: BlockedUsage[];
     isReadyForMenu: boolean;
+    /** 今週の初日（月曜）。これより前の週を「過去の献立」に分ける */
+    thisWeekStart: string;
 }
 
 /** タグ */

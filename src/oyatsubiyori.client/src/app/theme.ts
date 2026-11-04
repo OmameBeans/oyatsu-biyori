@@ -160,7 +160,7 @@ const isPaletteColor = (color: unknown): color is 'primary' | 'secondary' | 'err
  * - 塗りの Button・Chip・Fab：ホバーとキーボードで選んだときの背景を、dark ではなく main を少し明るくした色にする（DARK_HOVER_LIGHTEN）
  * - Paper：MUI はダークで、浮いた部品（Dialog など）に白を重ねて明るくする。重ねると文字との比が計算と合わなくなるので重ねない。
  *   浮いた部品は、枠線で背景と分ける
- * - standard の Alert：MUI のままだと背景がほぼ黒で、「アレルゲンの最終確認は〜」（info）などが溶け込むので、区分の色を薄く敷く。
+ * - standard の Alert：MUI のままだと背景がほぼ黒で、info の Alert などが溶け込むので、区分の色を薄く敷く。
  *   文字は区分の色を白に寄せた色、アイコンは区分の色（main。背景と 5.1:1 以上）にする
  * - filled の Alert（🔴 の大事な知らせ）：MUI のままだと背景が error.dark を暗くした色、文字が黒になり 4.5:1 に届かないので、
  *   背景を main、文字を contrastText にする（error で 7.27:1）
