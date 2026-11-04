@@ -398,14 +398,14 @@
 
 ## 13. ブラッシュアップ（issue）
 
-ファーストの完成（第8回まで）のあとの改善は、GitHub の issue で管理する（2026-11-04 から）。起票はスキル `brushup-issue`（`.claude/skills/brushup-issue/`）で行い、この表に1行足す。issue が本体で、この表は一覧と進み具合の記録。
+ファーストの完成（第8回まで）のあとの改善は、GitHub の issue で管理する（2026-11-04 から）。起票はスキル `brushup-issue`（`.claude/skills/brushup-issue/`）で行い、この表に1行足す。issue が本体で、この表は一覧と進み具合の記録。進める順番は、スキル `issue-triage` が手元のキュー（`docs/context/issue-queue.md`。公開しない）に書き、スキル `issue-queue` がその上から1件ずつサブエージェント `issue-worker` に任せて片付ける（1件だけなら `issue-run`）。
 
 - 「ID」は issue の番号。「種類」「優先度」「リスク」「安全」は issue のラベルと同じ（リスクは REVIEW.md の区分の見込みで、コミット前に `precheck.py` が決め直す）
 - 「状態」は、閉じたら `✅ <コミット>`、途中なら `🔶 <残り>`（進み具合と同じ書き方）。コミットのメッセージに `Closes #<番号>` を入れる
 
 | ID | 優先度 | タスク | 種類 | リスク | 要件 | 安全 | 状態 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| #1 | あると良い | [サイドバーの選ばれた項目を、幅いっぱいの薄い背景と左端の縦の線で示す](https://github.com/OmameBeans/oyatsu-biyori/issues/1) | 見た目・文言 | 低 | SC-02, T0-14 |  |  |
+| #1 | あると良い | [サイドバーの選ばれた項目を、幅いっぱいの薄い背景と左端の縦の線で示す](https://github.com/OmameBeans/oyatsu-biyori/issues/1) | 見た目・文言 | 低 | SC-02, T0-14 |  | ✅ 2026-11-04 |
 | #2 | あると良い | [設定画面で色のテーマを選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/2) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |
 | #3 | あると良い | [PC でもサイドバーを開閉できるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/3) | 改善 | 中 | SC-02, T0-14 |  |  |
 | #4 | あると良い | [ダークモード（暗い背景）を選べるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/4) | 改善 | 中 | SC-02, SC-03, T0-10 |  |  |

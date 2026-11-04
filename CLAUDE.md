@@ -116,6 +116,7 @@ tools/                       開発用の道具（アプリには含めない）
 
 - **コミットとプッシュは、ユーザーが指示したときだけ行う**
 - ファーストの完成（第8回まで）のあとの改善（ブラッシュアップ）は、GitHub の issue で管理する。起票はスキル `brushup-issue` で行い（案づくりはサブエージェント `issue-drafter` に任せてもよい。起票はメインで行う。起票の前にユーザーの OK は取らず、起票のあとに内容を伝える）、一覧と進み具合は `docs/implementation-tasks/implementation-tasks.md` の「13. ブラッシュアップ（issue）」に残す。issue は公開されるので、実データ・画像・子どもの情報を書かない
+  - issue を進めるとき：1件ならスキル `issue-run`（すべてメインで行う）。複数を続けて進めるなら、スキル `issue-triage` で順番を決めてキュー（`docs/context/issue-queue.md`。手元のみ）に書き、スキル `issue-queue` で上から1件ずつサブエージェント `issue-worker` に計画・実装・確認させる（レビュー・コミット・キューの更新はメイン。ワーカーは同時に1つだけ）
 - 開発は `main` ブランチで直接行う（1人で開発するため、作業用のブランチは切らない。審査ではリポジトリの既定ブランチが見られるので、`main` を常に最新に保つ）
 - **コミット前の手順は `REVIEW.md` に従う**。変えたものでリスクの区分（高・中・低）を決め、区分に応じて確かめる
   - 中・高：ビルド・テスト・lint（`dotnet build OyatsuBiyori.slnx`・`dotnet test src/OyatsuBiyori.Biz.Tests`・フロントの `npm run lint` と `npm run build`。画面を変えたら `npm run e2e` も）を `python tools/precheck/precheck.py` でまとめて実行し（確認していない差分のコミットはフックが止める）、その結果をユーザーに見せる。そのうえで `/code-review` で差分をレビューする
