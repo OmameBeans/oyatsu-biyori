@@ -47,7 +47,7 @@ public sealed class MenuApplicationService(
     }
 
     /// <summary>
-    /// 献立一覧（SC-10。T3-01・T4-12）。今週・来週・再来週は未作成でも行を出す。新しい週が上。
+    /// 献立一覧（SC-10。T3-01・T4-12）。今週・来週・再来週と、今週から最後の献立の週までの間で空いた週は、未作成でも行を出す。新しい週が上。
     /// 上部に対応が必要なこと（パッケージで確認する商品・未確定の献立・使えなくなった商品を使う献立）を返す。
     /// </summary>
     public async Task<Result<MenuListView>> ListAsync()
@@ -64,9 +64,13 @@ public sealed class MenuApplicationService(
             rows.Add(ToRow(menu, context, today));
         }
 
-        foreach (var weekStart in new[] { thisWeek, thisWeek.AddDays(7), thisWeek.AddDays(14) })
+        // 今週・来週・再来週と、今週から最後の献立の週までの間で空いた週は、未作成の行を出す
+        // （先の週の下書きを削除して間が空いても、その週を開いて作れるように。D-88 で週を選ぶ入口は置かないため）
+        var existingWeeks = rows.Select(r => r.WeekStart).ToHashSet();
+        var lastWeek = existingWeeks.Append(thisWeek.AddDays(14)).Max();
+        for (var weekStart = thisWeek; weekStart <= lastWeek; weekStart = weekStart.AddDays(7))
         {
-            if (!rows.Any(r => r.WeekStart == weekStart))
+            if (!existingWeeks.Contains(weekStart))
             {
                 rows.Add(new MenuListRow(weekStart, null, null, null, null, null, 0, 0, 0, 0, null, false));
             }

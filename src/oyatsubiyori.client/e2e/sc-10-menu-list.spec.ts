@@ -51,4 +51,32 @@ test.describe('SC-10 献立一覧', () => {
         await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
         await expect(page.getByRole('tab', { name: 'チラシ取り込み', exact: true })).toBeVisible();
     });
+
+    test('FR-LIST-00 先の週の下書きを削除して間が空いても、その週の行が出て献立を作れる', async ({ page }) => {
+        await page.goto('/menus');
+        const upcoming = page.getByRole('region', { name: '今週とこれから' });
+        const further = upcoming.getByRole('button', { name: /^さらに先の週（.+〜）の献立を作る$/ });
+        const weekCard = (date: string) => upcoming.getByRole('region', { name: new RegExp(`(^| )${date}（月）`) });
+
+        // さらに先の週を2つ作る（1つ目を、あとで削除して間を空ける）
+        const gapDate = (await further.textContent())?.match(/（(\d+\/\d+)〜）/)?.[1] ?? '';
+        expect(gapDate).not.toBe('');
+        await further.click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
+        await page.goto('/menus');
+        await expect(further).not.toContainText(`（${gapDate}〜）`);
+        await further.click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
+
+        await page.goto('/menus');
+        await weekCard(gapDate).getByRole('button', { name: /のメニュー$/ }).click();
+        await page.getByRole('menuitem', { name: '下書きを削除' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: '削除する' }).click();
+
+        const createButton = weekCard(gapDate).getByRole('button', { name: '献立を作る' });
+        await expect(createButton).toBeVisible();
+        await createButton.click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
+        await expect(page.getByRole('tab', { name: 'チラシ取り込み', exact: true })).toBeVisible();
+    });
 });

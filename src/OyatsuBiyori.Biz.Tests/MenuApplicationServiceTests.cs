@@ -178,4 +178,34 @@ public class MenuApplicationServiceTests
         Assert.All(menu.Days, d => Assert.Equal(50, d.ChildrenCount));
         Assert.Equal(result.Value, again.Value);
     }
+
+    [Fact]
+    public async Task FR_LIST_00_先の週の下書きを削除して間が空いても_その週の未作成の行が出る()
+    {
+        var data = new InMemoryData();
+        var (service, _) = Create(data);
+        var thisWeek = JapanDate.WeekStart(Today);
+        var threeWeeksLater = await service.CreateAsync(thisWeek.AddDays(21));
+        await service.CreateAsync(thisWeek.AddDays(28));
+        await service.DeleteAsync(threeWeeksLater.Value);
+
+        var list = await service.ListAsync();
+
+        var weeks = list.Value!.Rows.Select(r => r.WeekStart).ToList();
+        Assert.Equal([thisWeek.AddDays(28), thisWeek.AddDays(21), thisWeek.AddDays(14), thisWeek.AddDays(7), thisWeek], weeks);
+        var gap = list.Value.Rows.Single(r => r.WeekStart == thisWeek.AddDays(21));
+        Assert.Null(gap.MenuId);
+        Assert.Null(gap.RelativeLabel);
+    }
+
+    [Fact]
+    public async Task FR_LIST_00_献立がなければ_今週_来週_再来週の行だけが出る()
+    {
+        var (service, _) = Create(new InMemoryData());
+        var thisWeek = JapanDate.WeekStart(Today);
+
+        var list = await service.ListAsync();
+
+        Assert.Equal([thisWeek.AddDays(14), thisWeek.AddDays(7), thisWeek], list.Value!.Rows.Select(r => r.WeekStart));
+    }
 }
