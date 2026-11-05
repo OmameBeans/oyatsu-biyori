@@ -172,7 +172,7 @@
 | ID | タスク | 要件 | テスト | 安全 | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | T8-01 | IIS の準備：Hosting Bundle（.NET 10）、サイト（インプロセス）、HTTPS（win-acme・Let's Encrypt）、HTTP → HTTPS、環境変数（API キー・初期アカウント）、アプリケーション プールのアイドル停止と定期リサイクルを止め、Application Initialization を有効にする（読み取り結果・処理の状態をメモリに持つため）、SQLite・Data Protection のキー・バックアップを Web から見えない場所に置き、書き込み権限を与える | NFR-OPS-01, NFR-SEC-01, 08, D-06, D-07 | | |  |
-| T8-02 | 手元で `dotnet publish` → 配置。マイグレーションは手元で `dotnet ef migrations script --idempotent` で SQL を作り、サーバーで適用する（sqlite3 などの道具を置く。適用前にバックアップ。U-03）。配置したら本番で1回、読み取りを動かす（プロンプトが publish に入っているか） | NFR-OPS-01, U-03 | | |  |
+| T8-02 | 手元で `dotnet publish` → 配置。マイグレーションは手元で SQL を作り、サーバーで sqlite3 で適用する（SQLite では `--idempotent` が使えないため、サーバーの `__EFMigrationsHistory` で当て済みの最後のマイグレーションを確かめ、`dotnet ef migrations script <その ID>` で差分を作る。初回は全部。適用前にバックアップ。NFR-OPS-01a・U-03）。配置したら本番で1回、読み取りを動かす（プロンプトが publish に入っているか） | NFR-OPS-01, U-03 | | |  |
 | T8-03 | バックアップ：`VACUUM INTO` か SQLite のバックアップ API で日付つきのファイル、タスク スケジューラで1日1回、7世代、Web から見えない場所 | NFR-OPS-02 | | |  |
 | T8-04 | Anthropic Console でワークスペースの月の利用上限を設定（試用の前に） | NFR-COST-05 | | |  |
 | T8-05 | 運用メモ（`docs/context/` に置く）：ロックの解除（`Auth:UnlockOnStartup`）、2028-04-01 にカシューナッツの「表示が確実でない」を外す、バックアップからの戻し方、ダミーデータの Skill を本番で使わないこと | FR-AUTH-05, 03 §2.1 | | |  |

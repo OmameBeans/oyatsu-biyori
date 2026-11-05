@@ -44,7 +44,7 @@
 | ID | 要件 |
 | --- | --- |
 | NFR-OPS-01 | 本番は XServer VPS for Windows Server + IIS で動かす。サーバー上ではビルドせず、手元で `dotnet publish` した成果物を配置する |
-| NFR-OPS-01a | 本番の DB のマイグレーションは、手元で SQL を作り（`dotnet ef migrations script --idempotent`）、サーバーで適用する。適用の前に DB をバックアップする（D-42） |
+| NFR-OPS-01a | 本番の DB のマイグレーションは、手元で SQL を作り、サーバーで `sqlite3` で適用する。SQLite では `--idempotent`（当て済みかを SQL の中で確かめる形）が使えないため、サーバーの `__EFMigrationsHistory` で当て済みの最後のマイグレーションを確かめ、そこからの差分だけを `dotnet ef migrations script <当て済みの最後のマイグレーション>` で作る（初回は引数なしで全部）。適用の前に DB をバックアップし、適用のあとで `__EFMigrationsHistory` に新しい行があることを確かめる（D-42） |
 | NFR-OPS-02 | SQLite を1日1回以上バックアップする。動作中のファイルを単純にコピーすると壊れたバックアップになりうるため、`VACUUM INTO` か SQLite のバックアップ API で日付つきのファイルに書き出す（Windows のタスク スケジューラで実行）。7世代残す。バックアップのフォルダは Web から見えない場所に置く |
 | NFR-OPS-03 | Claude API の障害時でも、商品一覧・既存の献立の閲覧・手動での献立編集はできる |
 | NFR-OPS-04 | Claude API の呼び出しには、タイムアウトと再試行を設ける。再試行は2回まで。タイムアウトは、画像の読み取り（チラシ・パッケージ）と献立の提案が90秒、商品照合の判定が30秒（仮の値。実測で見直す）。SDK の自動の再試行は切り、アプリで再試行する（1日の呼び出し回数に再試行も数えるため。NFR-COST-05）（D-64） |
