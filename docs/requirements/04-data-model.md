@@ -123,7 +123,7 @@ menus ────────┬───── 週の献立
 | volume | 内容量（例：「10袋入」「120g」） |
 | pieces_per_pack | 入数（注文できる単位1つで何人分か。献立の個数計算に使う。NULL の商品は献立の候補にしない） |
 | default_per_child_count | 1人あたりの個数の既定値（既定1。献立に入れるときに menu_items に写す） |
-| snack_type | おやつの分類：しょっぱいもの / あまいもの / のどごしのいいもの / 対象外（重複ルールと組み合わせに使う） |
+| snack_type | おやつの分類：しょっぱいもの / あまいもの / デザート・飲料 / 対象外（重複ルールと組み合わせに使う） |
 | listed_week_start | 最後にチラシに載った週の初日（NULL 可。商品一覧での表示用。献立の候補は menus.listed_products で決める） |
 | price | 税込価格（注文できる単位1つあたり。チラシを取り込むたびに上書き。NULL の商品は献立の候補にしない） |
 | price_excluding_tax | 税抜価格（チラシに載っていれば。取り込むたびに上書き） |
@@ -175,6 +175,7 @@ menus ────────┬───── 週の献立
 | weekly_budget | その週の予算（円・税込）。作るときに settings.default_weekly_budget を写し、職員が上書きできる（店で買うおやつの日がある週は下げる など） |
 | listed_products | その週の掲載品の写し。`{ product_id, price, order_no }` の配列（JSON）。チラシの取り込みを確定したときに保存し、取り込み直すと置き換える。献立の候補・「その週の掲載品」の判定・献立に入れるときの価格に使う（FR-FLYER-07） |
 | excluded_product_ids | 「今週は使わない」と指定した商品の ID の配列（JSON。FR-MENU-07b） |
+| order_checks | 注文リストで「注文した」とチェックした行。`{ product_id, order_no, pack_count, checked_at, checked_by }` の配列（JSON。商品・注文番号ごとに1件）。`pack_count` はチェックしたときのパック数で、今のパック数と違えば「数量が変わった」と示す（FR-MENU-35） |
 | request_text | 職員が入力した週の要望（原文） |
 | interpreted_requests | Claude が読み取った要望の一覧（「こう理解しました」の内容） |
 | status | 下書き / 確定。確定済みの献立を直し始めたら下書きに戻す（[07 の D-54](07-open-questions.md)）。警告の商品にチェックを付け直すだけ（`menu_items.acknowledged_at`・`acknowledged_judgement` の更新）では確定のまま（D-71） |
@@ -189,7 +190,7 @@ menus ────────┬───── 週の献立
 | date | 日付 |
 | children_count | その日の人数（通常人数、または要望・職員の修正で変えた値） |
 | children_count_source | 人数の出どころ：通常 / 要望から読み取り / 職員が修正 |
-| day_type | 通常 / 手作り / おやつなし（祝日・休みも「おやつなし」で表す） |
+| day_type | 通常 / おやつなし（祝日・休み・手作りの日も「おやつなし」で表す。D-92） |
 | day_type_edited | 日の種類を職員が直したか |
 | label | 日の見出し（NULL 可。「誕生日会」など。要望から読み取るか、職員が入力） |
 | label_edited | 日の見出しを職員が直したか |
@@ -207,7 +208,7 @@ menus ────────┬───── 週の献立
 | order_no | 注文番号（献立に入れた時点の値を保存。注文リストに使う） |
 | per_child_count | 1人あたりの個数（既定1） |
 | pack_count | 必要パック数（保存する値）。既定は式（[02 の金額計算の定義](02-functional.md#金額計算の定義)）で求める。入れ替え案（パック数の ±1）と職員の修正で上書きでき、その日の人数か1人あたりの個数を変えたら式で求め直す。全員分に足りない数なら警告する（[07 の D-43](07-open-questions.md)） |
-| amount | 金額（pack_count × unit_price の計算値）。日の種類が「手作り」「おやつなし」の日と人数が0の日は、商品があっても0のまま（その日の金額と合わせる。[07 の D-77](07-open-questions.md)、[02 の金額計算の定義](02-functional.md#金額計算の定義)） |
+| amount | 金額（pack_count × unit_price の計算値）。日の種類が「おやつなし」の日と人数が0の日は、商品があっても0のまま（その日の金額と合わせる。[07 の D-77](07-open-questions.md)、[02 の金額計算の定義](02-functional.md#金額計算の定義)） |
 | acknowledged_at | 確定時に、この商品の警告を職員が確認した日時（NULL＝未確認） |
 | acknowledged_judgement | 確認したときの判定（参考 / 要再確認 / 未確認の品目あり など）。今の判定と違えば、確認していない扱いに戻す（[SR-22](03-allergen-safety.md)） |
 

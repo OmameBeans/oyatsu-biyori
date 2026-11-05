@@ -21,6 +21,7 @@ import { JobProgress } from '../../../shared/ui';
 import { BudgetFitDialog } from './BudgetFitDialog';
 import { ConfirmMenuDialog } from './ConfirmMenuDialog';
 import { DayCard } from './DayCard';
+import { OrderListDialog } from './OrderListDialog';
 
 interface MenuBoardProps {
     menu: MenuDetail;
@@ -55,6 +56,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
     const isRunning = (!!(startedJobId ?? runningId) && !isJobFinished(job)) || isChatRunning;
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [isBudgetFitOpen, setIsBudgetFitOpen] = useState(false);
+    const [isOrderListOpen, setIsOrderListOpen] = useState(false);
     const [budgetDraft, setBudgetDraft] = useState(String(menu.weeklyBudget));
 
     useEffect(() => {
@@ -86,7 +88,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
             component="section"
             aria-label="献立の操作"
             variant="outlined"
-            sx={{ px: 2, py: 1.25, borderRadius: 3, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 2, rowGap: 1 }}
+            sx={{ px: 2, py: 1.25, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 2, rowGap: 1 }}
         >
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', flex: 1, minWidth: 0 }} useFlexGap>
                 <Chip
@@ -94,7 +96,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                     label={menu.status === MENU_STATUS.CONFIRMED ? `確定済み（${menu.confirmedAt ? formatDateTime(menu.confirmedAt) : ''}）` : '下書き'}
                 />
                 <Typography variant="h3" component="p" sx={{ color: menu.week.isOverBudget ? 'error.main' : 'text.primary' }}>
-                    週の実績 {formatYen(menu.week.total)} / 週の予算
+                    実績 {formatYen(menu.week.total)} / 予算
                 </Typography>
                 {/* 入力欄と「円」は離さない */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -125,6 +127,11 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                         予算に合わせる
                     </Button>
                 )}
+                {menu.status === MENU_STATUS.CONFIRMED && hasItems && (
+                    <Button variant="outlined" onClick={() => setIsOrderListOpen(true)}>
+                        注文リスト（{menu.orderList.orderedCount}/{menu.orderList.lines.length}）
+                    </Button>
+                )}
                 <Button onClick={onEditRequest} disabled={isRunning}>
                     要望を直す
                 </Button>
@@ -134,7 +141,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
             </Stack>
             {menu.status === MENU_STATUS.CONFIRMED && (
                 <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>
-                    商品・個数・日の種類などを直すと下書きに戻ります。直したら、もう一度「確定」を押してください。
+                    商品・個数・種別などを直すと下書きに戻ります。直したら、もう一度「確定」を押してください。
                 </Typography>
             )}
         </Paper>
@@ -144,12 +151,13 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
         <Stack spacing={2}>
             {commandBarContainer === undefined ? commandBar : commandBarContainer && createPortal(commandBar, commandBarContainer)}
             {menu.avoidedAllergenNames.length === 0 && <NoAvoidedAllergenNotice />}
-            {isRunning && (
+            {/* 進み具合は献立案の作成のときだけ出す（チャットの処理中は、チャットの欄に出す。手で直すボタンは押せないままにする） */}
+            {isRunning && !isChatRunning && (
                 <Card>
                     <CardContent>
                         <JobProgress
-                            stage={isChatRunning ? chatJob?.stage : job?.stage}
-                            fallbackStage={isChatRunning ? 'ご依頼に合わせて、献立を組み直しています' : '要望を読み取って、献立を考えています'}
+                            stage={job?.stage}
+                            fallbackStage="要望を読み取って、献立を考えています"
                             note="数十秒から数分かかることがあります。画面を閉じても続きます。"
                         />
                     </CardContent>
@@ -207,7 +215,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                             </Alert>
                         )}
                         <Typography variant="caption" color="text.secondary">
-                            人数・日の種類・見出しは、下の日ごとのカードで直せます。
+                            人数・種別・見出しは、下の日ごとのカードで直せます。
                         </Typography>
                     </CardContent>
                 </Card>
@@ -276,6 +284,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                     enqueueSnackbar('献立を確定しました', { variant: 'success' });
                 }}
             />
+            <OrderListDialog menu={menu} isOpen={isOrderListOpen} onClose={() => setIsOrderListOpen(false)} />
             <BudgetFitDialog
                 key={isBudgetFitOpen || isBudgetFitRequested ? 'fit-open' : 'fit-closed'}
                 menu={menu}

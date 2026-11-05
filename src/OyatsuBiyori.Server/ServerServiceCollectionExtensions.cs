@@ -43,6 +43,9 @@ public static class ServerServiceCollectionExtensions
             .Validate(o => o.DiceThreshold is > 0 and <= 1 && o.MaxCandidates >= 1, "ProductMatch の設定が正しくありません（DiceThreshold は 0 より大きく 1 以下、MaxCandidates は 1 以上）")
             .ValidateOnStart();
 
+        // 処理の流れ（Server-Sent Events。JobsController.Stream）も、enum を名前の文字列で送る
+        services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
         services.AddControllers()
             // enum は名前の文字列で送る（画面の定数と合わせる）
             .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))

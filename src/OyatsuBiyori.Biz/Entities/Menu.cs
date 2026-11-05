@@ -45,7 +45,18 @@ public sealed class Menu : EntityBase
 
     /// <summary>チャットの履歴</summary>
     public List<MenuMessage> Messages { get; set; } = [];
+
+    /// <summary>注文リストで「注文した」とチェックした行（FR-MENU-35。商品・注文番号ごとに1件）</summary>
+    public List<OrderCheck> OrderChecks { get; set; } = [];
 }
+
+/// <summary>注文リストの「注文した」のチェック</summary>
+/// <param name="ProductId">商品</param>
+/// <param name="OrderNo">注文番号（なければ null）</param>
+/// <param name="PackCount">チェックしたときのパック数（あとで献立のパック数が変わったら知らせる）</param>
+/// <param name="CheckedAt">チェックした日時（UTC）</param>
+/// <param name="CheckedBy">チェックした職員</param>
+public sealed record OrderCheck(string ProductId, string? OrderNo, int PackCount, DateTime CheckedAt, string? CheckedBy);
 
 /// <summary>掲載品の写し</summary>
 /// <param name="ProductId">商品</param>

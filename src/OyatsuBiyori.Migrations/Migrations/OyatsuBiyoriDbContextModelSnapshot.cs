@@ -1229,6 +1229,10 @@ namespace OyatsuBiyori.Migrations.Migrations
                     b.Property<string>("Note")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("OrderChecks")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RequestText")
                         .HasColumnType("TEXT");
 

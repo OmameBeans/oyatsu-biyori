@@ -57,7 +57,7 @@ public sealed class FakeFlyerReader(IHostEnvironment environment, IConfiguration
     {
         "しょっぱいもの" => SnackType.Salty,
         "あまいもの" => SnackType.Sweet,
-        "のどごしのいいもの" => SnackType.Smooth,
+        "デザート・飲料" => SnackType.Smooth,
         "対象外" => SnackType.NotSnack,
         _ => null,
     };
@@ -142,10 +142,45 @@ public sealed class FakeBudgetFitExplainer : IBudgetFitExplainer
 /// <summary>
 /// E2E 用の偽の献立づくり。道具（本物の Biz）で候補を探し、日ごとに2品ずつ順に入れて submit_menu に出す。
 /// 受け付けられなければ、問題の商品を外して出し直す（本物と同じく、検証は Biz が行う）。
+/// チャットで「？」で終わる文章は質問として、submit_menu を出さずに Markdown の返答を少しずつ流す（D-91）。
 /// </summary>
 public sealed class FakeMenuPlannerAgent : IMenuPlannerAgent
 {
-    public Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, CancellationToken cancellationToken)
+    /// <summary>E2E の偽の質問への返答（Markdown）</summary>
+    public const string AnswerText = "今週の献立について、お答えします（E2E の偽の返答）。\n\n- **しょっぱいもの・あまいもの**と、デザート・飲料を組み合わせています\n- 金額は、画面の週の実績で確かめてください\n\n献立は変えていません。";
+
+    public async Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken)
+    {
+        var text = request.RequestText?.Trim() ?? string.Empty;
+        if (request.Mode == MenuAgentMode.Chat && (text.EndsWith('？') || text.EndsWith('?')))
+        {
+            await StreamAsync(AnswerText, progress, cancellationToken);
+            return Result<MenuAgentRunResult>.Ok(new MenuAgentRunResult(false, 1, AnswerText));
+        }
+
+        var result = Submit(request, tools);
+        if (request.Mode == MenuAgentMode.Chat && tools.IsAccepted)
+        {
+            const string explanation = "ご依頼に合わせて、商品を組み直しました（E2E の偽の返答）。\n\n- **変えたところ**：日ごとの商品";
+            await StreamAsync(explanation, progress, cancellationToken);
+            return Result<MenuAgentRunResult>.Ok(result with { ReplyText = explanation });
+        }
+
+        return Result<MenuAgentRunResult>.Ok(result);
+    }
+
+    /// <summary>本物と同じく、文章を少しずつ報告する</summary>
+    private static async Task StreamAsync(string text, IJobProgress progress, CancellationToken cancellationToken)
+    {
+        for (var length = 0; length < text.Length;)
+        {
+            length = Math.Min(text.Length, length + 8);
+            progress.ReportText(text[..length]);
+            await Task.Delay(40, cancellationToken);
+        }
+    }
+
+    private static MenuAgentRunResult Submit(MenuAgentRequest request, IMenuAgentTools tools)
     {
         using var document = JsonDocument.Parse(tools.SearchProducts(null, null));
         var candidates = document.RootElement.GetProperty("products").EnumerateArray()
@@ -172,7 +207,7 @@ public sealed class FakeMenuPlannerAgent : IMenuPlannerAgent
                 ids.Add(smooth[i % smooth.Count]);
             }
 
-            return new MenuAgentProposalDay(date, ids, "しょっぱいもの・あまいものと、のどごしのいいものを組み合わせました");
+            return new MenuAgentProposalDay(date, ids, "しょっぱいもの・あまいものと、デザート・飲料を組み合わせました");
         }).ToList();
 
         // 本物と同じく check_budget で金額を確かめ、週の予算を超えるあいだは、後ろの日から2品目を外す（予算に少し届かない状態になる）
@@ -204,6 +239,6 @@ public sealed class FakeMenuPlannerAgent : IMenuPlannerAgent
             : "候補の中から、分類が偏らないように選びました（E2E の偽の返答）";
         var iterations = 1;
         tools.SubmitMenu(new MenuAgentSubmission(new MenuAgentProposal(days, []), interpreted, [], explanation, false));
-        return Task.FromResult(Result<MenuAgentRunResult>.Ok(new MenuAgentRunResult(tools.IsAccepted, iterations)));
+        return new MenuAgentRunResult(tools.IsAccepted, iterations);
     }
 }

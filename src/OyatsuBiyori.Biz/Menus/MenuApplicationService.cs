@@ -108,6 +108,62 @@ public sealed class MenuApplicationService(
             thisWeek));
     }
 
+    /// <summary>
+    /// 献立一覧のカレンダー（SC-11。FR-LIST-03）。month（yyyy-MM。省略したら今月）の月を含む週（月曜〜日曜）の、献立のある日の中身を返す。
+    /// 判定は今のマスタ・記録で求め直す（献立一覧の件数と同じ）。週ごとの状態・金額は献立一覧（ListAsync）の行を使う。
+    /// </summary>
+    public async Task<Result<MenuCalendarView>> CalendarAsync(string? month)
+    {
+        var (context, _) = await _contextFactory.ForAllProductsAsync();
+        var today = context.Today;
+        DateOnly first;
+        if (string.IsNullOrEmpty(month))
+        {
+            first = new DateOnly(today.Year, today.Month, 1);
+        }
+        else if (!DateOnly.TryParseExact(month + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out first))
+        {
+            return Result<MenuCalendarView>.Error("月の指定が正しくありません。献立一覧から開き直してください");
+        }
+
+        // 日付の上限・下限で計算が例外にならないよう、扱う年を決めておく
+        if (first.Year < 2000 || first.Year > 2100)
+        {
+            return Result<MenuCalendarView>.Error("月の指定が正しくありません。献立一覧から開き直してください");
+        }
+
+        var from = JapanDate.WeekStart(first);
+        var to = JapanDate.WeekStart(first.AddMonths(1).AddDays(-1)).AddDays(6);
+        var menus = await _menus.GetAllAsync();
+        var days = menus
+            .SelectMany(menu => menu.Days.Where(d => d.Date >= from && d.Date <= to).Select(day => (menu, day)))
+            .OrderBy(x => x.day.Date)
+            .Select(x => new CalendarDayView(
+                x.day.Date,
+                x.menu.Id,
+                x.menu.Status,
+                x.day.DayType,
+                x.day.Label,
+                x.day.ChildrenCount,
+                x.day.Items
+                    .OrderBy(i => context.FindProduct(i.ProductId)?.SnackType ?? SnackType.NotSnack)
+                    .ThenBy(i => i.Id, StringComparer.Ordinal)
+                    .Select(item =>
+                    {
+                        // 商品が見つからなければ 🔴 使えませんにする（一覧の件数と同じ扱い。区分はサーバーで決め、画面はそのまま出す）
+                        var product = context.FindProduct(item.ProductId);
+                        var judgement = product is null ? null : context.Judge(product);
+                        return new CalendarItemView(
+                            product?.Name ?? "（商品が見つかりません）",
+                            judgement?.Category ?? AllergenJudgementCategory.Blocked,
+                            product is null ? null : AllergenJudgementView.From(product, judgement!, today));
+                    })
+                    .ToList()))
+            .ToList();
+
+        return Result<MenuCalendarView>.Ok(new MenuCalendarView(first.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture), from, to, today, days));
+    }
+
     /// <summary>「パッケージで確認する商品」か（🟡 と、情報がないため 🔴 の商品。03 §6.3）</summary>
     public static bool NeedsPackageCheck(AllergenJudgement judgement) =>
         judgement.Category == AllergenJudgementCategory.Warning
@@ -120,27 +176,22 @@ public sealed class MenuApplicationService(
         var blocked = 0;
         var warning = 0;
         var recheck = 0;
+        // 1つの商品は1つの種類だけに数える（同じ商品が2つのバッジに出ないように。D-90）。分け方は商品の確認のダイアログ・日ごとのカードと同じ
         foreach (var item in items)
         {
-            var product = context.FindProduct(item.ProductId);
-            if (product is null)
+            switch (MenuConfirmationChecker.ClassifyIssue(menu.Status, item, context))
             {
-                blocked++;
-                continue;
-            }
-
-            var judgement = context.Judge(product);
-            if (judgement.Category == AllergenJudgementCategory.Blocked)
-            {
-                blocked++;
-            }
-            else if (judgement.Category == AllergenJudgementCategory.Warning)
-            {
-                warning++;
-                if (menu.Status == MenuStatus.Confirmed && !MenuConfirmationChecker.IsAcknowledged(item, judgement, context.Fingerprint(product)))
-                {
+                case MenuItemIssueKind.Blocked:
+                    blocked++;
+                    break;
+                case MenuItemIssueKind.Recheck:
                     recheck++;
-                }
+                    break;
+                case MenuItemIssueKind.Warning:
+                    warning++;
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -424,7 +475,7 @@ public sealed class MenuApplicationService(
             {
                 if (!Enum.IsDefined(dayType.Value))
                 {
-                    return Result.Error("日の種類を選び直してください");
+                    return Result.Error("種別を選び直してください");
                 }
 
                 if (day.DayType != dayType.Value)
@@ -604,6 +655,43 @@ public sealed class MenuApplicationService(
 
             return Task.FromResult(new Result());
         });
+    }
+
+    /// <summary>
+    /// 注文リストの「注文した」のチェックを付ける・外す（FR-MENU-35）。確定済みの献立だけ。
+    /// 献立の中身は変えないので、下書きに戻さず、row_version の照合もしない（PC とスマホで別々にチェックしてもよい）。
+    /// チャットで組み直している間は、組み直しの保存がぶつからないように止める。「入れられない」の商品には付けない（SR-17）。
+    /// </summary>
+    public async Task<Result<MenuDetailView>> SetOrderedAsync(string? menuId, string? productId, string? orderNo, bool isOrdered)
+    {
+        var menu = string.IsNullOrEmpty(menuId) ? null : await _menus.GetAsync(menuId);
+        if (menu is null)
+        {
+            return Result<MenuDetailView>.Error(NotFound);
+        }
+
+        if (menu.Status != MenuStatus.Confirmed)
+        {
+            return Result<MenuDetailView>.Error("注文リストは、献立を確定してから使えます。献立を確定してください");
+        }
+
+        if (IsProposalRunning(menu.Id))
+        {
+            return Result<MenuDetailView>.Error(Running);
+        }
+
+        var context = await _contextFactory.ForMenuAsync(menu);
+        var user = await _userContext.GetCurrentUserInfoAsync();
+        var result = OrderListBuilder.SetOrdered(menu, productId, orderNo, isOrdered, _timeProvider.GetUtcNow().UtcDateTime, user?.UserId, id => IsBlockedForOrder(menu, id, context));
+        if (result.HasError)
+        {
+            return Result<MenuDetailView>.Error(result.ErrorMessages[0]);
+        }
+
+        await TouchAsync(menu);
+        await _unitOfWork.SaveChangesAsync();
+        await _menus.RefreshRowVersionAsync(menu);
+        return Result<MenuDetailView>.Ok(await BuildDetailAsync(menu));
     }
 
     /// <summary>確定のダイアログの中身（T4-11）。判定は呼ぶたびに求め直す</summary>
@@ -854,9 +942,8 @@ public sealed class MenuApplicationService(
                 {
                     var product = context.FindProduct(item.ProductId);
                     var judgement = product is null ? null : context.Judge(product);
-                    var needsRecheck = product is not null && judgement!.Category == AllergenJudgementCategory.Warning
-                        && item.AcknowledgedAt is not null
-                        && !MenuConfirmationChecker.IsAcknowledged(item, judgement, context.Fingerprint(product));
+                    // 確認の種類は献立一覧の件数と同じ分け方（D-90）。確認し直しは確定済みの献立だけ
+                    var issueKind = MenuConfirmationChecker.ClassifyIssue(menu.Status, item, context);
                     return new MenuItemView(
                         item.Id,
                         item.ProductId,
@@ -870,7 +957,8 @@ public sealed class MenuApplicationService(
                         item.OrderNo,
                         product is null ? null : AllergenJudgementView.From(product, judgement!, context.Today),
                         product is not null && judgement!.Category == AllergenJudgementCategory.Warning && MenuConfirmationChecker.IsAcknowledged(item, judgement, context.Fingerprint(product)),
-                        needsRecheck,
+                        issueKind == MenuItemIssueKind.Recheck,
+                        issueKind,
                         product is null ? null : context.Fingerprint(product));
                 })
                 .ToList();
@@ -909,7 +997,15 @@ public sealed class MenuApplicationService(
             days,
             new WeekAmountView(week.Total, week.Budget, week.Remaining, week.IsOverBudget, week.IsUnderBudget),
             validation.Issues.Select(i => new MenuIssueView(i.Severity, i.Kind, i.Date, i.MenuItemId, i.ProductId, i.ProductName, i.Message, i.BlocksConfirmation)).ToList(),
-            messages.Select(m => new MenuMessageView(m.Role, m.Content, m.CreatedAt)).ToList());
+            messages.Select(m => new MenuMessageView(m.Role, m.Content, m.CreatedAt)).ToList(),
+            OrderListBuilder.Build(menu, id => context.FindProduct(id)?.Name, id => IsBlockedForOrder(menu, id, context)));
+    }
+
+    /// <summary>注文リストの行が「入れられない」か（商品が見つからない・判定が入れられない。ClassifyIssue と同じ基準）</summary>
+    private static bool IsBlockedForOrder(Menu menu, string productId, MenuContext context)
+    {
+        var item = menu.Days.SelectMany(d => d.Items).First(i => i.ProductId == productId);
+        return MenuConfirmationChecker.ClassifyIssue(menu.Status, item, context) == MenuItemIssueKind.Blocked;
     }
 
     /// <summary>
@@ -967,6 +1063,15 @@ public sealed record MenuListRow(
     string? RelativeLabel,
     bool IsOverBudget);
 
+/// <summary>献立一覧のカレンダー（SC-11）。From〜To は月を含む週の月曜〜日曜</summary>
+public sealed record MenuCalendarView(string Month, DateOnly From, DateOnly To, DateOnly Today, IReadOnlyList<CalendarDayView> Days);
+
+/// <summary>カレンダーの1日（献立のある日だけ）</summary>
+public sealed record CalendarDayView(DateOnly Date, string MenuId, MenuStatus Status, DayType DayType, string? Label, int ChildrenCount, IReadOnlyList<CalendarItemView> Items);
+
+/// <summary>カレンダーの1日の商品。Category は表示する区分（商品が見つからなければ Blocked）。Judgement が null なら商品が見つからない</summary>
+public sealed record CalendarItemView(string ProductName, AllergenJudgementCategory Category, AllergenJudgementView? Judgement);
+
 /// <summary>使えなくなった商品を使う献立の日</summary>
 public sealed record BlockedUsageView(string MenuId, DateOnly WeekStart, DateOnly Date, string ProductName, AllergenJudgementView? Judgement);
 
@@ -1020,7 +1125,8 @@ public sealed record MenuDetailView(
     IReadOnlyList<MenuDayView> Days,
     WeekAmountView Week,
     IReadOnlyList<MenuIssueView> Issues,
-    IReadOnlyList<MenuMessageView> Messages);
+    IReadOnlyList<MenuMessageView> Messages,
+    OrderList OrderList);
 
 /// <summary>日ごとの献立</summary>
 public sealed record MenuDayView(
@@ -1053,6 +1159,7 @@ public sealed record MenuItemView(
     AllergenJudgementView? Judgement,
     bool IsAcknowledged,
     bool NeedsRecheck,
+    MenuItemIssueKind IssueKind,
     string? JudgementFingerprint);
 
 /// <summary>週の金額</summary>

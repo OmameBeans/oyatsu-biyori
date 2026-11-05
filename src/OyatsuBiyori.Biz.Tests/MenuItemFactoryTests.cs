@@ -104,11 +104,11 @@ public class MenuItemFactoryTests
     }
 
     [Fact]
-    public void 手作りの日に入れた商品の金額は0()
+    public void おやつなしの日に入れた商品の金額は0()
     {
         var cookie = Safe("さくさくクッキー");
         var menu = NewMenu(20000, 50, (cookie, 298));
-        menu.Days[0].DayType = DayType.Handmade;
+        menu.Days[0].DayType = DayType.NoSnack;
 
         var item = MenuItemFactory.Create(menu.Days[0], cookie, menu.ListedProducts[0]).Value!;
 

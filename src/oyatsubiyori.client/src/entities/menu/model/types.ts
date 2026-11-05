@@ -1,6 +1,33 @@
 import type { AllergenJudgement } from '../../../shared/type';
-import type { DayType, MenuStatus, SnackType } from '../../../shared/type';
+import type { DayType, MenuItemIssue, MenuStatus, SnackType } from '../../../shared/type';
 import type { JobStatus } from '../../../shared/api';
+
+/** 献立一覧のカレンダー（SC-11）。from〜to は月を含む週の月曜〜日曜 */
+export interface MenuCalendar {
+    month: string;
+    from: string;
+    to: string;
+    today: string;
+    days: CalendarDay[];
+}
+
+/** カレンダーの1日（献立のある日だけ） */
+export interface CalendarDay {
+    date: string;
+    menuId: string;
+    status: MenuStatus;
+    dayType: DayType;
+    label: string | null;
+    childrenCount: number;
+    items: CalendarItem[];
+}
+
+/** カレンダーの1日の商品。category は表示する区分（サーバーが決める。商品が見つからなければ Blocked）。judgement が null なら商品が見つからない */
+export interface CalendarItem {
+    productName: string;
+    category: AllergenJudgement['category'];
+    judgement: AllergenJudgement | null;
+}
 
 /** 献立一覧の1週 */
 export interface MenuListRow {
@@ -103,6 +130,8 @@ export interface MenuItem {
     judgement: AllergenJudgement | null;
     isAcknowledged: boolean;
     needsRecheck: boolean;
+    /** 確認の種類（サーバーが決める。D-90） */
+    issueKind: MenuItemIssue;
     judgementFingerprint: string | null;
 }
 
@@ -169,6 +198,49 @@ export interface MenuDetail {
     week: { total: number; budget: number; remaining: number; isOverBudget: boolean; isUnderBudget: boolean };
     issues: MenuIssue[];
     messages: MenuMessage[];
+    /** 注文リスト（サーバーが集計する。FR-MENU-35） */
+    orderList: OrderList;
+}
+
+/** 注文リストの1行 */
+export interface OrderListLine {
+    orderNo: string | null;
+    productId: string;
+    productName: string;
+    /** 必要なパック数（その週の合計） */
+    packCount: number;
+    amount: number;
+    /** 使う日 */
+    dates: string[];
+    /** 注文したか（QuantityChanged：チェックしたあとでパック数が変わった） */
+    state: OrderLineState;
+    /** チェックしたときのパック数 */
+    orderedPackCount: number | null;
+    orderedAt: string | null;
+    /** 判定が「入れられない」か商品が見つからない（注文してはいけない。サーバーが決める） */
+    isBlocked: boolean;
+}
+
+/** 注文リストの行の状態 */
+export type OrderLineState = 'NotOrdered' | 'Ordered' | 'QuantityChanged';
+
+/** 「注文した」のチェックを付ける・外す */
+export interface OrderedInput {
+    productId: string;
+    orderNo: string | null;
+    isOrdered: boolean;
+}
+
+/** 注文リスト（通常の日の商品を、注文番号・商品ごとにまとめたもの） */
+export interface OrderList {
+    lines: OrderListLine[];
+    totalPackCount: number;
+    totalAmount: number;
+    missingOrderNoCount: number;
+    orderedCount: number;
+    quantityChangedCount: number;
+    /** 「入れられない」の行の数 */
+    blockedCount: number;
 }
 
 /** 確定のダイアログ */

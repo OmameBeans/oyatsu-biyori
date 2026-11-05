@@ -58,7 +58,7 @@
       "code": "8107", "age": "1歳半から", "origin": "製造長野。", "next": "10月4日", "maker": "うさぎ乳業", "shelf": "6カ月",
       "name": "うさぎのミミ いちごゼリー", "volume": "6個入", "priceExcludingTax": 258,
       "description": "果汁20%の、ぷるんとしたいちごゼリー。1個（70g）52kcal。",
-      "allergenLabel": null, "piecesPerPackCandidates": [6], "snackCategory": "のどごしのいいもの",
+      "allergenLabel": null, "piecesPerPackCandidates": [6], "snackCategory": "デザート・飲料",
       "package": { "color": "#ef7f9a", "icon": "🐰" }
     },
     {
@@ -97,7 +97,7 @@
       "name": "りんごとにんじん 100", "volume": "100ml×3", "priceExcludingTax": 180,
       "unitPrice": "1本",
       "description": "国産にんじんとりんごをミックスした、すっきりした味わいのジュース。果汁50%・野菜汁50%。1本（100ml）44kcal。",
-      "allergenLabel": null, "piecesPerPackCandidates": [3], "snackCategory": "のどごしのいいもの",
+      "allergenLabel": null, "piecesPerPackCandidates": [3], "snackCategory": "デザート・飲料",
       "package": { "color": "#f08a3c", "icon": "🍎" }
     },
     {
@@ -105,7 +105,7 @@
       "name": "のむヨーグルト いちご", "volume": "125ml×6", "priceExcludingTax": 398,
       "unitPrice": "1本", "chilled": true,
       "description": "生乳を使った、まろやかなのむヨーグルト。いちご果汁入り。1本（125ml）86kcal。",
-      "allergenLabel": ["乳"], "piecesPerPackCandidates": [6], "snackCategory": "のどごしのいいもの",
+      "allergenLabel": ["乳"], "piecesPerPackCandidates": [6], "snackCategory": "デザート・飲料",
       "package": { "color": "#f4a7b9", "icon": "🍓" }
     },
     {
@@ -122,7 +122,7 @@
       "name": "くまのポッケ フルーツオレ", "volume": "200ml×12", "priceExcludingTax": 998,
       "unitPrice": "1本", "bulk": "箱でお届け", "stickers": ["次回より値上げ"],
       "description": "3種のくだもの果汁とミルクをあわせた、やさしい甘さのドリンク。1本（200ml）112kcal。",
-      "allergenLabel": ["乳"], "piecesPerPackCandidates": [12], "snackCategory": "のどごしのいいもの",
+      "allergenLabel": ["乳"], "piecesPerPackCandidates": [12], "snackCategory": "デザート・飲料",
       "package": { "color": "#f2b552", "icon": "🐻" }
     },
     {

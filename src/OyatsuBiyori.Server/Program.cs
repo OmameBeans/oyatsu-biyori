@@ -118,7 +118,7 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 
 // 存在しない API に index.html を返さない（画面のルートだけ index.html に戻す）
-app.Map("/api/{**path}", () => Results.NotFound(Result.Error("その操作は見つかりませんでした。画面を読み込み直してください。")));
+app.Map("/api/{**path}", () => Results.NotFound(Result.Error("エラーが発生しました。読み込み直してください。")));
 app.MapFallbackToFile("/index.html").AllowAnonymous();
 
 app.Run();

@@ -69,14 +69,14 @@ public class MenuValidatorTests
     }
 
     [Fact]
-    public void 手作りの日や人数0の日でも入れられない商品はエラー()
+    public void おやつなしの日や人数0の日でも入れられない商品はエラー()
     {
         var (menu, products) = CleanMenu();
         var egg = ReferenceOnly("たまごボーロ", SnackType.Sweet, 10, "egg");
         menu.ListedProducts.Add(new ListedProduct(egg.Id, 198, "2222"));
         Put(menu, 3, egg);
         Put(menu, 4, egg);
-        menu.Days[3].DayType = DayType.Handmade;
+        menu.Days[3].DayType = DayType.NoSnack;
         menu.Days[4].ChildrenCount = 0;
 
         var result = MenuValidator.Validate(menu, Context([.. products, egg], Avoid("egg")));
@@ -156,12 +156,12 @@ public class MenuValidatorTests
     }
 
     [Fact]
-    public void 通常の日が0品なら警告し手作りの日が0品なら警告しない()
+    public void 通常の日が0品なら警告しおやつなしの日が0品なら警告しない()
     {
         var (menu, products) = CleanMenu();
         menu.Days[0].Items.Clear();
         menu.Days[1].Items.Clear();
-        menu.Days[1].DayType = DayType.Handmade;
+        menu.Days[1].DayType = DayType.NoSnack;
 
         var result = MenuValidator.Validate(menu, Context(products));
 
@@ -171,7 +171,7 @@ public class MenuValidatorTests
     }
 
     [Fact]
-    public void 手作りやおやつなしの日に商品があれば金額に含まれていないと警告する()
+    public void おやつなしの日に商品があれば金額に含まれていないと警告する()
     {
         var (menu, products) = CleanMenu();
         menu.Days[2].DayType = DayType.NoSnack;
@@ -186,11 +186,11 @@ public class MenuValidatorTests
     }
 
     [Fact]
-    public void 手作りの日の商品には足りないパック数の警告を重ねない()
+    public void おやつなしの日の商品には足りないパック数の警告を重ねない()
     {
         var (menu, products) = CleanMenu();
         MenuItemFactory.SetPackCount(menu.Days[0].Items[0], menu.Days[0], 1);
-        menu.Days[0].DayType = DayType.Handmade;
+        menu.Days[0].DayType = DayType.NoSnack;
 
         var warning = Assert.Single(MenuValidator.Validate(menu, Context(products)).Warnings);
 

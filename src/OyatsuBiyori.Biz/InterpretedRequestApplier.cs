@@ -167,7 +167,7 @@ public static class InterpretedRequestApplier
             {
                 if (!Enum.IsDefined(dayType))
                 {
-                    result.NotApplied.Add(new RejectedRequest($"{label}の日の種類", "日の種類が読み取れませんでした"));
+                    result.NotApplied.Add(new RejectedRequest($"{label}の種別", "種別が読み取れませんでした"));
                 }
                 else if (day.DayTypeEdited && !overwrite)
                 {

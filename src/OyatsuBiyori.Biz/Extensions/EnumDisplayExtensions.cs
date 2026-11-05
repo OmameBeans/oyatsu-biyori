@@ -80,7 +80,7 @@ public static class EnumDisplayExtensions
     {
         SnackType.Salty => "しょっぱいもの",
         SnackType.Sweet => "あまいもの",
-        SnackType.Smooth => "のどごしのいいもの",
+        SnackType.Smooth => "デザート・飲料",
         SnackType.NotSnack => "対象外",
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };
@@ -97,7 +97,6 @@ public static class EnumDisplayExtensions
     public static string ToDisplayString(this DayType value) => value switch
     {
         DayType.Normal => "通常",
-        DayType.Handmade => "手作り",
         DayType.NoSnack => "おやつなし",
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };

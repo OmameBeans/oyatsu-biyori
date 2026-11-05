@@ -99,7 +99,7 @@ export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps)
                     </Typography>
                     <TextField
                         select
-                        label="日の種類"
+                        label="種別"
                         value={day.dayType}
                         disabled={isPending}
                         onChange={(event) =>

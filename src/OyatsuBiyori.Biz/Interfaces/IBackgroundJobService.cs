@@ -25,7 +25,23 @@ public interface IBackgroundJobService
 
     /// <summary>対象に結びついた、いちばん新しい「終わった」処理の状態（あとの処理が失敗しても、前の結果を見失わないため）</summary>
     BackgroundJobStatus? FindLatestSucceeded(string kind, string ownerKey);
+
+    /// <summary>
+    /// 処理の段階名と返答の文章を、変わるたびに流す（チャットの返答をパラパラ出すため）。
+    /// 最初に今の状態を1回流し、処理が終わったら最後の状態を流して止まる。見つからない ID は「失敗（再起動）」を1回流して止まる。
+    /// </summary>
+    IAsyncEnumerable<BackgroundJobStreamEvent> StreamAsync(string id, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// 処理の流れの1件。返答の文章は、Offset の位置から後ろを Delta で置き換える（再試行で書き直したときも、同じ形で直せる）。
+/// </summary>
+/// <param name="State">処理の状態</param>
+/// <param name="Stage">今の段階名</param>
+/// <param name="Offset">Delta を置く位置（それより後ろの文字は捨てる）</param>
+/// <param name="Delta">足す文章</param>
+/// <param name="ErrorMessages">失敗したときのメッセージ</param>
+public sealed record BackgroundJobStreamEvent(BackgroundJobState State, string? Stage, int Offset, string Delta, IReadOnlyList<string> ErrorMessages);
 
 /// <summary>バックグラウンドの処理の本体</summary>
 /// <param name="services">処理ごとのスコープのサービス（DbContext などはここから取る）</param>
@@ -38,6 +54,9 @@ public interface IJobProgress
 {
     /// <summary>今の段階名を報告する（例：「チラシを読み取っています」）</summary>
     void Report(string stage);
+
+    /// <summary>今の返答の文章（ここまでの全文）を報告する。Claude の文章なので、画面ではテキストか安全な Markdown としてだけ出す</summary>
+    void ReportText(string text);
 }
 
 /// <summary>処理の状態</summary>

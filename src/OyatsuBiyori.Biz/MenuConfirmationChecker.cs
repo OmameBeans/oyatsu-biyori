@@ -6,11 +6,37 @@ namespace OyatsuBiyori.Biz;
 /// 献立を確定できるかの判定（FR-MENU-32、SR-04・SR-21・SR-22、D-78、T1-16）。
 /// - 確定を止める：入れられない商品・価格か入数がない商品・掲載品にない商品（存在しない商品も）。職員の確認でも確定できない
 /// - 確認が要る：判定が「警告」の商品。確認したときの判定の種類と中身（指紋）が今と同じときだけ確認済みとみなす
-/// - 表示だけ：候補から外した商品・重複・予算超過・0品の日・手作り / おやつなしの日の商品・足りないパック数
+/// - 表示だけ：候補から外した商品・重複・予算超過・0品の日・おやつなしの日の商品・足りないパック数
 /// 判定はこの関数を呼ぶたびに求め直す（確定ボタンを押した時点でも呼び直すこと）。
 /// </summary>
 public static class MenuConfirmationChecker
 {
+    /// <summary>
+    /// 献立の商品の確認の種類（D-90）。献立一覧のバッジの件数・商品の確認のダイアログ・日ごとのカードの「確認し直し」は、すべてこれで分ける。
+    /// 商品が見つからないか判定が「入れられない」なら Blocked。判定が「警告」で、確定済みの献立で今の判定に対して確認が済んでいなければ Recheck
+    /// （確定のときは安全で確認していなかった商品が、あとで警告になった場合も含む）、それ以外の警告は Warning。
+    /// </summary>
+    public static MenuItemIssueKind ClassifyIssue(MenuStatus status, MenuItem item, MenuContext context)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var product = context.FindProduct(item.ProductId);
+        if (product is null)
+        {
+            return MenuItemIssueKind.Blocked;
+        }
+
+        var judgement = context.Judge(product);
+        return judgement.Category switch
+        {
+            AllergenJudgementCategory.Blocked => MenuItemIssueKind.Blocked,
+            AllergenJudgementCategory.Warning when status == MenuStatus.Confirmed && !IsAcknowledged(item, judgement, context.Fingerprint(product)) => MenuItemIssueKind.Recheck,
+            AllergenJudgementCategory.Warning => MenuItemIssueKind.Warning,
+            _ => MenuItemIssueKind.None,
+        };
+    }
+
     /// <summary>確定できるかを調べる</summary>
     public static MenuConfirmationResult Check(Menu menu, MenuContext context)
     {
@@ -137,4 +163,20 @@ public sealed class MenuConfirmationResult(
 
     /// <summary>確定できるか：止めるエラーがなく、警告の商品をすべて今の判定のまま確認済み</summary>
     public bool CanConfirm => BlockingIssues.Count == 0 && Acknowledgements.All(a => a.IsAcknowledged);
+}
+
+/// <summary>献立の商品の確認の種類（D-90）</summary>
+public enum MenuItemIssueKind
+{
+    /// <summary>確認は要らない（🟢）</summary>
+    None,
+
+    /// <summary>🔴 使えません（商品が見つからないものも）</summary>
+    Blocked,
+
+    /// <summary>確認し直し（確定済みの献立で、今の判定に対して確認が済んでいない 🟡）</summary>
+    Recheck,
+
+    /// <summary>🟡 要確認（確認し直し以外の 🟡）</summary>
+    Warning,
 }

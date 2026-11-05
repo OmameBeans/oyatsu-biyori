@@ -67,9 +67,8 @@ public class MenuAmountCalculatorTests
     }
 
     [Theory]
-    [InlineData(DayType.Handmade)]
     [InlineData(DayType.NoSnack)]
-    public void 手作りとおやつなしの日は商品があっても金額0で金額に含まれていない印(DayType dayType)
+    public void おやつなしの日は商品があっても金額0で金額に含まれていない印(DayType dayType)
     {
         var day = Day(dayType, 45, Item("a", 398, 5));
 
@@ -81,9 +80,9 @@ public class MenuAmountCalculatorTests
     }
 
     [Fact]
-    public void 手作りの日に商品がなければ金額に含まれていない印は立たない()
+    public void おやつなしの日に商品がなければ金額に含まれていない印は立たない()
     {
-        var result = MenuAmountCalculator.CalculateDay(Day(DayType.Handmade, 45), _ => 10);
+        var result = MenuAmountCalculator.CalculateDay(Day(DayType.NoSnack, 45), _ => 10);
 
         Assert.False(result.ExcludedFromAmount);
     }
@@ -127,7 +126,7 @@ public class MenuAmountCalculatorTests
         var menu = new Menu { WeeklyBudget = 5000 };
         menu.Days.Add(Day(DayType.Normal, 45, Item("a", 398, 5)));
         menu.Days.Add(Day(DayType.Normal, 45, Item("b", 500, 6)));
-        menu.Days.Add(Day(DayType.Handmade, 45, Item("c", 1000, 5)));
+        menu.Days.Add(Day(DayType.NoSnack, 45, Item("c", 1000, 5)));
 
         var result = MenuAmountCalculator.CalculateWeek(menu, _ => 10);
 

@@ -10,6 +10,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { AllergenCategoryMark } from '../../../entities/allergen-judgement';
 import { ROUTE } from '../../../shared/type';
+import { AppIcon } from '../../../shared/ui';
 
 const STEPS: { title: string; text: ReactNode }[] = [
     { title: '撮る', text: 'コープのチラシを撮影するか、画像・PDF を選びます。商品・価格・アレルゲンの表記を読み取ります。' },
@@ -41,8 +42,9 @@ export const LandingPage = () => (
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
         <Box sx={{ background: (theme) => `linear-gradient(160deg, ${theme.palette.primary.light} 0%, ${theme.palette.background.default} 70%)`, py: { xs: 6, md: 10 } }}>
             <Container maxWidth="md">
-                <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '2rem', md: '2.6rem' }, mb: 2 }}>
-                    🍪 おやつ日和
+                <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '2rem', md: '2.6rem' }, mb: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <AppIcon size="1.4em" />
+                    おやつ日和
                 </Typography>
                 <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' }, mb: 4 }}>
                     チラシを撮るだけで、1週間分のおやつ献立案。

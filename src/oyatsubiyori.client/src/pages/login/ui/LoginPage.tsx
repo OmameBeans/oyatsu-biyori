@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { useAuthStatus, useLogin } from '../../../entities/auth';
 import { errorMessageOf } from '../../../shared/api';
 import { ROUTE } from '../../../shared/type';
+import { AppIcon } from '../../../shared/ui';
 
 /**
  * SC-01 ログイン（T2-05）。ログイン済みで開いたら献立一覧へ、初期パスワードのままならパスワード変更へ移す（履歴は置き換える）。
@@ -42,8 +43,9 @@ export const LoginPage = () => {
         <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', p: 2 }}>
             <Card sx={{ width: '100%', maxWidth: 400 }}>
                 <CardContent sx={{ p: 3 }}>
-                    <Typography variant="h1" component="h1" sx={{ mb: 0.5 }}>
-                        🍪 おやつ日和
+                    <Typography variant="h1" component="h1" sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AppIcon size="1.4em" />
+                        おやつ日和
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                         ログインしてください

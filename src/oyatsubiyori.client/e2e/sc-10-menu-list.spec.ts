@@ -34,6 +34,30 @@ test.describe('SC-10 献立一覧', () => {
         await expect(page.getByText(/確認し直し \d+件/).first()).toBeVisible();
     });
 
+    test('FR-MENU-34a 「確認し直し」のバッジを押すと、何をどう確認するかのダイアログが開き、確認し直しのチェックと確認の入口が出る', async ({ page }) => {
+        await page.goto('/menus');
+        await page.getByRole('button', { name: /^確認し直し \d+件$/ }).first().click();
+        const dialog = page.getByRole('dialog', { name: /の商品の確認$/ });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole('heading', { name: /^確認し直し \d+件$/ })).toBeVisible();
+        // 確認し直しのチェック（押すとダミーデータが変わり、スマホのテストに響くので押さない）
+        await expect(dialog.getByRole('button', { name: /^☐ / }).first()).toBeVisible();
+        // 確認の画面は別のタブで開く
+        await expect(dialog.getByRole('link', { name: /をパッケージで確認する（新しいタブで開く）$/ }).first()).toHaveAttribute('target', '_blank');
+        await dialog.getByRole('button', { name: '閉じる' }).click();
+        await expect(dialog).toHaveCount(0);
+    });
+
+    test('FR-LIST-00 「要確認」のバッジを押すと、バッジと同じ件数の商品と、パッケージで確認する入口が出る', async ({ page }) => {
+        await page.goto('/menus');
+        const badge = page.getByRole('button', { name: /^要確認 \d+件$/ }).first();
+        const count = (await badge.textContent())?.match(/\d+/)?.[0];
+        await badge.click();
+        const dialog = page.getByRole('dialog', { name: /の商品の確認$/ });
+        await expect(dialog.getByRole('heading', { name: new RegExp(`要確認 ${count}件$`) })).toBeVisible();
+        await expect(dialog.getByRole('link', { name: /をパッケージで確認する（新しいタブで開く）$/ }).first()).toHaveAttribute('target', '_blank');
+    });
+
     test('SC-10 今日以降の献立で使う、パッケージで確認する商品があれば、上部に件数つきの注意を出す', async ({ page }) => {
         await page.goto('/menus');
         await expect(page.getByText(/今日以降の献立で使う、パッケージで確認する商品が\s*\d+件\s*あります/)).toBeVisible();

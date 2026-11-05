@@ -35,6 +35,13 @@ export const BlockedInMenuNotice = () => (
 );
 
 /**
+ * AI チャットの返答の下に出す注意（D-91・SR-18）。Claude の文章はアレルゲンの判定ではないため、判定は画面の表示とパッケージで確かめてもらう。
+ * 打ち消しの文なので、アイコンは付けない。
+ */
+export const AiAnswerAllergenNotice = () =>
+    `AI の返答はアレルゲンの判定ではありません。アレルゲンは、献立の「${CATEGORY_LABEL.Blocked}」「${CATEGORY_LABEL.Warning}」「${CATEGORY_LABEL.Safe}」の表示と、パッケージの原材料表示で確かめてください`;
+
+/**
  * パッケージ以外の情報源を選んだときの知らせ（FR-PROD-06b。画面に「参考」とは出さない）。
  * 「使えます にはならない」と打ち消す文なので、アイコンは付けない（緑のチェックを見て安全と読み違えないように）。
  */

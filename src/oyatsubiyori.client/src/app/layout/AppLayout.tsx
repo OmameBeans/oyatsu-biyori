@@ -26,7 +26,7 @@ import { useAuthStatus, useLogout } from '../../entities/auth';
 import { errorMessageOf } from '../../shared/api';
 import { readPreference, writePreference } from '../../shared/lib';
 import { PREFERENCE_KEY, ROUTE } from '../../shared/type';
-import { PageErrorBoundary } from '../../shared/ui';
+import { AppIcon, PageErrorBoundary } from '../../shared/ui';
 
 const DRAWER_WIDTH = 220;
 /**
@@ -76,6 +76,8 @@ const NAV_ITEMS = [
  * 選ばれていない項目にも同じ幅の透明な線を付け、文字の位置がずれないようにする。
  */
 const NAV_ITEM_SX = {
+    // 項目どうしの間が詰まって見えないよう、上下の内側を既定（8px）より広くする
+    py: 1.5,
     borderLeft: 4,
     borderLeftColor: 'transparent',
     '&.active': {
@@ -156,9 +158,7 @@ export const AppLayout = () => {
             <Toolbar disableGutters={isMini} sx={{ gap: 1, justifyContent: isMini ? 'center' : undefined }}>
                 {!isMini && (
                     <>
-                        <Typography component="span" sx={{ fontSize: 22 }} aria-hidden>
-                            🍪
-                        </Typography>
+                        <AppIcon size={32} />
                         <Typography variant="h3" component="span">
                             おやつ日和
                         </Typography>
@@ -209,7 +209,7 @@ export const AppLayout = () => {
                         onClick={handleLogout}
                         disabled={logout.isPending}
                         aria-label={isMini ? miniLogoutLabel : undefined}
-                        sx={{ mx: 1, pl: 1.5, pr: isMini ? 1 : undefined, borderRadius: 2 }}
+                        sx={{ mx: 1, pl: 1.5, pr: isMini ? 1 : undefined, py: isMini ? 1.5 : undefined, borderRadius: 2 }}
                     >
                         <ListItemIcon sx={{ minWidth: isMini ? 0 : 36 }}>
                             <LogoutIcon />
@@ -229,8 +229,11 @@ export const AppLayout = () => {
                     <IconButton edge="start" aria-label="メニューを開く" onClick={() => setIsDrawerOpen(true)} sx={{ mr: 1 }}>
                         <MenuIcon />
                     </IconButton>
+                    <Box sx={{ display: 'flex', mr: 1 }}>
+                        <AppIcon size={28} />
+                    </Box>
                     <Typography variant="h3" component="span">
-                        🍪 おやつ日和
+                        おやつ日和
                     </Typography>
                 </Toolbar>
             </AppBar>

@@ -17,12 +17,12 @@ public class InterpretedRequestApplierTests
 
         var result = InterpretedRequestApplier.ApplyRequest(menu, Request(
             new InterpretedDay(D(2), 30, null, null),
-            new InterpretedDay(D(3), null, DayType.Handmade, null),
+            new InterpretedDay(D(3), null, DayType.NoSnack, null),
             new InterpretedDay(D(4), null, null, "誕生日会")), DefaultChildren, _ => 10);
 
         Assert.Equal(30, menu.Days[2].ChildrenCount);
         Assert.Equal(ChildrenCountSource.FromRequest, menu.Days[2].ChildrenCountSource);
-        Assert.Equal(DayType.Handmade, menu.Days[3].DayType);
+        Assert.Equal(DayType.NoSnack, menu.Days[3].DayType);
         Assert.Equal("誕生日会", menu.Days[4].Label);
         Assert.Equal(3, result.Applied.Count);
         Assert.Empty(result.NotApplied);
@@ -42,7 +42,7 @@ public class InterpretedRequestApplierTests
 
         var result = InterpretedRequestApplier.ApplyRequest(menu, Request(
             new InterpretedDay(D(2), 30, null, null),
-            new InterpretedDay(D(3), null, DayType.Handmade, null),
+            new InterpretedDay(D(3), null, DayType.NoSnack, null),
             new InterpretedDay(D(4), null, null, "誕生日会")), DefaultChildren, _ => 10);
 
         Assert.Equal(45, menu.Days[2].ChildrenCount);
@@ -58,7 +58,7 @@ public class InterpretedRequestApplierTests
     {
         var menu = NewMenu(20000, DefaultChildren);
         InterpretedRequestApplier.ApplyRequest(menu, Request(
-            new InterpretedDay(D(2), 30, DayType.Handmade, "都民の日")), DefaultChildren, _ => 10);
+            new InterpretedDay(D(2), 30, DayType.NoSnack, "都民の日")), DefaultChildren, _ => 10);
 
         InterpretedRequestApplier.ApplyRequest(menu, Request(new InterpretedDay(D(4), null, null, "誕生日会")), DefaultChildren, _ => 10);
 
@@ -90,7 +90,7 @@ public class InterpretedRequestApplierTests
     public void 同じ要望をもう一度当てても変えた値はない()
     {
         var menu = NewMenu(20000, DefaultChildren);
-        var request = Request(new InterpretedDay(D(2), 30, DayType.Handmade, "都民の日"));
+        var request = Request(new InterpretedDay(D(2), 30, DayType.NoSnack, "都民の日"));
         InterpretedRequestApplier.ApplyRequest(menu, request, DefaultChildren, _ => 10);
 
         var again = InterpretedRequestApplier.ApplyRequest(menu, request, DefaultChildren, _ => 10);
@@ -197,13 +197,13 @@ public class InterpretedRequestApplierTests
     }
 
     [Fact]
-    public void 手作りの日になったら商品の金額は0になる()
+    public void おやつなしの日になったら商品の金額は0になる()
     {
         var cookie = Safe("さくさくクッキー");
         var menu = NewMenu(20000, DefaultChildren, (cookie, 300));
         var item = Put(menu, 3, cookie);
 
-        InterpretedRequestApplier.ApplyRequest(menu, Request(new InterpretedDay(D(3), null, DayType.Handmade, null)), DefaultChildren, _ => 10);
+        InterpretedRequestApplier.ApplyRequest(menu, Request(new InterpretedDay(D(3), null, DayType.NoSnack, null)), DefaultChildren, _ => 10);
 
         Assert.Equal(0, item.Amount);
     }
@@ -219,17 +219,17 @@ public class InterpretedRequestApplierTests
         menu.Days[2].ChildrenCountSource = ChildrenCountSource.EditedByStaff;
 
         var result = InterpretedRequestApplier.ApplyChat(menu,
-            [new InterpretedDay(D(1), 35, null, null), new InterpretedDay(D(2), 30, DayType.Handmade, null)],
+            [new InterpretedDay(D(1), 35, null, null), new InterpretedDay(D(2), 30, DayType.NoSnack, null)],
             new HashSet<DateOnly> { D(2) }, _ => 10);
 
         Assert.Equal("誕生日会", menu.Days[4].Label);
         Assert.Equal(45, menu.Days[1].ChildrenCount);
         Assert.Equal(30, menu.Days[2].ChildrenCount);
         Assert.Equal(ChildrenCountSource.FromRequest, menu.Days[2].ChildrenCountSource);
-        Assert.Equal(DayType.Handmade, menu.Days[2].DayType);
+        Assert.Equal(DayType.NoSnack, menu.Days[2].DayType);
         Assert.Single(result.KeptStaffEdits);
         Assert.Equal([D(2), D(4)], menu.InterpretedRequests!.Days.Select(d => d.Date));
-        Assert.Contains(menu.InterpretedRequests.Days, d => d.Date == D(2) && d.ChildrenCount == 30 && d.DayType == DayType.Handmade);
+        Assert.Contains(menu.InterpretedRequests.Days, d => d.Date == D(2) && d.ChildrenCount == 30 && d.DayType == DayType.NoSnack);
     }
 
     [Fact]

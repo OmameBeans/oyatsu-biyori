@@ -246,7 +246,6 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
 
     private static string DayTypeLabel(DayType dayType) => dayType switch
     {
-        DayType.Handmade => "手作り",
         DayType.NoSnack => "おやつなし",
         _ => "通常",
     };
@@ -255,7 +254,7 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
     {
         SnackType.Salty => "しょっぱいもの",
         SnackType.Sweet => "あまいもの",
-        SnackType.Smooth => "のどごしのいいもの",
+        SnackType.Smooth => "デザート・飲料",
         _ => "対象外",
     };
 }

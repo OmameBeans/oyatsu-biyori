@@ -54,7 +54,7 @@ public sealed class MenuProposalApplicationService(
     {
         if (string.IsNullOrWhiteSpace(message))
         {
-            return Result<string>.Error("直してほしいことを入れてください");
+            return Result<string>.Error("直してほしいことか、聞きたいことを入れてください");
         }
 
         if (message.Length > 1000)
@@ -132,6 +132,36 @@ public sealed class MenuProposalApplicationService(
         return Result<string>.Ok(jobId);
     }
 
+    /// <summary>
+    /// チャットの履歴を消す（献立・週の要望・読み取った方針は変えない）。次の依頼では、消したあとの履歴だけを Claude に渡す。
+    /// 献立を考えている途中は消さない（返答を保存する先がなくならないように）。
+    /// </summary>
+    public async Task<Result> ClearChatAsync(string? menuId)
+    {
+        var menu = string.IsNullOrEmpty(menuId) ? null : await _menus.GetAsync(menuId);
+        if (menu is null)
+        {
+            return Result.Error(NotFound);
+        }
+
+        await StartLock.WaitAsync();
+        try
+        {
+            if (IsProposalRunning(menu.Id))
+            {
+                return Result.Error("献立を考えている途中です。終わってから消してください");
+            }
+
+            _menus.RemoveMessages(await _menus.GetMessagesAsync(menu.Id));
+            await _unitOfWork.SaveChangesAsync();
+            return new Result();
+        }
+        finally
+        {
+            StartLock.Release();
+        }
+    }
+
     private static readonly SemaphoreSlim StartLock = new(1, 1);
 
     /// <summary>その献立で、献立案の作成・組み直しが動いているか（動いているあいだは手で直させない）</summary>
@@ -163,13 +193,13 @@ public sealed class MenuProposalApplicationService(
         var recent = await _menus.GetConfirmedInRangeAsync(from, to);
         var history = mode == MenuAgentMode.Chat ? await _menus.GetMessagesAsync(menu.Id) : [];
 
-        progress.Report(mode == MenuAgentMode.Create ? "要望を読み取って、献立を考えています" : "ご依頼に合わせて、献立を組み直しています");
+        progress.Report(mode == MenuAgentMode.Create ? "要望を読み取って、献立を考えています" : "ご依頼を読んでいます");
         var weekRequest = mode == MenuAgentMode.Chat ? MenuAgentTools.BuildWeekRequestText(menu) : null;
         var request = new MenuAgentRequest(mode, tools.BuildConditionsText(setting, recent), text, history, weekRequest);
         Result<MenuAgentRunResult> run;
         try
         {
-            run = await _agent.RunAsync(request, tools, cancellationToken);
+            run = await _agent.RunAsync(request, tools, progress, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -177,7 +207,14 @@ public sealed class MenuProposalApplicationService(
             run = Result<MenuAgentRunResult>.Error("時間がかかりすぎたため、途中で止めました。");
         }
 
+        var replyText = run.HasError ? string.Empty : run.Value?.ReplyText?.Trim() ?? string.Empty;
         var submission = tools.AcceptedSubmission ?? tools.LastSubmission;
+        if (submission is null && mode == MenuAgentMode.Chat && replyText.Length > 0)
+        {
+            // 案を出さずに文章だけで答えた ＝ 質問への返答。献立は変えない（確定済みも下書きに戻さない。D-91）
+            return await SaveAnswerAsync(menu, replyText);
+        }
+
         if (submission is null)
         {
             var error = new Result<MenuProposalOutcome>();
@@ -225,7 +262,10 @@ public sealed class MenuProposalApplicationService(
             _menus.RemoveMessages(await _menus.GetMessagesAsync(menu.Id));
         }
 
-        var message = new StringBuilder(string.IsNullOrWhiteSpace(submission.Explanation) ? "献立案を作りました。" : submission.Explanation.Trim());
+        // チャットでは、受け付けた案のときだけ、流した返答（何を変えたか）を残す。書けなかったとき・却下された案のときは
+        // submit_menu の説明とアプリの注記を使う（却下された案のあとの Claude の文章は、実際の献立と食い違うことがあるため）
+        var explanation = mode == MenuAgentMode.Chat && tools.IsAccepted && replyText.Length > 0 ? replyText : submission.Explanation?.Trim();
+        var message = new StringBuilder(string.IsNullOrWhiteSpace(explanation) ? "献立案を作りました。" : explanation);
         if (!tools.IsAccepted)
         {
             message.AppendLine().AppendLine().Append("※ 条件をすべて満たす案にできませんでした。");
@@ -266,6 +306,33 @@ public sealed class MenuProposalApplicationService(
         }
 
         return Result<MenuProposalOutcome>.Ok(new MenuProposalOutcome(tools.IsAccepted, removed, applied.NotApplied.Select(n => $"{n.Text}：{n.Reason}").ToList(), submission.IsBudgetFitRequest && mode == MenuAgentMode.Chat));
+    }
+
+    /// <summary>
+    /// 質問への返答を、チャットの履歴に残す（献立・状態・更新日時は変えない）。
+    /// 返答は Claude の文章なので、アレルゲンの判定・ステータスには使わない（NFR-SEC-11・SR-18）。
+    /// </summary>
+    /// <summary>
+    /// 質問への返答に、アプリが必ず書き足す注記（SR-18）。Claude が直す依頼を質問と読み違えて「外しました」と文章だけで答えても、
+    /// 献立は変わっていないことが分かるようにする
+    /// </summary>
+    public const string AnswerNote = "※ この返答では献立を変えていません（アプリの記録）。直したいときは「水曜を○○に替えて」のように頼んでください。";
+
+    private async Task<Result<MenuProposalOutcome>> SaveAnswerAsync(Menu menu, string replyText)
+    {
+        var user = await _userContext.GetCurrentUserInfoAsync();
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        _menus.AddMessage(new MenuMessage
+        {
+            MenuId = menu.Id,
+            Role = MenuMessageRole.Claude,
+            Content = $"{replyText.TrimEnd()}\n\n{AnswerNote}",
+            CreatedAt = now,
+            UpdateDateTime = now,
+            UpdateUserId = user?.UserId,
+        });
+        await _unitOfWork.SaveChangesAsync(CancellationToken.None);
+        return Result<MenuProposalOutcome>.Ok(new MenuProposalOutcome(false, [], [], false, IsAnswer: true));
     }
 
     /// <summary>予算に合わせる案を受け付ける（予算に届かないときだけ。D-67）</summary>
@@ -458,7 +525,8 @@ public sealed class MenuProposalOptions
 /// <param name="RemovedItems">直しきれず外した商品</param>
 /// <param name="NotAppliedRequests">反映しなかった要望</param>
 /// <param name="IsBudgetFitRequest">チャットの依頼が「予算に合わせて」だったか（画面で入れ替え案を出す。U-12）</param>
-public sealed record MenuProposalOutcome(bool Accepted, IReadOnlyList<string> RemovedItems, IReadOnlyList<string> NotAppliedRequests, bool IsBudgetFitRequest);
+/// <param name="IsAnswer">チャットの質問に文章で答えただけで、献立は変えていないか（D-91）</param>
+public sealed record MenuProposalOutcome(bool Accepted, IReadOnlyList<string> RemovedItems, IReadOnlyList<string> NotAppliedRequests, bool IsBudgetFitRequest, bool IsAnswer = false);
 
 /// <summary>予算に合わせる案</summary>
 public sealed record BudgetFitView(int CurrentTotal, int Budget, IReadOnlyList<BudgetFitOptionView> Options, string? Note);

@@ -10,21 +10,19 @@ export type SnackType = (typeof SNACK_TYPE)[keyof typeof SNACK_TYPE];
 export const SNACK_TYPE_LABEL: Record<SnackType, string> = {
     Salty: 'しょっぱい',
     Sweet: 'あまい',
-    Smooth: 'のどごし',
+    Smooth: 'デザート・飲料',
     NotSnack: '対象外',
 };
 
-/** 日の種類（サーバーの DayType） */
+/** 日の種類（画面では「種別」。サーバーの DayType） */
 export const DAY_TYPE = {
     NORMAL: 'Normal',
-    HANDMADE: 'Handmade',
     NO_SNACK: 'NoSnack',
 } as const;
 export type DayType = (typeof DAY_TYPE)[keyof typeof DAY_TYPE];
 
 export const DAY_TYPE_LABEL: Record<DayType, string> = {
     Normal: '通常',
-    Handmade: '手作り',
     NoSnack: 'おやつなし',
 };
 
@@ -34,6 +32,15 @@ export const MENU_STATUS = {
     CONFIRMED: 'Confirmed',
 } as const;
 export type MenuStatus = (typeof MENU_STATUS)[keyof typeof MENU_STATUS];
+
+/** 献立の商品の確認の種類（サーバーの MenuItemIssueKind。D-90）。献立一覧のバッジ・商品の確認のダイアログ・日ごとのカードで同じ分け方 */
+export const MENU_ITEM_ISSUE = {
+    NONE: 'None',
+    BLOCKED: 'Blocked',
+    RECHECK: 'Recheck',
+    WARNING: 'Warning',
+} as const;
+export type MenuItemIssue = (typeof MENU_ITEM_ISSUE)[keyof typeof MENU_ITEM_ISSUE];
 
 /** 曜日（サーバーの DayOfWeek） */
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;

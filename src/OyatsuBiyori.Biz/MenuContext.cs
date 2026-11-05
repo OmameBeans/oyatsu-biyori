@@ -116,7 +116,7 @@ public sealed class MenuContext
 public sealed record ServedItem(string MenuId, DateOnly Date, string ProductId)
 {
     /// <summary>
-    /// 献立から作る。基準にするのは確定献立だけ（FR-MENU-12）。手作り・おやつなしの日の商品は、実際には出さないため数えない。
+    /// 献立から作る。基準にするのは確定献立だけ（FR-MENU-12）。おやつなしの日の商品は、実際には出さないため数えない。
     /// </summary>
     public static IReadOnlyList<ServedItem> FromMenus(IEnumerable<Menu> menus)
     {

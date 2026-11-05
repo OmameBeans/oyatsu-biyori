@@ -18,9 +18,11 @@ export const ENDPOINT = {
     SETTINGS_DELETE_FACILITY_ALLERGEN: '/api/settings/deleteFacilityAllergen',
 
     JOBS_GET: '/api/jobs/get',
+    JOBS_STREAM: '/api/jobs/stream',
 
     MENUS_LIST: '/api/menus/list',
     MENUS_GET: '/api/menus/get',
+    MENUS_CALENDAR: '/api/menus/calendar',
     MENUS_CREATE: '/api/menus/create',
     MENUS_DELETE: '/api/menus/delete',
     MENUS_LISTED_PRODUCTS: '/api/menus/listedProducts',
@@ -37,11 +39,13 @@ export const ENDPOINT = {
     MENUS_MOVE_ITEM: '/api/menus/moveItem',
     MENUS_UPDATE_ITEM: '/api/menus/updateItem',
     MENUS_CHAT: '/api/menus/chat',
+    MENUS_CLEAR_CHAT: '/api/menus/clearChat',
     MENUS_BUDGET_FIT: '/api/menus/budgetFit',
     MENUS_APPLY_BUDGET_FIT: '/api/menus/applyBudgetFit',
     MENUS_CONFIRMATION: '/api/menus/confirmation',
     MENUS_CONFIRM: '/api/menus/confirm',
     MENUS_ACKNOWLEDGE: '/api/menus/acknowledge',
+    MENUS_SET_ORDERED: '/api/menus/setordered',
 
     FLYERS_READ: '/api/flyers/read',
     FLYERS_LATEST: '/api/flyers/latest',

@@ -115,7 +115,7 @@ public enum SnackType
     /// <summary>あまいもの</summary>
     Sweet,
 
-    /// <summary>のどごしのいいもの</summary>
+    /// <summary>デザート・飲料</summary>
     Smooth,
 
     /// <summary>対象外（献立の候補にしない）</summary>
@@ -152,14 +152,11 @@ public enum MenuStatus
     Confirmed,
 }
 
-/// <summary>日の種類</summary>
+/// <summary>日の種類（画面では「種別」）。手作りの日は扱わない（Q-11）</summary>
 public enum DayType
 {
     /// <summary>通常</summary>
     Normal,
-
-    /// <summary>手作り</summary>
-    Handmade,
 
     /// <summary>おやつなし（祝日・休み・店で買うおやつの日も含む）</summary>
     NoSnack,

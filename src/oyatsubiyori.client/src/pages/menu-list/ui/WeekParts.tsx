@@ -9,6 +9,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { CATEGORY_ICON, CATEGORY_LABEL } from '../../../entities/allergen-judgement';
 import type { MenuListRow } from '../../../entities/menu';
@@ -51,22 +52,30 @@ export const WeekStatus = ({ row }: WeekStatusProps) => {
 
 interface IssueChipsProps {
     row: MenuListRow;
+    /** 押すと商品の確認のダイアログ（WeekIssuesDialog）を開く。渡さなければ押せない */
+    onClick?: () => void;
 }
 
-/** 商品の問題のバッジ（🔴 使えません・🟡 要確認・確認し直し。FR-MENU-34a） */
-export const IssueChips = ({ row }: IssueChipsProps) => {
+/** 商品の問題のバッジ（🔴 使えません・🟡 要確認・確認し直し。FR-MENU-34a）。onClick があれば、押すと何をどう確認するかを開く */
+export const IssueChips = ({ row, onClick }: IssueChipsProps) => {
     const { Blocked: BlockedIcon, Warning: WarningIcon } = CATEGORY_ICON;
+    const clickSx = onClick ? { cursor: 'pointer' } : {};
     return (
         <>
-            {row.blockedCount > 0 && <Chip size="small" color="error" icon={<BlockedIcon />} label={`${CATEGORY_LABEL.Blocked} ${row.blockedCount}件`} sx={TAG_SX} />}
-            {row.warningCount > 0 && <Chip size="small" color="warning" icon={<WarningIcon />} label={`${CATEGORY_LABEL.Warning} ${row.warningCount}件`} sx={TAG_SX} />}
+            {row.blockedCount > 0 && (
+                <Chip size="small" color="error" icon={<BlockedIcon />} label={`${CATEGORY_LABEL.Blocked} ${row.blockedCount}件`} onClick={onClick} sx={{ ...TAG_SX, ...clickSx }} />
+            )}
+            {row.warningCount > 0 && (
+                <Chip size="small" color="warning" icon={<WarningIcon />} label={`${CATEGORY_LABEL.Warning} ${row.warningCount}件`} onClick={onClick} sx={{ ...TAG_SX, ...clickSx }} />
+            )}
             {row.recheckCount > 0 && (
                 // warning.main の文字は白の上で 4.5:1 に届かないので、文字と枠は warning.dark にする（theme.ts）
                 <Chip
                     size="small"
                     variant="outlined"
                     label={`確認し直し ${row.recheckCount}件`}
-                    sx={{ ...TAG_SX, color: 'warning.dark', borderColor: 'warning.dark' }}
+                    onClick={onClick}
+                    sx={{ ...TAG_SX, ...clickSx, color: 'warning.dark', borderColor: 'warning.dark' }}
                 />
             )}
         </>
@@ -108,10 +117,12 @@ interface WeekCardProps {
     isPending: boolean;
     onOpen: () => void;
     onDelete: () => void;
+    /** バッジを押したとき（商品の確認のダイアログを開く） */
+    onShowIssues?: () => void;
 }
 
 /** 1週のカード（今週とこれから。スマホでは過去の週も） */
-export const WeekCard = ({ row, isThisWeek, isPending, onOpen, onDelete }: WeekCardProps) => (
+export const WeekCard = ({ row, isThisWeek, isPending, onOpen, onDelete, onShowIssues }: WeekCardProps) => (
     <Card
         component="section"
         variant="outlined"
@@ -160,12 +171,18 @@ export const WeekCard = ({ row, isThisWeek, isPending, onOpen, onDelete }: WeekC
                         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                             商品の確認：
                         </Typography>
-                        <IssueChips row={row} />
+                        <IssueChips row={row} onClick={onShowIssues} />
                     </Stack>
                 )}
             </Stack>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', alignSelf: { xs: 'flex-end', sm: 'center' } }}>
-                <Button variant="outlined" onClick={onOpen} disabled={isPending} sx={{ minHeight: 44, px: 3.5, fontWeight: 700 }}>
+                <Button
+                    variant="outlined"
+                    onClick={onOpen}
+                    disabled={isPending}
+                    endIcon={row.menuId ? <ChevronRightIcon /> : undefined}
+                    sx={{ minHeight: 44, px: 3.5, fontWeight: 700 }}
+                >
                     {row.menuId ? '開く' : '献立を作る'}
                 </Button>
                 <DraftMenu row={row} onDelete={onDelete} />

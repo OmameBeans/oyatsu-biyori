@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using OyatsuBiyori.Biz;
 using OyatsuBiyori.Biz.Interfaces;
@@ -20,6 +21,9 @@ public sealed class InMemoryBackgroundJobService(
 
     /// <summary>終わった処理を持っておく時間</summary>
     private static readonly TimeSpan Retention = TimeSpan.FromHours(24);
+
+    /// <summary>流すときに、変わった分をためる時間</summary>
+    private static readonly TimeSpan StreamBatchDelay = TimeSpan.FromMilliseconds(50);
 
     private readonly IServiceScopeFactory _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
     private readonly TimeProvider _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
@@ -64,6 +68,56 @@ public sealed class InMemoryBackgroundJobService(
             .Where(s => s.State == BackgroundJobState.Succeeded)
             .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefault();
+    }
+
+    public async IAsyncEnumerable<BackgroundJobStreamEvent> StreamAsync(string id, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (!_jobs.TryGetValue(id, out var entry))
+        {
+            var lost = BackgroundJobStatus.Lost(id);
+            yield return new BackgroundJobStreamEvent(lost.State, null, 0, string.Empty, lost.ErrorMessages);
+            yield break;
+        }
+
+        // 送った文章と段階名を覚えておき、変わった分だけ流す（最初の1回は今の全文）
+        var sentText = string.Empty;
+        string? sentStage = null;
+        var isFirst = true;
+        while (true)
+        {
+            var (snapshot, changed) = entry.Snapshot();
+            if (isFirst || snapshot.Text != sentText || snapshot.Stage != sentStage || snapshot.IsFinished)
+            {
+                // 前に送った文章の続きなら足りない分だけ、書き直されていれば違うところから後ろを送る
+                var offset = CommonPrefixLength(sentText, snapshot.Text);
+                yield return new BackgroundJobStreamEvent(snapshot.State, snapshot.Stage, offset, snapshot.Text[offset..], snapshot.ErrorMessages);
+                sentText = snapshot.Text;
+                sentStage = snapshot.Stage;
+                isFirst = false;
+            }
+
+            if (snapshot.IsFinished)
+            {
+                yield break;
+            }
+
+            await changed.WaitAsync(cancellationToken);
+
+            // 1文字ずつ送らず、少しためてから送る
+            await Task.Delay(StreamBatchDelay, cancellationToken);
+        }
+    }
+
+    private static int CommonPrefixLength(string a, string b)
+    {
+        var length = Math.Min(a.Length, b.Length);
+        var i = 0;
+        while (i < length && a[i] == b[i])
+        {
+            i++;
+        }
+
+        return i;
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -135,6 +189,10 @@ public sealed class InMemoryBackgroundJobService(
         private string? _stage;
         private object? _result;
         private IReadOnlyList<string> _errors = [];
+        private string _text = string.Empty;
+
+        // 変わったら完了させて作り直す（流している側は、これを待って次を送る）
+        private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public string Id { get; } = id;
 
@@ -157,6 +215,16 @@ public sealed class InMemoryBackgroundJobService(
             lock (_lock)
             {
                 _stage = stage;
+                NotifyChanged();
+            }
+        }
+
+        public void ReportText(string text)
+        {
+            lock (_lock)
+            {
+                _text = text ?? string.Empty;
+                NotifyChanged();
             }
         }
 
@@ -165,6 +233,7 @@ public sealed class InMemoryBackgroundJobService(
             lock (_lock)
             {
                 _state = BackgroundJobState.Running;
+                NotifyChanged();
             }
         }
 
@@ -175,6 +244,7 @@ public sealed class InMemoryBackgroundJobService(
                 _state = BackgroundJobState.Succeeded;
                 _result = result;
                 FinishedAt = now;
+                NotifyChanged();
             }
         }
 
@@ -185,7 +255,26 @@ public sealed class InMemoryBackgroundJobService(
                 _state = BackgroundJobState.Failed;
                 _errors = errors.ToList();
                 FinishedAt = now;
+                NotifyChanged();
             }
+        }
+
+        /// <summary>流すための今の状態と、次に変わったら完了する Task</summary>
+        public (StreamSnapshot Snapshot, Task Changed) Snapshot()
+        {
+            lock (_lock)
+            {
+                var isFinished = _state is BackgroundJobState.Succeeded or BackgroundJobState.Failed;
+                return (new StreamSnapshot(_state, _stage, _text, _errors, isFinished), _changed.Task);
+            }
+        }
+
+        // _lock の中で呼ぶ
+        private void NotifyChanged()
+        {
+            var changed = _changed;
+            _changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            changed.TrySetResult();
         }
 
         public BackgroundJobStatus ToStatus()
@@ -196,4 +285,7 @@ public sealed class InMemoryBackgroundJobService(
             }
         }
     }
+
+    /// <summary>流すための、ある時点の状態</summary>
+    private sealed record StreamSnapshot(BackgroundJobState State, string? Stage, string Text, IReadOnlyList<string> ErrorMessages, bool IsFinished);
 }

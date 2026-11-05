@@ -117,6 +117,18 @@ export const acknowledgementSentence = (judgement: AllergenJudgement): string =>
     return `${reason}。${promise}`;
 };
 
+/**
+ * 献立の商品の確認の種類ごとの、何をすればよいかの説明（商品の確認のダイアログ。D-90）。
+ * 商品ごとの理由と次にすることは judgementText で出すので、ここでは種類のまとまりの説明だけを書く（言い切らない）。
+ */
+export const ISSUE_GUIDE = {
+    BLOCKED: '献立に入れられない商品です。商品ごとの理由と次にすることを確かめてください。確認しても使えないときは、献立を開いて別の商品に替えてください。',
+    RECHECK: '献立を確定したときの確認から、判定が変わった商品です（確定のときは確認が要らなかった商品も含みます）。理由を読んで確かめたら、チェックを付けてください。献立は確定のままです。',
+    WARNING_CONFIRMED: '献立を確定したときに確認が済んだ商品です。商品が届いたら、パッケージの原材料表示を撮って確認してください。',
+    WARNING_DRAFT: '献立を確定するときに、商品ごとの確認が要ります。届いた商品があれば、パッケージの原材料表示を撮って確認してください。',
+    MISSING_PRODUCT: '商品が見つかりません。献立を開いて、別の商品に替えてください',
+} as const;
+
 /** 「メーカーへの確認が必要」の文（SR-06）。なければ null */
 export const manufacturerCheckText = (allergens: string[]): string | null =>
     allergens.length === 0 ? null : `メーカーへの確認が必要（${allergens.join('・')}は表示されないことがあります）`;

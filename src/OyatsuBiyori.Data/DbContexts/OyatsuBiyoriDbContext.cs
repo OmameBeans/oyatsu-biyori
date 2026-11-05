@@ -201,6 +201,8 @@ public sealed class OyatsuBiyoriDbContext(DbContextOptions<OyatsuBiyoriDbContext
                 .HasConversion(JsonColumn.Converter<List<ListedProduct>>(), JsonColumn.Comparer<List<ListedProduct>>());
             entity.Property(e => e.ExcludedProductIds)
                 .HasConversion(JsonColumn.Converter<List<string>>(), JsonColumn.Comparer<List<string>>());
+            entity.Property(e => e.OrderChecks)
+                .HasConversion(JsonColumn.Converter<List<OrderCheck>>(), JsonColumn.Comparer<List<OrderCheck>>());
             entity.Property(e => e.InterpretedRequests)
                 .HasConversion(JsonColumn.Converter<InterpretedRequests?>(), JsonColumn.Comparer<InterpretedRequests?>());
             entity.HasMany(e => e.Days).WithOne(e => e.Menu).OnDelete(DeleteBehavior.Cascade);

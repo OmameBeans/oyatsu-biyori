@@ -42,7 +42,7 @@ public static class MenuAmountCalculator
 
     /// <summary>
     /// 保存する商品の金額（menu_items.amount）：金額を数える日（通常の日で人数1以上）は パック数 × 価格。
-    /// 手作り・おやつなし・人数0の日は、商品があっても0（D-77。その日の金額と合わせる）。
+    /// おやつなし・人数0の日は、商品があっても0（D-77。その日の金額と合わせる）。
     /// </summary>
     public static int StoredItemAmount(MenuItem item, MenuDay day)
     {
@@ -59,8 +59,8 @@ public static class MenuAmountCalculator
     }
 
     /// <summary>
-    /// その日の金額。手作り・おやつなし・人数0の日は0で、1人あたり金額は null（「—」と表示）。
-    /// 手作り・おやつなしの日に商品があっても0のまま、「金額に含まれていません」の印を立てる（D-77）。
+    /// その日の金額。おやつなし・人数0の日は0で、1人あたり金額は null（「—」と表示）。
+    /// おやつなしの日に商品があっても0のまま、「金額に含まれていません」の印を立てる（D-77）。
     /// </summary>
     /// <param name="day">日ごとの献立（Items を読み込んでおくこと）</param>
     /// <param name="piecesPerPack">商品 ID から入数を返す（全員分に足りないかを見るため。分からなければ null）</param>
@@ -73,7 +73,7 @@ public static class MenuAmountCalculator
         var amount = counted ? day.Items.Sum(ItemAmount) : 0;
         decimal? perChild = counted ? (decimal)amount / day.ChildrenCount : null;
 
-        // 手作り・おやつなしの日の商品は出さないため、足りるかは見ない（「金額に含まれていません」で示す）
+        // おやつなしの日の商品は出さないため、足りるかは見ない（「金額に含まれていません」で示す）
         var shortItems = day.Items
             .Where(i => day.DayType == DayType.Normal
                 && piecesPerPack(i.ProductId) is int pieces && pieces >= 1
@@ -115,13 +115,13 @@ public sealed class DayAmount
     /// <summary>日付</summary>
     public DateOnly Date { get; init; }
 
-    /// <summary>その日の金額（手作り・おやつなし・人数0の日は0）</summary>
+    /// <summary>その日の金額（おやつなし・人数0の日は0）</summary>
     public int Amount { get; init; }
 
-    /// <summary>1人あたり金額（小数のまま。手作り・おやつなし・人数0の日は null ＝「—」）</summary>
+    /// <summary>1人あたり金額（小数のまま。おやつなし・人数0の日は null ＝「—」）</summary>
     public decimal? PerChildAmount { get; init; }
 
-    /// <summary>手作り・おやつなしの日に商品があり、金額に含めていない（「金額に含まれていません」）</summary>
+    /// <summary>おやつなしの日に商品があり、金額に含めていない（「金額に含まれていません」）</summary>
     public bool ExcludedFromAmount { get; init; }
 
     /// <summary>パック数が全員分に足りない商品</summary>

@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { jaJP } from '@mui/x-data-grid/locales';
@@ -16,10 +17,12 @@ interface PastMenuGridProps {
     label: string;
     onOpen: (row: MenuListRow) => void;
     onDelete: (row: MenuListRow) => void;
+    /** バッジを押したとき（商品の確認のダイアログを開く） */
+    onShowIssues: (row: MenuListRow) => void;
 }
 
 /** 過去の献立の表（PC。MUI X の DataGrid）。親の高さいっぱいに広がり、表の中だけをスクロールする */
-export const PastMenuGrid = ({ rows, label, onOpen, onDelete }: PastMenuGridProps) => {
+export const PastMenuGrid = ({ rows, label, onOpen, onDelete, onShowIssues }: PastMenuGridProps) => {
     const columns: GridColDef<MenuListRow>[] = [
         {
             field: 'weekStart',
@@ -77,8 +80,9 @@ export const PastMenuGrid = ({ rows, label, onOpen, onDelete }: PastMenuGridProp
             sortable: false,
             renderCell: ({ row }) =>
                 hasIssues(row) ? (
-                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                        <IssueChips row={row} />
+                    // DataGrid は Space をセルの移動に使うので、バッジでは Space を DataGrid に渡さない（押せるように）
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }} onKeyDown={(event) => event.key === ' ' && event.stopPropagation()}>
+                        <IssueChips row={row} onClick={() => onShowIssues(row)} />
                     </Stack>
                 ) : (
                     <Typography variant="body2" component="span" sx={{ color: 'text.secondary' }}>
@@ -100,7 +104,7 @@ export const PastMenuGrid = ({ rows, label, onOpen, onDelete }: PastMenuGridProp
             renderCell: ({ row }) => (
                 // DataGrid は Space をセルの移動に使い、ボタンが押せなくなる。セルの中のボタンでは Space を DataGrid に渡さない
                 <Stack direction="row" sx={{ alignItems: 'center' }} onKeyDown={(event) => event.key === ' ' && event.stopPropagation()}>
-                    <Button onClick={() => onOpen(row)} aria-label={`${formatWeekLabel(row.weekStart)}を開く`} sx={{ minHeight: 44, fontWeight: 700 }}>
+                    <Button onClick={() => onOpen(row)} endIcon={<ChevronRightIcon />} aria-label={`${formatWeekLabel(row.weekStart)}を開く`} sx={{ minHeight: 44, fontWeight: 700 }}>
                         開く
                     </Button>
                     <DraftMenu row={row} onDelete={() => onDelete(row)} />

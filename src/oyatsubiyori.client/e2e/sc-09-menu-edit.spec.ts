@@ -356,14 +356,14 @@ test.describe.serial('SC-09 献立作成', () => {
         }
         await expect(page.getByText('要望をこう理解しました')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText('しょっぱいものとゼリー系を合わせて出したい').first()).toBeVisible();
-        await expect(page.getByText(/週の実績 [\d,]+円 \/ 週の予算/)).toBeVisible();
+        await expect(page.getByText(/実績 [\d,]+円 \/ 予算/)).toBeVisible();
         await expect(page.getByText('理由').first()).toBeVisible();
         await captureScreen(page, testInfo, 'sc-09-step4-board');
     });
 
     test('FR-MENU-28・30 予算に届かないときだけ「予算に合わせる」が出て、案を選ぶと反映される', async ({ page }, testInfo) => {
         await openWeek(page, '再来週');
-        await expect(page.getByText(/週の実績 [\d,]+円 \/ 週の予算/)).toBeVisible();
+        await expect(page.getByText(/実績 [\d,]+円 \/ 予算/)).toBeVisible();
         await expect(page.getByRole('button', { name: /^確定/ })).toBeEnabled();
         const fit = page.getByRole('button', { name: '予算に合わせる' });
         if (!(await fit.isVisible())) {
@@ -403,6 +403,67 @@ test.describe.serial('SC-09 献立作成', () => {
         await page.getByLabel('チャットの依頼').fill('水曜はせんべいにしてください');
         await page.getByRole('button', { name: '送る' }).click();
         await expect(page.getByText('ご依頼に合わせて、商品を組み直しました', { exact: false })).toBeVisible({ timeout: 30_000 });
+        // 返答の Markdown は箇条書きとして出る（記号のまま出さない。D-91）
+        const log = page.getByRole('log', { name: 'チャットの履歴' });
+        await expect(log.getByRole('listitem').filter({ hasText: '変えたところ：日ごとの商品' })).toBeVisible();
+        await expect(log).not.toContainText('**');
+    });
+
+    test('D-91 チャットで質問すると、献立を変えずに Markdown で答え、送った質問は入力欄から履歴に移る', async ({ page }) => {
+        await openWeek(page, '再来週');
+        const isMobile = test.info().project.name === 'mobile';
+        if (isMobile) {
+            await page.getByRole('tab', { name: 'チャット' }).click();
+        }
+        const input = page.getByLabel('チャットの依頼');
+        await input.fill('月曜のおせんべいを選んだのはなぜ？');
+        await page.getByRole('button', { name: '送る' }).click();
+        const log = page.getByRole('log', { name: 'チャットの履歴' });
+        await expect(input).toHaveValue('');
+        await expect(log.getByText('月曜のおせんべいを選んだのはなぜ？')).toBeVisible();
+        await expect(log.getByText('献立は変えていません。')).toBeVisible({ timeout: 30_000 });
+        await expect(log.getByRole('listitem').filter({ hasText: 'しょっぱいもの・あまいものと、デザート・飲料を組み合わせています' })).toBeVisible();
+        await expect(log).not.toContainText('**');
+        // AI の返答はアレルゲンの判定ではないことを、返答の下に出す（SR-18）
+        await expect(log.getByText('AI の返答はアレルゲンの判定ではありません', { exact: false })).toBeVisible();
+        await expect(input).toBeEnabled();
+        await page.screenshot({ path: test.info().outputPath('chat-answer.png'), fullPage: true });
+    });
+
+    test('D-91 チャットを消すと、確認のあとで履歴が消え、献立はそのまま残る', async ({ page }) => {
+        await openWeek(page, '再来週');
+        const isMobile = test.info().project.name === 'mobile';
+        if (isMobile) {
+            await page.getByRole('tab', { name: 'チャット' }).click();
+        }
+        const log = page.getByRole('log', { name: 'チャットの履歴' });
+        await expect(log.getByText('献立は変えていません。')).toBeVisible();
+        const daysBefore = await page.getByRole('region', { name: /の献立$/ }).count();
+        await page.getByRole('button', { name: 'チャットを消す' }).click();
+        const dialog = page.getByRole('dialog', { name: 'チャットを消しますか？' });
+        await expect(dialog.getByText('献立と週の要望はそのまま残ります', { exact: false })).toBeVisible();
+        await dialog.getByRole('button', { name: '消す' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(log.getByText('何かお手伝いできることはありますか？')).toBeVisible();
+        await expect(log.getByText('献立は変えていません。')).toBeHidden();
+        await expect(page.getByRole('button', { name: 'チャットを消す' })).toBeDisabled();
+        expect(await page.getByRole('region', { name: /の献立$/ }).count()).toBe(daysBefore);
+    });
+
+    test('D-91 PC では AIチャットを閉じて細い帯にでき、開くと入力中の文字が残っている', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホはタブで切り替えるため、開閉のボタンはない');
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await openWeek(page, '再来週');
+        const input = page.getByLabel('チャットの依頼');
+        await input.fill('金曜をもう少し豪華に');
+        await page.getByRole('button', { name: 'AIチャットを閉じる' }).click();
+        await expect(page.getByRole('heading', { name: 'AIチャット' })).toBeHidden();
+        await expect(page.getByRole('separator', { name: '献立とチャットの境目' })).toBeHidden();
+        await page.screenshot({ path: testInfo.outputPath('chat-collapsed.png') });
+        await page.getByRole('button', { name: 'AIチャットを開く' }).click();
+        await expect(page.getByRole('heading', { name: 'AIチャット' })).toBeVisible();
+        await expect(input).toHaveValue('金曜をもう少し豪華に');
+        await input.fill('');
     });
 
     test('FR-MENU-24 PC では使える商品・献立・チャットが左から並び、商品をドラッグして足す・別の日へ動かす・一覧へ戻して外すができる', async ({ page }, testInfo) => {
@@ -410,7 +471,7 @@ test.describe.serial('SC-09 献立作成', () => {
         await page.setViewportSize({ width: 1600, height: 900 });
         await openWeek(page, '再来週');
         const panel = page.getByRole('region', { name: '使える商品' });
-        const chat = page.getByText('チャットで直す');
+        const chat = page.getByRole('heading', { name: 'AIチャット' });
         const days = page.getByRole('region', { name: /の献立$/ });
         await expect(panel).toBeVisible();
         await expect(days.first()).toBeVisible();
@@ -491,7 +552,7 @@ test.describe.serial('SC-09 献立作成', () => {
         const widened = await widthOf(panel);
 
         // 右の境目は ← キーで動かすと、チャットの列が広がる
-        const chatColumn = page.getByText('チャットで直す');
+        const chatColumn = page.getByRole('heading', { name: 'AIチャット' });
         const chatBefore = await rightSplitter.getAttribute('aria-valuenow');
         await rightSplitter.focus();
         await page.keyboard.press('ArrowLeft');
@@ -578,5 +639,71 @@ test.describe.serial('SC-09 献立作成', () => {
         await confirmButton.click();
         await expect(page.getByText('献立を確定しました')).toBeVisible();
         await expect(page.getByText(/^確定済み（\d/)).toBeVisible();
+    });
+});
+
+test.describe('SC-09 注文リスト', () => {
+    test('FR-MENU-35 確定した献立で「注文リスト」を開くと、注文番号・商品名・数量と合計が出て、コピーできる', async ({ page, context }, testInfo) => {
+        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        // 過去の週の確定済みの献立（ダミーデータ）を、献立案の手順で開く
+        await page.goto('/menus/history');
+        await page.getByRole('main').getByRole('button', { name: /開く$/ }).first().click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+$/);
+        await page.goto(page.url() + '?step=4');
+        await expect(page.getByText(/^確定済み（\d/)).toBeVisible();
+
+        await page.getByRole('button', { name: /^注文リスト/ }).click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog.getByText(/^注文リスト（/)).toBeVisible();
+        const table = dialog.getByRole('table', { name: '注文リスト' });
+        await expect(table.getByRole('columnheader', { name: '注文番号' })).toBeVisible();
+        await expect(table.getByRole('columnheader', { name: '数量' })).toBeVisible();
+        await expect(table.getByText(/^\d{4}$/).first()).toBeVisible();
+        await expect(table.getByText(/^合計（\d+品）$/)).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-order-list');
+
+        await dialog.getByRole('button', { name: 'コピー' }).click();
+        await expect(page.getByText('注文リストをコピーしました')).toBeVisible();
+        const copied = await page.evaluate(() => navigator.clipboard.readText());
+        // Windows のクリップボードは改行を \r\n にする
+        const copiedLines = copied.split(/\r?\n/);
+        expect(copiedLines[0]).toBe('注文番号\t商品名\t数量');
+        expect(copiedLines[1]).toMatch(/^\d{4}\t.+\t\d+$/);
+    });
+
+    test('FR-MENU-35 注文リストの行に「注文した」のチェックを付けると保存され、読み込み直しても残り、外せる', async ({ page }) => {
+        await page.goto('/menus/history');
+        await page.getByRole('main').getByRole('button', { name: /開く$/ }).first().click();
+        await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+$/);
+        const url = page.url() + '?step=4';
+        await page.goto(url);
+        await page.getByRole('button', { name: /^注文リスト/ }).click();
+        const dialog = page.getByRole('dialog');
+        const first = dialog.getByRole('checkbox', { name: /を注文した$/ }).first();
+        // チェックはサーバーに保存してから付くので、押したあとで状態を待つ（check() は押した直後に確かめるため使わない）。
+        // 前のテスト（PC）で付けたままなら外してから始める
+        if (await first.isChecked()) {
+            await first.click();
+            await expect(first).not.toBeChecked();
+        }
+        await expect(dialog.getByText(/^注文した 0 \/ \d+品$/)).toBeVisible();
+        await first.click();
+        await expect(first).toBeChecked();
+        await expect(dialog.getByText(/^(注文した 1 \/ \d+品|すべて注文しました)/)).toBeVisible();
+
+        await page.reload();
+        await page.getByRole('button', { name: /^注文リスト（1\// }).click();
+        const reopened = page.getByRole('dialog').getByRole('checkbox', { name: /を注文した$/ }).first();
+        await expect(reopened).toBeChecked();
+        await reopened.click();
+        await expect(reopened).not.toBeChecked();
+    });
+
+    test('FR-MENU-35 下書きの献立には「注文リスト」を出さない', async ({ page }) => {
+        // 来週はダミーデータに献立がなく、このファイルのテストでも確定しないので下書きのまま
+        await openWeek(page, '来週');
+        await page.goto(page.url().split('?')[0] + '?step=4');
+        await expect(page.getByText('下書き', { exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^注文リスト/ })).toHaveCount(0);
     });
 });

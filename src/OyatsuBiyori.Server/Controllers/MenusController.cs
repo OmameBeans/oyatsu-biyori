@@ -19,6 +19,10 @@ public sealed class MenusController(MenuApplicationService menuService, MenuProp
     [HttpGet]
     public async Task<IActionResult> List() => new JsonResult(await _menuService.ListAsync());
 
+    /// <summary>献立一覧のカレンダー（SC-11）。month は yyyy-MM（省略したら今月）</summary>
+    [HttpGet]
+    public async Task<IActionResult> Calendar([FromQuery] string? month) => new JsonResult(await _menuService.CalendarAsync(month));
+
     /// <summary>献立の中身</summary>
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? id) => new JsonResult(await _menuService.GetAsync(id));
@@ -64,6 +68,19 @@ public sealed class MenusController(MenuApplicationService menuService, MenuProp
     /// <summary>チャットでの組み直しを受け付ける（バックグラウンド）</summary>
     [HttpPost]
     public async Task<IActionResult> Chat([FromBody] ChatRequest request) => new JsonResult(await _proposalService.StartChatAsync(request.MenuId, request.Message));
+
+    /// <summary>チャットの履歴を消す（献立は変えない）</summary>
+    [HttpPost]
+    public async Task<IActionResult> ClearChat([FromBody] MenuRequest request)
+    {
+        var result = await _proposalService.ClearChatAsync(request.MenuId);
+        if (result.HasError)
+        {
+            return new JsonResult(result);
+        }
+
+        return new JsonResult(await _menuService.GetAsync(request.MenuId));
+    }
 
     /// <summary>予算に合わせる案を受け付ける（バックグラウンド）</summary>
     [HttpPost]
@@ -137,6 +154,11 @@ public sealed class MenusController(MenuApplicationService menuService, MenuProp
     public async Task<IActionResult> Acknowledge([FromBody] AcknowledgeRequest request)
         => new JsonResult(await _menuService.AcknowledgeAsync(request.MenuId, new AcknowledgementInput(request.ItemId, request.Kind, request.Fingerprint)));
 
+    /// <summary>注文リストの「注文した」のチェックを付ける・外す</summary>
+    [HttpPost]
+    public async Task<IActionResult> SetOrdered([FromBody] OrderedRequest request)
+        => new JsonResult(await _menuService.SetOrderedAsync(request.MenuId, request.ProductId, request.OrderNo, request.IsOrdered));
+
     /// <summary>献立の指定</summary>
     public class MenuRequest
     {
@@ -147,6 +169,16 @@ public sealed class MenusController(MenuApplicationService menuService, MenuProp
     public sealed class CreateRequest
     {
         public DateOnly? WeekStart { get; set; }
+    }
+
+    /// <summary>注文リストの「注文した」のチェック</summary>
+    public sealed class OrderedRequest : MenuRequest
+    {
+        public string? ProductId { get; set; }
+
+        public string? OrderNo { get; set; }
+
+        public bool IsOrdered { get; set; }
     }
 
     /// <summary>「今週は使わない」</summary>

@@ -94,11 +94,11 @@ public class BudgetFitSearcherTests
     }
 
     [Fact]
-    public void 手作り_おやつなし_人数0の日では試さない()
+    public void おやつなし_人数0の日では試さない()
     {
         var add = Safe("ついかのグミ", pieces: 50);
         var (menu, basic) = BaseMenu(100000, (add, 100));
-        menu.Days[0].DayType = DayType.Handmade;
+        menu.Days[0].DayType = DayType.NoSnack;
         menu.Days[1].DayType = DayType.NoSnack;
         menu.Days[2].ChildrenCount = 0;
 
@@ -188,7 +188,6 @@ public class BudgetFitSearcherTests
     }
 
     [Theory]
-    [InlineData(DayType.Handmade, 50)]
     [InlineData(DayType.NoSnack, 50)]
     [InlineData(DayType.Normal, 0)]
     [InlineData(DayType.Normal, 60)]

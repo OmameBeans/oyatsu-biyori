@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Anthropic;
+using System.Runtime.CompilerServices;
 using Anthropic.Exceptions;
 using Anthropic.Models.Beta.Messages;
 using Microsoft.Extensions.Logging;
@@ -79,7 +80,52 @@ public sealed class ClaudeRequestRunner(
     /// 組み立てたリクエストを送る（エージェントのループで1回ごとに呼ぶ）。1日の上限・再試行・記録はここで行う。
     /// 応答の中身（stop_reason など）は呼び出し側で確かめる。
     /// </summary>
-    public async Task<Result<BetaMessage>> SendAsync(ClaudePurpose purpose, MessageCreateParams request, CancellationToken cancellationToken)
+    public Task<Result<BetaMessage>> SendAsync(ClaudePurpose purpose, MessageCreateParams request, CancellationToken cancellationToken)
+        => SendCoreAsync(purpose, request, (r, token) => _client.Beta.Messages.Create(r, token), cancellationToken);
+
+    /// <summary>
+    /// ストリーミングで送り、文章が届くたびに onTextDelta を呼ぶ（チャットの返答をパラパラ出すため）。
+    /// 再試行するときは、試す前に onAttemptStart を呼ぶ（途中まで届いた文章を、呼び出し側で捨てられるように）。
+    /// 1日の上限・再試行・記録は SendAsync と同じ。
+    /// </summary>
+    public Task<Result<BetaMessage>> SendStreamingAsync(
+        ClaudePurpose purpose,
+        MessageCreateParams request,
+        Action onAttemptStart,
+        Action<string> onTextDelta,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(onAttemptStart);
+        ArgumentNullException.ThrowIfNull(onTextDelta);
+        return SendCoreAsync(purpose, request, async (r, token) =>
+        {
+            onAttemptStart();
+            return await WithTextDeltas(_client.Beta.Messages.CreateStreaming(r, token), onTextDelta, token).Aggregate();
+        }, cancellationToken);
+    }
+
+    /// <summary>流れてくる出来事をそのまま渡しながら、文章の差分を onTextDelta に知らせる</summary>
+    private static async IAsyncEnumerable<BetaRawMessageStreamEvent> WithTextDeltas(
+        IAsyncEnumerable<BetaRawMessageStreamEvent> source,
+        Action<string> onTextDelta,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var streamEvent in source.WithCancellation(cancellationToken))
+        {
+            if (streamEvent.TryPickContentBlockDelta(out var blockDelta) && blockDelta.Delta.TryPickText(out var textDelta))
+            {
+                onTextDelta(textDelta.Text);
+            }
+
+            yield return streamEvent;
+        }
+    }
+
+    private async Task<Result<BetaMessage>> SendCoreAsync(
+        ClaudePurpose purpose,
+        MessageCreateParams request,
+        Func<MessageCreateParams, CancellationToken, Task<BetaMessage>> send,
+        CancellationToken cancellationToken)
     {
         var model = request.Model.Raw();
         var timeout = _options.TimeoutFor(purpose);
@@ -97,7 +143,7 @@ public sealed class ClaudeRequestRunner(
             BetaMessage response;
             try
             {
-                response = await _client.Beta.Messages.Create(request, attemptCancellation.Token);
+                response = await send(request, attemptCancellation.Token);
             }
             catch (Exception ex) when (IsRetryable(ex, cancellationToken))
             {

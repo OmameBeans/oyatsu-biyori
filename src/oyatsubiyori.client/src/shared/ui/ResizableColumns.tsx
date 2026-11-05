@@ -29,6 +29,10 @@ interface ResizableColumnsProps {
      * 切り替えても要素の並びは変えない
      */
     isEnabled?: boolean;
+    /** true のあいだは右の列を閉じて細い帯（collapsedRightWidth）にし、右の境目を隠す。選んだ幅は変えない（開いたら元の幅に戻る） */
+    isRightCollapsed?: boolean;
+    /** 右の列を閉じたときの幅（px） */
+    collapsedRightWidth?: number;
 }
 
 const SPLITTER_WIDTH = 12;
@@ -40,7 +44,19 @@ const isWidths = (value: unknown): value is string => typeof value === 'string' 
  * 3列を並べ、列の境目（スプリッター）をドラッグして左右の列の幅を変えられるようにする。境目はキーボードでも動かせる
  * （Tab で選び、← → で動かす。Home で既定の幅に戻す）。PC の広い画面で使う。高さは親に合わせる。
  */
-export const ResizableColumns = ({ left, center, right, defaultWidths, minWidths, minCenterWidth, splitterLabels, storageKey, isEnabled = true }: ResizableColumnsProps) => {
+export const ResizableColumns = ({
+    left,
+    center,
+    right,
+    defaultWidths,
+    minWidths,
+    minCenterWidth,
+    splitterLabels,
+    storageKey,
+    isEnabled = true,
+    isRightCollapsed = false,
+    collapsedRightWidth = 56,
+}: ResizableColumnsProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     // 職員が選んだ幅（保存する値）。画面が狭いときは表示だけ縮め、この値は変えない（広げたら元の幅に戻るように）
     const [widths, setWidths] = useState<ColumnWidths>(() => {
@@ -116,6 +132,7 @@ export const ResizableColumns = ({ left, center, right, defaultWidths, minWidths
         }
     };
 
+    const isRightOpen = !isRightCollapsed;
     const splitter = (side: 'left' | 'right', label: string) => (
         <Box
             role="separator"
@@ -132,7 +149,7 @@ export const ResizableColumns = ({ left, center, right, defaultWidths, minWidths
             onKeyDown={handleKeyDown(side)}
             onDoubleClick={() => resetSide(side)}
             sx={{
-                display: isEnabled ? 'flex' : 'none',
+                display: isEnabled && (side === 'left' || isRightOpen) ? 'flex' : 'none',
                 cursor: 'col-resize',
                 touchAction: 'none',
                 justifyContent: 'center',
@@ -150,7 +167,12 @@ export const ResizableColumns = ({ left, center, right, defaultWidths, minWidths
             ref={containerRef}
             sx={{
                 display: 'grid',
-                gridTemplateColumns: isEnabled ? `${shown.left}px ${SPLITTER_WIDTH}px minmax(${minCenterWidth}px, 1fr) ${SPLITTER_WIDTH}px ${shown.right}px` : '1fr',
+                gridTemplateColumns: !isEnabled
+                    ? '1fr'
+                    : isRightOpen
+                      ? `${shown.left}px ${SPLITTER_WIDTH}px minmax(${minCenterWidth}px, 1fr) ${SPLITTER_WIDTH}px ${shown.right}px`
+                      : // 右の境目は隠す（display: none の要素は列を使わないので、境目の列も外す）
+                        `${shown.left}px ${SPLITTER_WIDTH}px minmax(${minCenterWidth}px, 1fr) ${SPLITTER_WIDTH + collapsedRightWidth}px`,
                 height: '100%',
                 minHeight: 0,
             }}
@@ -159,7 +181,7 @@ export const ResizableColumns = ({ left, center, right, defaultWidths, minWidths
             {splitter('left', splitterLabels[0])}
             <Box sx={{ minWidth: 0, minHeight: 0, height: '100%', overflow: isEnabled ? 'auto' : undefined }}>{center}</Box>
             {splitter('right', splitterLabels[1])}
-            <Box sx={{ minWidth: 0, minHeight: 0, height: '100%' }}>{right}</Box>
+            <Box sx={{ minWidth: 0, minHeight: 0, height: '100%', pl: isEnabled && !isRightOpen ? `${SPLITTER_WIDTH}px` : undefined }}>{right}</Box>
         </Box>
     );
 };

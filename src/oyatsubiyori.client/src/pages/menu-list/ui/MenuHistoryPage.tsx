@@ -13,6 +13,7 @@ import { menuPath, ROUTE } from '../../../shared/type';
 import { PageLayout } from '../../../shared/ui';
 import { DeleteDraftDialog } from './DeleteDraftDialog';
 import { PastMenuGrid } from './PastMenuGrid';
+import { WeekIssuesDialog } from './WeekIssuesDialog';
 import { WeekCard } from './WeekParts';
 
 /**
@@ -25,6 +26,7 @@ export const MenuHistoryPage = () => {
     const theme = useTheme();
     const isWide = useMediaQuery(theme.breakpoints.up('md'));
     const [deleting, setDeleting] = useState<MenuListRow | null>(null);
+    const [issuesMenuId, setIssuesMenuId] = useState<string | null>(null);
 
     const pastRows = list.rows.filter((row) => row.weekStart < list.thisWeekStart);
     // 過去の週は献立のある週だけ（未作成の行は今週・来週・再来週だけに出る）
@@ -47,16 +49,17 @@ export const MenuHistoryPage = () => {
                     <Typography sx={{ color: 'text.secondary' }}>過去の献立はまだありません。</Typography>
                 ) : isWide ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320 }}>
-                        <PastMenuGrid rows={pastRows} label="過去の献立" onOpen={openRow} onDelete={setDeleting} />
+                        <PastMenuGrid rows={pastRows} label="過去の献立" onOpen={openRow} onDelete={setDeleting} onShowIssues={(row) => setIssuesMenuId(row.menuId)} />
                     </Box>
                 ) : (
                     <Stack spacing={1.5}>
                         {pastRows.map((row) => (
-                            <WeekCard key={row.weekStart} row={row} isThisWeek={false} isPending={false} onOpen={() => openRow(row)} onDelete={() => setDeleting(row)} />
+                            <WeekCard key={row.weekStart} row={row} isThisWeek={false} isPending={false} onOpen={() => openRow(row)} onDelete={() => setDeleting(row)} onShowIssues={() => setIssuesMenuId(row.menuId)} />
                         ))}
                     </Stack>
                 )}
             </Box>
+            <WeekIssuesDialog isOpen={issuesMenuId !== null} menuId={issuesMenuId} onClose={() => setIssuesMenuId(null)} />
             <DeleteDraftDialog
                 isOpen={deleting !== null}
                 menuId={deleting?.menuId ?? null}

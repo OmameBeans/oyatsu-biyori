@@ -80,13 +80,13 @@ public class MenuConfirmationCheckerTests
     }
 
     [Fact]
-    public void 手作りの日の入れられない商品も確定を止める()
+    public void おやつなしの日の入れられない商品も確定を止める()
     {
         var (menu, products, item) = MenuWithReference();
         var egg = ReferenceOnly("たまごボーロ", SnackType.Sweet, 10, "egg");
         menu.ListedProducts.Add(new ListedProduct(egg.Id, 198, "2222"));
         Put(menu, 2, egg);
-        menu.Days[2].DayType = DayType.Handmade;
+        menu.Days[2].DayType = DayType.NoSnack;
         var context = Context([.. products, egg], Avoid("egg"));
         MenuConfirmationChecker.Acknowledge(item, context, Now);
 

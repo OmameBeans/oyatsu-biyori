@@ -190,6 +190,8 @@ internal sealed class FakeJobs : IBackgroundJobService
 
     public BackgroundJobStatus? FindLatestSucceeded(string kind, string ownerKey) =>
         (LatestSucceeded ?? (Latest is { State: BackgroundJobState.Succeeded } ? Latest : null)) is { } s && s.Kind == kind && s.OwnerKey == ownerKey ? s : null;
+
+    public IAsyncEnumerable<BackgroundJobStreamEvent> StreamAsync(string id, CancellationToken cancellationToken) => AsyncEnumerable.Empty<BackgroundJobStreamEvent>();
 }
 
 /// <summary>決まった読み取り結果を返す</summary>
@@ -216,9 +218,14 @@ internal sealed class FixedJudge(ProductMatchVerdict verdict) : IProductMatchJud
 /// <summary>進捗を捨てる</summary>
 internal sealed class NullProgress : IJobProgress
 {
+    /// <summary>最後に報告された返答の文章</summary>
+    public string Text { get; private set; } = string.Empty;
+
     public void Report(string stage)
     {
     }
+
+    public void ReportText(string text) => Text = text;
 }
 
 /// <summary>決まった時刻</summary>

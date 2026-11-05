@@ -13,7 +13,7 @@ namespace OyatsuBiyori.Biz;
 public static class DuplicateChecker
 {
     /// <summary>
-    /// 献立の商品の重複を求める。対象の献立では、手作り・おやつなしの日の商品も比べる（日の種類を通常に戻すことがあるため、多めに出す）。
+    /// 献立の商品の重複を求める。対象の献立では、おやつなしの日の商品も比べる（日の種類を通常に戻すことがあるため、多めに出す）。
     /// 確定献立の履歴は、実際に出した通常の日の商品だけ（ServedItem.FromMenus）。
     /// </summary>
     /// <param name="menu">対象の献立（自分自身は確定済みでも履歴から外し、同じ週の中として数える）</param>

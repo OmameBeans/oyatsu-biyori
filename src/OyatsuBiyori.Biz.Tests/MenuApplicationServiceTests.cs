@@ -178,14 +178,14 @@ public class MenuApplicationServiceTests
     }
 
     [Fact]
-    public async Task D_77_手作りの日へ動かすと_金額は0になる()
+    public async Task D_77_おやつなしの日へ動かすと_金額は0になる()
     {
         var data = new InMemoryData();
         var snack = Safe("ほしがたクッキー", SnackType.Sweet, pieces: 10);
         data.Products.Add(snack);
         var menu = NewMenu(20000, 50, (snack, 300));
         var item = Put(menu, 0, snack);
-        menu.Days.Single(d => d.Date == D(4)).DayType = DayType.Handmade;
+        menu.Days.Single(d => d.Date == D(4)).DayType = DayType.NoSnack;
         data.Menus.Add(menu);
         var (service, _) = Create(data);
 
@@ -344,6 +344,230 @@ public class MenuApplicationServiceTests
         var gap = list.Value.Rows.Single(r => r.WeekStart == thisWeek.AddDays(21));
         Assert.Null(gap.MenuId);
         Assert.Null(gap.RelativeLabel);
+    }
+
+    [Fact]
+    public async Task FR_LIST_00_下書きの警告の商品は_要確認に数え_確認し直しには数えない()
+    {
+        var (data, _, _) = WarningMenu();
+        var (service, _) = Create(data);
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId is not null);
+
+        Assert.Equal(1, row.WarningCount);
+        Assert.Equal(0, row.RecheckCount);
+    }
+
+    [Fact]
+    public async Task FR_LIST_00_確定済みの献立で確認が済んだ警告の商品は_要確認に数える()
+    {
+        var (data, menu, item) = WarningMenu();
+        var (service, _) = Create(data);
+        var ack = Assert.Single((await service.GetConfirmationAsync(menu.Id)).Value!.Acknowledgements);
+        await service.ConfirmAsync(menu.Id, [new AcknowledgementInput(item.Id, ack.Judgement.Kind, ack.Fingerprint)], null);
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+
+        Assert.Equal(1, row.WarningCount);
+        Assert.Equal(0, row.RecheckCount);
+    }
+
+    [Fact]
+    public async Task FR_MENU_34a_確認し直しの商品は_要確認と重ねて数えない()
+    {
+        var (data, menu, item) = WarningMenu();
+        var (service, _) = Create(data);
+        var ack = Assert.Single((await service.GetConfirmationAsync(menu.Id)).Value!.Acknowledgements);
+        await service.ConfirmAsync(menu.Id, [new AcknowledgementInput(item.Id, ack.Judgement.Kind, ack.Fingerprint)], null);
+        // 確認したあとに判定の中身が変わった（確認したときの指紋と今の指紋が違う）
+        item.AcknowledgedJudgementFingerprint = "確認したときの指紋";
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+
+        Assert.Equal(MenuStatus.Confirmed, menu.Status);
+        Assert.Equal(0, row.WarningCount);
+        Assert.Equal(1, row.RecheckCount);
+    }
+
+    [Fact]
+    public async Task FR_MENU_34a_確定のときは安全で_あとで警告になった商品は_一覧でも献立の画面でも確認し直しにする()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var safe = Safe("さくさくクッキー");
+        data.Products.Add(safe);
+        var menu = NewMenu(20000, 50, (safe, 300));
+        Put(menu, 0, safe);
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+        var confirmed = await service.ConfirmAsync(menu.Id, [], null);
+        Assert.False(confirmed.HasError, string.Join(",", confirmed.ErrorMessages));
+        // 確定のあとに、チラシの情報（参考）の記録が足されて 🟡 になった
+        safe.AllergenChecks.Add(Reference(Today));
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+        var detail = (await service.GetAsync(menu.Id)).Value!;
+        var item = detail.Days.SelectMany(d => d.Items).Single();
+
+        Assert.Equal(1, row.RecheckCount);
+        Assert.Equal(0, row.WarningCount);
+        Assert.Equal(MenuItemIssueKind.Recheck, item.IssueKind);
+        Assert.True(item.NeedsRecheck);
+
+        // 古い指紋では確認済みにしない（SR-22）
+        var stale = await service.AcknowledgeAsync(menu.Id, new AcknowledgementInput(item.Id, item.Judgement!.Kind, "古い指紋"));
+        Assert.True(stale.HasError);
+
+        // 今の判定で確認し直すと、要確認へ移り、確認し直しは0件になる（確定のときに一度も確認していない商品でも）
+        var acknowledged = await service.AcknowledgeAsync(menu.Id, new AcknowledgementInput(item.Id, item.Judgement.Kind, item.JudgementFingerprint!));
+        Assert.False(acknowledged.HasError, string.Join(",", acknowledged.ErrorMessages));
+        Assert.Equal(MenuItemIssueKind.Warning, acknowledged.Value!.Days.SelectMany(d => d.Items).Single().IssueKind);
+        var after = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+        Assert.Equal(0, after.RecheckCount);
+        Assert.Equal(1, after.WarningCount);
+        Assert.Equal(MenuStatus.Confirmed, menu.Status);
+    }
+
+    [Fact]
+    public async Task FR_LIST_00_献立の画面の確認の種類は_一覧の件数と同じ分け方にする()
+    {
+        var (data, menu, _) = WarningMenu();
+        var (service, _) = Create(data);
+
+        var item = (await service.GetAsync(menu.Id)).Value!.Days.SelectMany(d => d.Items).Single();
+
+        Assert.Equal(MenuItemIssueKind.Warning, item.IssueKind);
+        Assert.False(item.NeedsRecheck);
+    }
+
+    [Fact]
+    public async Task FR_LIST_00_見つからない商品と避ける品目を含む商品は_使えませんに数える()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var blocked = Snack("たまごボーロ", SnackType.Sweet, 4, 1, ConfirmedAll(Today.AddDays(-5), ["egg"]));
+        data.Products.Add(blocked);
+        var menu = NewMenu(20000, 50, (blocked, 300));
+        Put(menu, 0, blocked);
+        PutRaw(menu, 1, "missing-product");
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+
+        Assert.Equal(2, row.BlockedCount);
+        Assert.Equal(0, row.WarningCount);
+        Assert.Equal(0, row.RecheckCount);
+    }
+
+    [Fact]
+    public async Task SR_17_確定のあとに使えなくなった商品は_確認し直しではなく使えませんに数える()
+    {
+        var (data, menu, item) = WarningMenu();
+        var (service, _) = Create(data);
+        var ack = Assert.Single((await service.GetConfirmationAsync(menu.Id)).Value!.Acknowledgements);
+        await service.ConfirmAsync(menu.Id, [new AcknowledgementInput(item.Id, ack.Judgement.Kind, ack.Fingerprint)], null);
+        // 確定のあとに、パッケージで確かめたら避ける品目（卵）を含んでいた
+        data.Products.Single(p => p.Id == item.ProductId).AllergenChecks.Add(ConfirmedAll(Today, ["egg"]));
+
+        var row = (await service.ListAsync()).Value!.Rows.Single(r => r.MenuId == menu.Id);
+
+        Assert.Equal(1, row.BlockedCount);
+        Assert.Equal(0, row.WarningCount);
+        Assert.Equal(0, row.RecheckCount);
+    }
+
+    [Fact]
+    public async Task FR_LIST_03_カレンダーは避ける品目を含む商品を使えませんで返す()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var blocked = Snack("たまごボーロ", SnackType.Sweet, 4, 1, ConfirmedAll(Today.AddDays(-5), ["egg"]));
+        data.Products.Add(blocked);
+        var menu = NewMenu(20000, 50, (blocked, 300));
+        Put(menu, 0, blocked);
+        PutRaw(menu, 1, "missing-product");
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var calendar = await service.CalendarAsync("2026-11");
+
+        var found = Assert.Single(calendar.Value!.Days.Single(d => d.Date == D(0)).Items);
+        Assert.Equal(AllergenJudgementCategory.Blocked, found.Category);
+        Assert.Equal(AllergenJudgementCategory.Blocked, found.Judgement!.Category);
+        var missing = Assert.Single(calendar.Value.Days.Single(d => d.Date == D(1)).Items);
+        Assert.Equal(AllergenJudgementCategory.Blocked, missing.Category);
+    }
+
+    [Fact]
+    public async Task FR_LIST_03_カレンダーは月を含む週の献立の日を_今の判定つきで返す()
+    {
+        var (data, menu, _) = WarningMenu();
+        var (service, _) = Create(data);
+
+        var calendar = await service.CalendarAsync("2026-11");
+
+        Assert.False(calendar.HasError);
+        // 2026-11-01 は日曜なので、その週の月曜（10-26）から、11-30（月）の週の日曜（12-06）まで
+        Assert.Equal(new DateOnly(2026, 10, 26), calendar.Value!.From);
+        Assert.Equal(new DateOnly(2026, 12, 6), calendar.Value.To);
+        Assert.Equal(menu.Days.Select(d => d.Date).OrderBy(d => d), calendar.Value.Days.Select(d => d.Date));
+        var first = calendar.Value.Days[0];
+        Assert.Equal(menu.Id, first.MenuId);
+        var item = Assert.Single(first.Items);
+        Assert.Equal("ふわふわゼリー", item.ProductName);
+        Assert.Equal(AllergenJudgementCategory.Warning, item.Judgement!.Category);
+    }
+
+    [Fact]
+    public async Task FR_LIST_03_カレンダーは範囲の外の週の献立を返さない()
+    {
+        var (data, _, _) = WarningMenu();
+        var (service, _) = Create(data);
+
+        var calendar = await service.CalendarAsync("2026-09");
+
+        Assert.Empty(calendar.Value!.Days);
+    }
+
+    [Fact]
+    public async Task FR_LIST_03_カレンダーは商品が見つからない日を判定なしで返す()
+    {
+        var data = new InMemoryData();
+        var menu = NewMenu(20000, 50);
+        PutRaw(menu, 2, "missing-product");
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var calendar = await service.CalendarAsync("2026-11");
+
+        var item = Assert.Single(calendar.Value!.Days.Single(d => d.Date == D(2)).Items);
+        Assert.Null(item.Judgement);
+    }
+
+    [Theory]
+    [InlineData("2026-13")]
+    [InlineData("2026/11")]
+    [InlineData("abc")]
+    [InlineData("9999-12")]
+    [InlineData("0001-01")]
+    public async Task FR_LIST_03_カレンダーの月の形が違えばエラーにする(string month)
+    {
+        var (service, _) = Create(new InMemoryData());
+
+        var calendar = await service.CalendarAsync(month);
+
+        Assert.True(calendar.HasError);
+    }
+
+    [Fact]
+    public async Task FR_LIST_03_カレンダーの月を省略したら今月にする()
+    {
+        var (service, _) = Create(new InMemoryData());
+
+        var calendar = await service.CalendarAsync(null);
+
+        Assert.Equal($"{Today:yyyy-MM}", calendar.Value!.Month);
     }
 
     [Fact]

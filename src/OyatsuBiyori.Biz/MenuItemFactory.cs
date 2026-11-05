@@ -131,7 +131,7 @@ public static class MenuItemFactory
         }
     }
 
-    /// <summary>日の種類を変えたあと、商品の金額を求め直す（手作り・おやつなしの日は0。D-77）</summary>
+    /// <summary>日の種類を変えたあと、商品の金額を求め直す（おやつなしの日は0。D-77）</summary>
     public static void RefreshAmounts(MenuDay day)
     {
         ArgumentNullException.ThrowIfNull(day);

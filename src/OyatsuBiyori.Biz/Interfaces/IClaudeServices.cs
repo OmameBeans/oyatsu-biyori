@@ -145,14 +145,16 @@ public sealed record AllergenExtraction(
 
 /// <summary>
 /// 献立づくりのエージェント（Sonnet。T4-04・T4-08、D-82）。道具（IMenuAgentTools）を使わせ、submit_menu が Biz の検証を通したら止める。
+/// チャットでは、質問なら submit_menu を使わずに文章で答えさせ、直す依頼なら submit_menu のあとに何を変えたかを文章で書かせる（D-91）。
 /// </summary>
 public interface IMenuPlannerAgent
 {
-    /// <summary>献立案を作る（チャットでの組み直しも同じ）</summary>
+    /// <summary>献立案を作る（チャットでの組み直し・質問への返答も同じ）</summary>
     /// <param name="request">渡す条件</param>
     /// <param name="tools">道具（判断のロジックは Biz）</param>
+    /// <param name="progress">段階名と、チャットの返答の文章（届いた順）を報告する</param>
     /// <param name="cancellationToken">処理全体の期限</param>
-    Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, CancellationToken cancellationToken);
+    Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken);
 }
 
 /// <summary>エージェントの動かし方</summary>
@@ -176,7 +178,8 @@ public sealed record MenuAgentRequest(MenuAgentMode Mode, string ConditionsText,
 /// <summary>エージェントの結果（受け付けた案は tools 側が持つ）</summary>
 /// <param name="Accepted">submit_menu で案を受け付けたか</param>
 /// <param name="Iterations">ループの回数</param>
-public sealed record MenuAgentRunResult(bool Accepted, int Iterations);
+/// <param name="ReplyText">チャットの返答の文章（Claude が書いた Markdown。質問への返答か、何を変えたかの説明。なければ空）</param>
+public sealed record MenuAgentRunResult(bool Accepted, int Iterations, string ReplyText = "");
 
 /// <summary>
 /// 献立づくりの道具（判断のロジックは Biz。NFR-MNT-05）。入出力は文字列（JSON）で、Claude の道具の定義は Claude プロジェクトに置く。

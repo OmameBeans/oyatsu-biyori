@@ -1,3 +1,5 @@
+export * from './AppIcon';
+export * from './ClaudeMarkdown';
 export * from './ClaudeText';
 export * from './ConfirmDialog';
 export * from './ImagePicker';

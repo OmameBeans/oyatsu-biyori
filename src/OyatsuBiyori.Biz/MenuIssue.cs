@@ -52,7 +52,7 @@ public enum MenuIssueKind
     /// <summary>通常の日に商品がない</summary>
     EmptyNormalDay,
 
-    /// <summary>手作り・おやつなしの日に商品がある（金額に含まれていない）</summary>
+    /// <summary>おやつなしの日に商品がある（金額に含まれていない）</summary>
     ItemsOnNonNormalDay,
 
     /// <summary>パック数が全員分に足りない</summary>

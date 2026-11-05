@@ -38,7 +38,7 @@ test.describe('SC-03・SC-04・SC-12 設定', () => {
         // SC-03 フォームはカードに載せる。PC でもスマホでも横にはみ出さない（#6）
         await expectNoHorizontalOverflow(page, [
             page.getByLabel('既定の週の予算（税込）'),
-            page.getByLabel('のどごし', { exact: true }),
+            page.getByLabel('デザート・飲料', { exact: true }),
             page.getByLabel('重複についての補足ルール（AI に伝えます）'),
             page.getByRole('button', { name: '保存する' }),
         ]);
@@ -370,9 +370,9 @@ test.describe('#4 見た目（明るさ）', () => {
         await page.goto('/menus');
         await expect(page.getByRole('heading', { name: '献立一覧' })).toBeVisible();
         expect(isDarkColor(await readBackground(page))).toBe(true);
-        // ダークでも、ボタンの丸み（BASE_THEME_OPTIONS の borderRadius: 999）が引き継がれている
+        // ダークでも、丸み（BASE_THEME_OPTIONS の shape.borderRadius: 4）が引き継がれている
         const openButton = page.getByRole('region', { name: /^今週 / }).getByRole('button', { name: '開く', exact: true });
-        expect(await openButton.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('999px');
+        expect(await openButton.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('4px');
         await captureScreen(page, testInfo, 'dark-sc-10-menu-list');
 
         // 献立の編集（確定済みの今週の献立。日ごとのカードに 🔴🟡🟢 と注記が出る）
@@ -380,7 +380,7 @@ test.describe('#4 見た目（明るさ）', () => {
         await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
         // URL が変わっても、次の画面の読み込みが終わるまでは一覧が残るので、見出しが替わるのを待つ
         await expect(page.getByRole('heading', { level: 1, name: /^献立作成/ })).toBeVisible();
-        await expect(page.getByText(/週の実績 [\d,]+円 \/ 週の予算/)).toBeVisible();
+        await expect(page.getByText(/実績 [\d,]+円 \/ 予算/)).toBeVisible();
         await captureScreen(page, testInfo, 'dark-sc-09-step4-board');
 
         // 商品詳細

@@ -1,9 +1,10 @@
 import { apiGet, apiPost } from '../../../shared/api';
 import { ENDPOINT } from '../../../shared/type';
 import type { DayType } from '../../../shared/type';
-import type { AcknowledgementInput, BudgetFitOption, LatestJob, ListedProducts, MenuConfirmation, MenuDetail, MenuList } from '../model/types';
+import type { AcknowledgementInput, BudgetFitOption, LatestJob, ListedProducts, MenuCalendar, MenuConfirmation, MenuDetail, MenuList, OrderedInput } from '../model/types';
 
 export const fetchMenuList = () => apiGet<MenuList>(ENDPOINT.MENUS_LIST);
+export const fetchMenuCalendar = (month: string) => apiGet<MenuCalendar>(ENDPOINT.MENUS_CALENDAR, { month });
 export const fetchMenu = (id: string) => apiGet<MenuDetail>(ENDPOINT.MENUS_GET, { id });
 export const fetchListedProducts = (id: string) => apiGet<ListedProducts>(ENDPOINT.MENUS_LISTED_PRODUCTS, { id });
 export const fetchConfirmation = (id: string) => apiGet<MenuConfirmation>(ENDPOINT.MENUS_CONFIRMATION, { id });
@@ -18,6 +19,7 @@ export const postSetListedValues = (menuId: string, productId: string, price: nu
 export const postSaveRequest = (menuId: string, requestText: string) => apiPost<never>(ENDPOINT.MENUS_SAVE_REQUEST, { menuId, requestText });
 export const postStartProposal = (menuId: string, requestText: string) => apiPost<string>(ENDPOINT.MENUS_START_PROPOSAL, { menuId, requestText });
 export const postChat = (menuId: string, message: string) => apiPost<string>(ENDPOINT.MENUS_CHAT, { menuId, message });
+export const postClearChat = (menuId: string) => apiPost<MenuDetail>(ENDPOINT.MENUS_CLEAR_CHAT, { menuId });
 export const postBudgetFit = (menuId: string) => apiPost<string>(ENDPOINT.MENUS_BUDGET_FIT, { menuId });
 export const postApplyBudgetFit = (menuId: string, option: BudgetFitOption) =>
     apiPost<MenuDetail>(ENDPOINT.MENUS_APPLY_BUDGET_FIT, {
@@ -60,5 +62,7 @@ export const postUpdateItem = (menuId: string, update: ItemUpdate, rowVersion: s
     apiPost<MenuDetail>(ENDPOINT.MENUS_UPDATE_ITEM, { menuId, ...update, rowVersion });
 export const postConfirm = (menuId: string, acknowledgements: AcknowledgementInput[], rowVersion: string) =>
     apiPost<MenuDetail>(ENDPOINT.MENUS_CONFIRM, { menuId, acknowledgements, rowVersion });
+export const postSetOrdered = (menuId: string, input: OrderedInput) =>
+    apiPost<MenuDetail>(ENDPOINT.MENUS_SET_ORDERED, { menuId, productId: input.productId, orderNo: input.orderNo, isOrdered: input.isOrdered });
 export const postAcknowledge = (menuId: string, input: AcknowledgementInput) =>
     apiPost<MenuDetail>(ENDPOINT.MENUS_ACKNOWLEDGE, { menuId, itemId: input.menuItemId, kind: input.kind, fingerprint: input.fingerprint });

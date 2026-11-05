@@ -23,11 +23,16 @@ import { ChatPanel } from '../../../features/menu-chat';
 import { MenuProductPanel } from '../../../features/menu-products';
 import { RequestStep } from '../../../features/menu-request';
 import { isJobFinished } from '../../../shared/api';
-import { formatWeekLabel } from '../../../shared/lib';
+import { formatWeekLabel, readPreference, writePreference } from '../../../shared/lib';
 import { MENU_STATUS, PREFERENCE_KEY, ROUTE } from '../../../shared/type';
 import { ConfirmDialog, PageErrorBoundary, PageLayout, ResizableColumns } from '../../../shared/ui';
 
 const STEPS = ['チラシ取り込み', '今週の商品', '要望の入力', '献立案'] as const;
+
+const isBooleanText = (value: unknown): value is 'true' | 'false' => value === 'true' || value === 'false';
+
+/** 保存した AI チャットの開閉を読む。保存がない・読めないときは開いた状態で始める */
+const readIsChatCollapsed = (): boolean => readPreference(PREFERENCE_KEY.MENU_CHAT_COLLAPSED, isBooleanText, 'false') === 'true';
 
 /** 文字が実際に描かれている範囲（ラベルの要素は幅いっぱいに広がるので、要素ではなく文字の範囲を測る） */
 const textRectOf = (element: Element) => {
@@ -88,6 +93,13 @@ export const MenuEditPage = () => {
     const [commandBarElement, setCommandBarElement] = useState<HTMLDivElement | null>(null);
     // 初めから正しい形で出す（一度1列で出てから3列に変わらないように）
     const isWide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'), { noSsr: true });
+    // AI チャットの列を閉じているか（広い PC だけ。次に開いたときも同じにする）
+    const [isChatCollapsed, setIsChatCollapsed] = useState(readIsChatCollapsed);
+    const toggleChat = () => {
+        const next = !isChatCollapsed;
+        setIsChatCollapsed(next);
+        writePreference(PREFERENCE_KEY.MENU_CHAT_COLLAPSED, String(next));
+    };
     // 今の手順で、離れると消える入力（何が消えるか）。手順は1つずつしか出さないので、1つだけ持つ
     const [unsavedInput, setUnsavedInput] = useState<string | null>(null);
     const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
@@ -125,7 +137,13 @@ export const MenuEditPage = () => {
                 <Stepper ref={stepperRef} nonLinear activeStep={step - 1} alternativeLabel>
                     {STEPS.map((label, index) => (
                         <Step key={label} completed={index + 1 < step}>
-                            <StepButton onClick={() => goStep(index + 1)} disabled={index > 0 && menu.listedCount === 0}>
+                            <StepButton
+                                onClick={() => goStep(index + 1)}
+                                disabled={index > 0 && menu.listedCount === 0}
+                                // 押したときの波紋（ホワンと広がる薄い層）は出さない。キーボードで選んだときだけ枠線で示す
+                                disableRipple
+                                sx={{ '&.Mui-focusVisible': { outline: 2, outlineColor: 'primary.main', outlineOffset: 2, borderRadius: 1 } }}
+                            >
                                 {label}
                             </StepButton>
                         </Step>
@@ -152,13 +170,14 @@ export const MenuEditPage = () => {
                         <Tabs value={mobileTab} onChange={(_, value) => setMobileTab(value)} sx={{ display: { lg: 'none' }, mb: 1, flexShrink: 0 }}>
                             <Tab value="products" label="使える商品" />
                             <Tab value="board" label="献立" />
-                            <Tab value="chat" label="チャット" />
+                            <Tab value="chat" label="AIチャット" />
                         </Tabs>
                         {/* 広い PC（lg 以上）は左から「使える商品」「献立」「チャット」の3列。境目をドラッグして幅を変えられる。
                             商品を献立へドラッグして足せる（FR-MENU-24）。それより狭い幅ではタブで切り替える */}
                         <Box sx={{ flex: { md: 1 }, minHeight: 0 }}>
                             <ResizableColumns
                                 isEnabled={isWide}
+                                isRightCollapsed={isWide && isChatCollapsed}
                                 defaultWidths={{ left: 260, right: 300 }}
                                 minWidths={{ left: 200, right: 240 }}
                                 minCenterWidth={420}
@@ -182,7 +201,13 @@ export const MenuEditPage = () => {
                                 }
                                 right={
                                     <Box sx={{ display: { xs: mobileTab === 'chat' ? 'block' : 'none', lg: 'block' }, height: { md: '100%' } }}>
-                                        <ChatPanel menu={menu} onBudgetFitRequested={() => setIsBudgetFitRequested(true)} onUnsavedInputChange={setUnsavedInput} />
+                                        <ChatPanel
+                                            menu={menu}
+                                            onBudgetFitRequested={() => setIsBudgetFitRequested(true)}
+                                            onUnsavedInputChange={setUnsavedInput}
+                                            isCollapsed={isWide && isChatCollapsed}
+                                            onToggleCollapsed={isWide ? toggleChat : undefined}
+                                        />
                                     </Box>
                                 }
                             />

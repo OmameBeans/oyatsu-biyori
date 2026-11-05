@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- ===== 背景レイヤー：献立（メニュー表） ===== -->
+  <g id="menu">
+    <rect x="12" y="8" width="76" height="96" rx="4" fill="#FFF7EC" stroke="#8B5E3C" stroke-width="4"/>
+    <!-- ヘッダー帯 -->
+    <path d="M16 8 h68 a4 4 0 0 1 4 4 v14 h-76 v-14 a4 4 0 0 1 4 -4 z" fill="#F4C98A" stroke="#8B5E3C" stroke-width="4" stroke-linejoin="miter"/>
+    <!-- 項目（四角マーカー＋線） -->
+    <g fill="#8B5E3C">
+      <rect x="23" y="39" width="6" height="6"/>
+      <rect x="23" y="55" width="6" height="6"/>
+      <rect x="23" y="71" width="6" height="6"/>
+    </g>
+    <g stroke="#C9A27E" stroke-width="4" stroke-linecap="butt">
+      <line x1="34" y1="42" x2="74" y2="42"/>
+      <line x1="34" y1="58" x2="66" y2="58"/>
+      <line x1="34" y1="74" x2="54" y2="74"/>
+    </g>
+  </g>
+
+  <!-- ===== 前面レイヤー：スナック菓子（袋） ===== -->
+  <g id="sweets" transform="translate(-2 -5) rotate(15 90 92)">
+    <!-- 袋の形（上下ギザギザのシール） -->
+    <path id="bag" d="M66 66 L70 62 L74 66 L78 62 L82 66 L86 62 L90 66 L94 62 L98 66 L102 62 L106 66 L110 62 L114 66
+             L111 92 L114 118
+             L110 122 L106 118 L102 122 L98 118 L94 122 L90 118 L86 122 L82 118 L78 122 L74 118 L70 122 L66 118
+             L69 92 Z"/>
+    <!-- 白フチ（背景との分離用） -->
+    <use href="#bag" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="10" stroke-linejoin="miter"/>
+    <!-- 袋本体 -->
+    <use href="#bag" fill="#E8A07E" stroke="#8B5E3C" stroke-width="3.5" stroke-linejoin="miter"/>
+    <!-- シール部分のライン -->
+    <g stroke="#8B5E3C" stroke-width="2.5">
+      <line x1="68" y1="72" x2="112" y2="72"/>
+      <line x1="68" y1="112" x2="112" y2="112"/>
+    </g>
+    <!-- ラベル -->
+    <polygon points="76,80 104,80 104,104 76,104" fill="#F6E0B5" stroke="#8B5E3C" stroke-width="2.5"/>
+    <!-- ポテトチップス -->
+    <path d="M81 96 L85 86 L94 83 L100 89 L97 99 L87 101 Z" fill="#E6B878" stroke="#8B5E3C" stroke-width="2.5" stroke-linejoin="miter"/>
+    <path d="M86 93 L90 89 M91 96 L95 91" stroke="#8B5E3C" stroke-width="2" opacity="0.6"/>
+    <!-- ハイライト -->
+    <line x1="72" y1="78" x2="71" y2="106" stroke="#FFFFFF" stroke-width="2.5" opacity="0.35"/>
+  </g>
+</svg>

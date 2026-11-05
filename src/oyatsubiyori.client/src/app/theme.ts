@@ -88,7 +88,9 @@ const MODE_PALETTES: Record<ResolvedColorMode, PaletteOptions> = {
     light: {
         mode: 'light',
         secondary: { main: '#5b8f6b', contrastText: '#ffffff' },
-        background: { default: '#fbf7f2', paper: '#ffffff' },
+        // 画面の背景は薄い灰色、カードなどの面（paper）は白にし、部品の境目は罫線（divider）で示す。
+        // default と各テーマの primary.main・error・warning.dark・success は 4.5:1 以上（いちばん低いのはオレンジの 4.56:1）
+        background: { default: '#f4f6f8', paper: '#ffffff' },
         error: { main: '#c62828' },
         warning: { main: '#ed8c00', dark: '#8a4b00' },
         success: { main: '#2e7d32' },
@@ -108,10 +110,12 @@ const MODE_PALETTES: Record<ResolvedColorMode, PaletteOptions> = {
 };
 
 /**
- * どのテーマ・明るさでも同じ部分：「おやつ日和」に合わせた、やわらかい丸みと文字（T0-10）。
+ * どのテーマ・明るさでも同じ部分：丸みと文字（T0-10）。
+ * 見た目は MUI のマテリアルデザインの既定に寄せる（角は少し丸める・背景は白・境目は罫線・カードは既定から大きく変えない）。
+ * sx の borderRadius の数値は、この borderRadius の倍数になる（2 なら 8px）
  */
 const BASE_THEME_OPTIONS = {
-    shape: { borderRadius: 12 },
+    shape: { borderRadius: 4 },
     typography: {
         fontFamily: '"Noto Sans JP", "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif',
         h1: { fontSize: '1.6rem', fontWeight: 700 },
@@ -122,14 +126,14 @@ const BASE_THEME_OPTIONS = {
     components: {
         MuiButton: {
             defaultProps: { disableElevation: true },
-            styleOverrides: { root: { borderRadius: 999, minHeight: 40 } },
+            styleOverrides: { root: { minHeight: 40 } },
         },
         MuiCard: {
+            // 影ではなく罫線で背景と分ける（ダークでは影が見えないため）。丸みは既定のまま
             defaultProps: { variant: 'outlined' },
-            styleOverrides: { root: { borderRadius: 16 } },
         },
         MuiChip: {
-            styleOverrides: { root: { borderRadius: 999 } },
+            styleOverrides: { root: {} },
         },
         MuiTextField: {
             defaultProps: { size: 'small' },

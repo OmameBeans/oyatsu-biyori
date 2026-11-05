@@ -1,14 +1,17 @@
 import { useIsMutating, useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { ensureOk, isJobFinished, unwrap, useJobPolling } from '../../../shared/api';
 import type { GenericResult } from '../../../shared/type';
-import type { AcknowledgementInput, BudgetFitOption, MenuDetail, MenuProposalOutcome } from '../model/types';
+import type { AcknowledgementInput, BudgetFitOption, MenuDetail, MenuProposalOutcome, OrderedInput } from '../model/types';
 import {
     fetchConfirmation,
     fetchLatestProposalJob,
     fetchListedProducts,
     fetchMenu,
+    fetchMenuCalendar,
     fetchMenuList,
     postAcknowledge,
+    postClearChat,
+    postSetOrdered,
     postAddItem,
     postApplyBudgetFit,
     postBudgetFit,
@@ -32,6 +35,7 @@ import type { DayUpdate, ItemUpdate } from './menu';
 export const menuKeys = {
     all: ['menus'] as const,
     lists: () => [...menuKeys.all, 'list'] as const,
+    calendar: (month: string) => [...menuKeys.all, 'calendar', month] as const,
     detail: (id: string) => [...menuKeys.all, 'detail', id] as const,
     listed: (id: string) => [...menuKeys.all, 'listed', id] as const,
     confirmation: (id: string) => [...menuKeys.all, 'confirmation', id] as const,
@@ -44,6 +48,13 @@ export const useMenuList = () =>
     useSuspenseQuery({
         queryKey: menuKeys.lists(),
         queryFn: async () => unwrap(await fetchMenuList()),
+    });
+
+/** 献立一覧のカレンダー（SC-11）。month は YYYY-MM */
+export const useMenuCalendar = (month: string) =>
+    useSuspenseQuery({
+        queryKey: menuKeys.calendar(month),
+        queryFn: async () => unwrap(await fetchMenuCalendar(month)),
     });
 
 /** 献立の中身 */
@@ -98,7 +109,7 @@ export const useDeleteMenu = () => {
 /** 献立に関わるものを読み直す */
 const useInvalidateMenu = (menuId: string) => {
     const queryClient = useQueryClient();
-    return () => queryClient.invalidateQueries({ queryKey: menuKeys.all, predicate: (q) => q.queryKey.includes(menuId) || q.queryKey[1] === 'list' });
+    return () => queryClient.invalidateQueries({ queryKey: menuKeys.all, predicate: (q) => q.queryKey.includes(menuId) || q.queryKey[1] === 'list' || q.queryKey[1] === 'calendar' });
 };
 
 /** 献立を返す操作：返った献立で画面を置き換える */
@@ -111,6 +122,7 @@ const useMenuMutation = <TVariables>(menuId: string, action: (variables: TVariab
         onSuccess: (detail) => {
             queryClient.setQueryData(menuKeys.detail(menuId), detail);
             void queryClient.invalidateQueries({ queryKey: menuKeys.lists() });
+            void queryClient.invalidateQueries({ queryKey: [...menuKeys.all, 'calendar'] });
             void queryClient.invalidateQueries({ queryKey: menuKeys.listed(menuId) });
         },
         onError: () => {
@@ -189,6 +201,8 @@ export const useAddItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postAddItem(menuId, update, rowVersion));
 export const useReplaceItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postReplaceItem(menuId, update, rowVersion));
+/** チャットの履歴を消す（献立は変えない） */
+export const useClearChat = (menuId: string) => useMenuMutation(menuId, () => postClearChat(menuId));
 export const useRemoveItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postRemoveItem(menuId, update, rowVersion));
 /** 商品を別の日へ動かす（ドラッグ＆ドロップ） */
@@ -201,6 +215,8 @@ export const useConfirmMenu = (menuId: string) =>
         postConfirm(menuId, acknowledgements, rowVersion),
     );
 export const useAcknowledge = (menuId: string) => useMenuMutation(menuId, (input: AcknowledgementInput) => postAcknowledge(menuId, input));
+/** 注文リストの「注文した」のチェック（献立の中身は変えない） */
+export const useSetOrdered = (menuId: string) => useMenuMutation(menuId, (input: OrderedInput) => postSetOrdered(menuId, input));
 
 /**
  * 献立を直す操作（足す・動かす・外すなど）が、画面のどこかで実行中か。続けて操作すると古い row_version で送って

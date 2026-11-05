@@ -38,7 +38,7 @@ interface MenuProductPanelProps {
 
 /**
  * SC-09 手順4 の左の列「使える商品」（FR-MENU-24）。献立に入れられる今週の商品（候補かどうかはサーバーが決める）を並べ、
- * 日のカードへドラッグすると足せる。献立の商品をここへドラッグして戻すと外せる。
+ * 「＋」ボタンか日のカードへのドラッグ＆ドロップで献立に足せる。献立の商品をここへドラッグして戻すと外せる。
  * ドラッグできない端末（スマホなど）のために、商品ごとの「＋」から日を選んで足すこともできる。
  */
 export const MenuProductPanel = ({ menu }: MenuProductPanelProps) => {
@@ -78,14 +78,14 @@ export const MenuProductPanel = ({ menu }: MenuProductPanelProps) => {
             aria-label="使える商品"
             variant="outlined"
             {...handlers}
-            sx={{ display: 'flex', flexDirection: 'column', height: { md: '100%' }, borderRadius: 4, ...dropTargetSx(isOver) }}
+            sx={{ display: 'flex', flexDirection: 'column', height: { md: '100%' }, ...dropTargetSx(isOver) }}
         >
             <Box sx={{ p: 2, pb: 1 }}>
                 <Typography variant="h3" component="h2">
                     使える商品 {candidates.length}件
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: { xs: 'none', lg: 'block' } }}>
-                    日のカードへドラッグすると足せます（「＋」で日を選んでも足せます）。献立の商品をここへ戻すと外せます。
+                    「＋」ボタンまたはドラッグ＆ドロップで献立に追加できます。献立の商品をここへ戻すと外せます。
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: { lg: 'none' } }}>
                     「＋」で日を選んで足せます。

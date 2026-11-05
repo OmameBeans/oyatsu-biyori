@@ -175,7 +175,7 @@ export const RequestStep = ({ menu, onStarted, onManual, onUnsavedInputChange }:
                     void start();
                 }}
             >
-                <Typography>今の献立案とチャットの履歴は消えます。職員が直した人数・日の種類・見出しは残します。</Typography>
+                <Typography>今の献立案とチャットの履歴は消えます。職員が直した人数・種別・見出しは残します。</Typography>
             </ConfirmDialog>
         </Box>
     );

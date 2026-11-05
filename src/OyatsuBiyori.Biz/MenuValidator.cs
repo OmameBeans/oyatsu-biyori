@@ -6,8 +6,8 @@ namespace OyatsuBiyori.Biz;
 /// <summary>
 /// 献立案の検証（FR-MENU-15、SR-18、D-23、T1-13）。Claude の案・手動の編集・チャット・入れ替え案のどれにも同じ検証をかける。
 /// エラー：入れられない・掲載品にない・写しの価格か入数がない・存在しない商品・候補から外した商品（今週は使わない・使わない・対象外）
-/// 警告：判定が警告・重複・予算超過・通常の日が0品・手作り / おやつなしの日に商品・全員分に足りないパック数
-/// 日の種類・人数にかかわらず、すべての日の商品の判定を調べる（手作りの日でも、入れられない商品はエラー）。
+/// 警告：判定が警告・重複・予算超過・通常の日が0品・おやつなしの日に商品・全員分に足りないパック数
+/// 日の種類・人数にかかわらず、すべての日の商品の判定を調べる（おやつなしの日でも、入れられない商品はエラー）。
 /// </summary>
 public static class MenuValidator
 {
@@ -33,7 +33,7 @@ public static class MenuValidator
             if (day.DayType == DayType.Normal && day.ChildrenCount > 0 && day.Items.Count == 0)
             {
                 issues.Add(new MenuIssue(MenuIssueSeverity.Warning, MenuIssueKind.EmptyNormalDay, day.Date, null, null, null,
-                    "おやつの商品が1つもありません。商品を入れるか、日の種類を「手作り」「おやつなし」にしてください"));
+                    "おやつの商品が1つもありません。商品を入れるか、種別を「おやつなし」にしてください"));
             }
         }
 
@@ -46,7 +46,7 @@ public static class MenuValidator
                 foreach (var item in day.Items)
                 {
                     issues.Add(Issue(MenuIssueSeverity.Warning, MenuIssueKind.ItemsOnNonNormalDay, day, item, context,
-                        $"日の種類が「{DayTypeLabel(day.DayType)}」のため、金額に含まれていません。不要なら外してください"));
+                        $"種別が「{DayTypeLabel(day.DayType)}」のため、金額に含まれていません。不要なら外してください"));
                 }
             }
 
@@ -118,7 +118,6 @@ public static class MenuValidator
 
     private static string DayTypeLabel(DayType dayType) => dayType switch
     {
-        DayType.Handmade => "手作り",
         DayType.NoSnack => "おやつなし",
         _ => "通常",
     };
