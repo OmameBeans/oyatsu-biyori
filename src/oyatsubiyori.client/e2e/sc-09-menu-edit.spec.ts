@@ -5,6 +5,7 @@ import type { Locator, Page } from '@playwright/test';
 import { captureScreen, captureScreenAs, openFlyerItemDetail } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
+const FLYER_PDF = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.pdf');
 
 /** 文字列を、正規表現の中でそのままの文字として使えるようにする */
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -97,6 +98,28 @@ test.describe('SC-09 献立作成 手順1 の配置', () => {
         expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
         expect(await countScrollingAncestors(list)).toBe(0);
         await captureScreenAs(page, 'sc-09-step1-picker-1440x900-10');
+    });
+
+    test('FR-FLYER-01 画像を準備している間は「読み取る」を押せず、準備が終わると押せる', async ({ page }) => {
+        // PDF のページ分けに使う worker の読み込みを止めて、準備中のままにする
+        let releaseWorker = () => {};
+        const workerGate = new Promise<void>((resolve) => {
+            releaseWorker = resolve;
+        });
+        await page.route(/pdf\.worker/, async (route) => {
+            await workerGate;
+            await route.continue();
+        });
+
+        await openFlyerPicker(page);
+        await page.getByTestId('file-input').setInputFiles(FLYER_PDF);
+        await expect(page.getByText('画像を準備しています…')).toBeVisible();
+        await expect(page.getByRole('button', { name: '読み取る' })).toBeDisabled();
+
+        releaseWorker();
+        await expect(page.getByText('画像を準備しています…')).toBeHidden();
+        await expect(page.getByRole('list', { name: '追加したチラシの一覧' }).getByRole('listitem').first()).toBeVisible();
+        await expect(page.getByRole('button', { name: '読み取る' })).toBeEnabled();
     });
 
     test('SC-09 「作成を中断して一覧へ」は下書きとして残ることを知らせ、読み取っていない画像があるときは消えることを確かめる', async ({ page }, testInfo) => {

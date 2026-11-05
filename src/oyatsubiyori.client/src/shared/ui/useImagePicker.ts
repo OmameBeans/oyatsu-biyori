@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, InputHTMLAttributes, RefObject } from 'react';
 import { checkFile, isPdf, preparePdfPages, prepareImage, releaseImages, ImagePrepError } from '../lib/imagePrep';
 import type { PreparedImage } from '../lib/imagePrep';
@@ -24,6 +24,14 @@ export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisab
     const [errors, setErrors] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
+    // 欄が外れたあとに準備が終わった画像は、状態に足さずに解放する（#9）
+    const isMountedRef = useRef(true);
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     const addFiles = async (files: File[]) => {
         if (files.length === 0) {
@@ -47,6 +55,10 @@ export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisab
             } catch (error) {
                 messages.push(error instanceof ImagePrepError ? error.message : `「${file.name}」を読めませんでした。別のファイルで試してください。`);
             }
+        }
+        if (!isMountedRef.current) {
+            releaseImages(added);
+            return;
         }
         const room = Math.max(maxImages - images.length, 0);
         if (added.length > room) {

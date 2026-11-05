@@ -413,7 +413,7 @@
 | #6 | あると良い | [条件設定のフォームをカードに載せ、入力欄を読みやすくする](https://github.com/OmameBeans/oyatsu-biyori/issues/6) | 見た目・文言 | 中 | SC-03, T2-06 |  | ✅ 2026-11-04 |
 | #7 | あると良い | [マイグレーションを、本番を含めてアプリの起動時に当てるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/7) | 改善 | 高 | D-42, NFR-OPS-01a, U-03, T8-02 |  | ⏭ 取り下げ（2026-11-04） |
 | #8 | 必須 | [献立一覧で、先の週に空きができてもその週の献立を開ける・作れるようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/8) | 不具合 | 中 | FR-LIST-00, SC-10, D-88, D-49 |  |  |
-| #9 | 必須 | [チラシの画像を準備している間は「読み取る」を押せないようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/9) | 不具合 | 高 | FR-FLYER-01, SC-09 |  |  |
+| #9 | 必須 | [チラシの画像を準備している間は「読み取る」を押せないようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/9) | 不具合 | 高 | FR-FLYER-01, SC-09 |  | ✅ 2026-11-05 |
 | #10 | あると良い | [献立作成で、まだ保存していない入力を、どの離れ方でも確認してから消すようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/10) | 不具合 | 中 | SC-09, FR-MENU-06 |  |  |
 | #11 | あると良い | [スマホではチラシの読み取り結果を表ではなくカードで出す](https://github.com/OmameBeans/oyatsu-biyori/issues/11) | 改善 | 高 | FR-FLYER-04, SC-09 |  |  |
 | #12 | あると良い | [チラシの表の「確定済み」のチップを緑にしない](https://github.com/OmameBeans/oyatsu-biyori/issues/12) | 見た目・文言 | 高 | SC-09, SR-20, D-83 | ○ |  |

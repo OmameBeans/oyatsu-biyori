@@ -103,6 +103,9 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
     }, [unsavedInput, onUnsavedInputChange]);
     useEffect(() => () => onUnsavedInputChange?.(null), [onUnsavedInputChange]);
 
+    // 画像の準備中に送ると、準備できた分だけが送られるので、準備が終わるまで読み取らせない（#9）
+    const canRead = images.length > 0 && !isPreparingImages && !startReading.isPending;
+
     const handleRead = () => {
         startReading.mutate(images, {
             onSuccess: (id) => setStartedJobId(id),
@@ -172,7 +175,7 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1.5, sm: 2 }} useFlexGap sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between', flexWrap: 'wrap', flexShrink: 0 }}>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 1.5 }} sx={{ alignItems: { sm: 'center' } }}>
-                            <Button variant="contained" size="large" onClick={handleRead} disabled={images.length === 0 || startReading.isPending} sx={{ px: 4 }}>
+                            <Button variant="contained" size="large" onClick={handleRead} disabled={!canRead} sx={{ px: 4 }}>
                                 {failedJob ? 'もう一度試す' : '読み取る'}
                             </Button>
                             {images.length === 0 && (
