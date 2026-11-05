@@ -13,12 +13,6 @@ export const CATEGORY_LABEL: Record<JudgementCategory, string> = {
     Safe: '使えます',
 };
 
-export const CATEGORY_EMOJI: Record<JudgementCategory, string> = {
-    Blocked: '🔴',
-    Warning: '🟡',
-    Safe: '🟢',
-};
-
 /** MUI の色（区分で決める） */
 export const CATEGORY_COLOR: Record<JudgementCategory, 'error' | 'warning' | 'success'> = {
     Blocked: 'error',
@@ -130,23 +124,3 @@ export const manufacturerCheckText = (allergens: string[]): string | null =>
 /** 「パッケージで確認する商品」か（🟡 と、情報がないため 🔴 の商品） */
 export const needsPackageCheck = (judgement: AllergenJudgement): boolean =>
     judgement.category === JUDGEMENT_CATEGORY.WARNING || (judgement.category === JUDGEMENT_CATEGORY.BLOCKED && judgement.kind === JUDGEMENT_KIND.UNKNOWN);
-
-/** SC-08：全文で避ける品目の言葉が当たったときの知らせ（「含まない」にしても 🔴 は消えない。SR-14・03 §6.2） */
-export const keywordHitNotice = (words: { keyword: string; allergenName: string }[], where: '原材料' | '読み取った全文' | '注意書き'): string | null => {
-    if (words.length === 0) {
-        return null;
-    }
-    const list = [...new Set(words.map((w) => `『${w.keyword}』（${w.allergenName}）`))].join('・');
-    if (where === '注意書き') {
-        return `注意書きに、避ける品目の言葉があります：${list}。判断は職員が行ってください（判定は変わりません）`;
-    }
-    const prefix = where === '原材料' ? '原材料' : 'AI が読み取った全文';
-    return `${prefix}に、避ける品目の言葉があります：${list}。アレルゲン確認で『含まない』にしても、${CATEGORY_EMOJI.Blocked} ${CATEGORY_LABEL.Blocked} の表示は消えません`;
-};
-
-/** 使えない商品が今日以降の献立に入っているときの知らせ */
-export const blockedInMenuNotice = (): string => `${CATEGORY_EMOJI.Blocked} 今日以降の献立に、使えない商品が入っています。別の商品に替えてください`;
-
-/** パッケージ以外の情報源を選んだときの知らせ（FR-PROD-06b。画面に「参考」とは出さない） */
-export const nonPackageSourceNotice = (): string =>
-    `パッケージ以外の情報では ${CATEGORY_EMOJI.Safe} ${CATEGORY_LABEL.Safe} にはなりません（献立では ${CATEGORY_EMOJI.Warning} ${CATEGORY_LABEL.Warning} か ${CATEGORY_EMOJI.Blocked} ${CATEGORY_LABEL.Blocked} になります）。「含む」の品目だけが記録されます`;

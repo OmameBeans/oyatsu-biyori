@@ -14,7 +14,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
-import { AllergenJudgementLine, blockedInMenuNotice, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
+import { AllergenJudgementLine, BlockedInMenuNotice, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { useProduct, useUpdateProduct } from '../../../entities/product';
 import type { CheckHistory, ProductDetail } from '../../../entities/product';
 import { errorMessageOf } from '../../../shared/api';
@@ -62,7 +62,7 @@ export const ProductDetailPage = () => {
                 {product.usages.length > 0 && (
                     <Alert severity={isBlocked ? 'error' : 'info'} variant={isBlocked ? 'filled' : 'standard'}>
                         <Typography sx={{ fontWeight: 700 }}>
-                            {isBlocked ? blockedInMenuNotice() : '今日以降の献立で使っています'}
+                            {isBlocked ? <BlockedInMenuNotice /> : '今日以降の献立で使っています'}
                         </Typography>
                         {product.usages.map((usage) => (
                             <Box key={`${usage.menuId}-${usage.date}`}>

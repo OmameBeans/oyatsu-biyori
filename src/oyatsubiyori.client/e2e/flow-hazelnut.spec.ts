@@ -85,7 +85,7 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         // 2. 今週の商品では 🟡 要確認（チラシの情報だけ）で、献立に入れられる
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
         const listed = page.getByRole('region', { name: 'ことりのさくさくショコラ' });
-        await expect(listed.getByText('🟡 要確認')).toBeVisible();
+        await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
 
         // 3. 手で水曜に入れる（自分で組む）
         await page.getByRole('tab', { name: '献立案', exact: true }).click();
@@ -105,7 +105,7 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
 
         // 5. 改行をまたいでも、当たった言葉を強調し、「含まない」にしても 🔴 が消えないことを示す
         await expect(page.getByText(/^原材料に、避ける品目の言葉があります：.*ヘーゼルナッツ/)).toBeVisible();
-        await expect(page.getByText(/^原材料に.*『含まない』にしても、🔴 使えません の表示は消えません/)).toBeVisible();
+        await expect(page.getByText(/^原材料に.*『含まない』にしても、使えません の表示は消えません/)).toBeVisible();
 
         // 職員が全文から言葉を消しても、AI が読み取った全文に言葉があることを示し続ける
         await page.getByLabel('原材料の全文').fill('小麦粉（国内製造）、砂糖、全粉乳（一部に小麦・乳成分・大豆を含む）');
@@ -131,7 +131,8 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         // 8. 日ごとのカードにも 🔴 と「別の商品に替えてください」が出る
         await page.getByRole('link', { name: /（水）の献立/ }).first().click();
         const card = page.getByRole('region', { name: /（水）の献立$/ });
-        await expect(card.getByText('🔴 使えません')).toBeVisible();
+        await expect(card.getByText('使えません', { exact: true })).toBeVisible();
+        await expect(card.getByTestId('allergen-icon-Blocked')).toBeVisible();
         await expect(card.getByText('別の商品に替えてください', { exact: false })).toBeVisible();
 
         // #4 ダークでも、🔴 の知らせ（献立一覧・商品詳細・確定のダイアログ）が読める（PC とスマホ。データは変えない）

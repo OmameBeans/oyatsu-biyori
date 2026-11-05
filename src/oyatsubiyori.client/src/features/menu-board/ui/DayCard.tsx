@@ -14,7 +14,7 @@ import Typography from '@mui/material/Typography';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { useSnackbar } from 'notistack';
-import { AllergenJudgementLine, acknowledgementSentence, CATEGORY_EMOJI } from '../../../entities/allergen-judgement';
+import { AllergenCategoryMark, AllergenJudgementLine, acknowledgementSentence } from '../../../entities/allergen-judgement';
 import { useAcknowledge, useAddItem, useRemoveItem, useReplaceItem, useUpdateDay, useUpdateItem } from '../../../entities/menu';
 import type { ListedProduct, MenuDay, MenuDetail, MenuIssue, MenuItem as MenuItemData } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -115,7 +115,12 @@ export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps)
                     <TextField select label="商品を足す" value={adding} onChange={(event) => setAdding(event.target.value)} sx={{ flex: 1 }} disabled={isPending}>
                         {candidates.map((candidate) => (
                             <MenuItem key={candidate.productId} value={candidate.productId}>
-                                {candidate.name}（{candidate.price !== null ? formatYen(candidate.price) : '価格なし'}）{candidate.judgement.category === 'Warning' ? ` ${CATEGORY_EMOJI.Warning}` : ''}
+                                {candidate.name}（{candidate.price !== null ? formatYen(candidate.price) : '価格なし'}）{candidate.judgement.category === 'Warning' && (
+                                    <>
+                                        {' '}
+                                        <AllergenCategoryMark category="Warning" />
+                                    </>
+                                )}
                             </MenuItem>
                         ))}
                     </TextField>

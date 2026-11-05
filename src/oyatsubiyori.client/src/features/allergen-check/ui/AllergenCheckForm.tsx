@@ -17,7 +17,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { AllergenJudgementLine, blockedInMenuNotice, keywordHitNotice, manufacturerCheckText, nonPackageSourceNotice } from '../../../entities/allergen-judgement';
+import { AllergenJudgementLine, BlockedInMenuNotice, KeywordHitNotice, manufacturerCheckText, NonPackageSourceNotice } from '../../../entities/allergen-judgement';
 import { useKeywordHits, useRecordCheck, useStartExtraction } from '../../../entities/product';
 import type { AllergenExtraction, CheckRecorded, CheckSource, KeywordRange, ProductDetail } from '../../../entities/product';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
@@ -173,7 +173,7 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                 {result.usages.length > 0 ? (
                     <Alert severity={isBlocked ? 'error' : 'info'} variant={isBlocked ? 'filled' : 'standard'}>
                         <Typography sx={{ fontWeight: 700 }}>
-                            {isBlocked ? blockedInMenuNotice() : 'この商品を使う今日以降の献立'}
+                            {isBlocked ? <BlockedInMenuNotice /> : 'この商品を使う今日以降の献立'}
                         </Typography>
                         {result.usages.map((usage) => (
                             <Box key={`${usage.menuId}-${usage.date}`}>
@@ -247,10 +247,10 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                             />
                             {/* 強調の範囲は、範囲を求めた全文（入力が落ち着いたあとの全文）に当てる */}
                             {debouncedText.trim() && <HighlightedText text={debouncedText} ranges={hits} />}
-                            {hits.length > 0 && <Alert severity="error">{keywordHitNotice(hits, '原材料')}</Alert>}
-                            {lostWords.length > 0 && <Alert severity="error">{keywordHitNotice(lostWords, '読み取った全文')}</Alert>}
+                            {hits.length > 0 && <Alert severity="error"><KeywordHitNotice words={hits} where="原材料" /></Alert>}
+                            {lostWords.length > 0 && <Alert severity="error"><KeywordHitNotice words={lostWords} where="読み取った全文" /></Alert>}
                             <TextField label="同じ工場・コンタミの注意書き" value={contamination} onChange={(event) => setContamination(event.target.value)} />
-                            {contaminationHits.length > 0 && <Alert severity="warning">{keywordHitNotice(contaminationHits, '注意書き')}</Alert>}
+                            {contaminationHits.length > 0 && <Alert severity="warning"><KeywordHitNotice words={contaminationHits} where="注意書き" /></Alert>}
                         </Stack>
                     </Box>
                 </CardContent>
@@ -328,7 +328,7 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                     </FormControl>
                     {!isPackage && (
                         <Alert severity="warning" sx={{ mt: 1 }}>
-                            {nonPackageSourceNotice()}
+                            <NonPackageSourceNotice />
                         </Alert>
                     )}
                     {isPackage && !canRecord && (

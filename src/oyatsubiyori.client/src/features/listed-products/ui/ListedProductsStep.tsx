@@ -14,7 +14,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
-import { AllergenJudgementLine, CATEGORY_EMOJI, CATEGORY_LABEL, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
+import { AllergenCategoryMark, AllergenJudgementLine, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { useListedProducts, useSetExcluded, useSetListedValues } from '../../../entities/menu';
 import type { ListedProduct } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -54,8 +54,8 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                 <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, alignItems: { md: 'center' } }}>
                     <Box sx={{ flex: 1 }}>
                         <Typography variant="h3" component="h2">
-                            献立に入れられる商品 {data.candidateCount}件（うち {CATEGORY_EMOJI.Warning} {CATEGORY_LABEL.Warning} {data.candidateWarningCount}件）／ {CATEGORY_EMOJI.Blocked}{' '}
-                            {CATEGORY_LABEL.Blocked} {data.blockedCount}件
+                            献立に入れられる商品 {data.candidateCount}件（うち <AllergenCategoryMark category="Warning" /> {data.candidateWarningCount}件）／{' '}
+                            <AllergenCategoryMark category="Blocked" /> {data.blockedCount}件
                         </Typography>
                         {data.excludedCount > 0 && (
                             <Typography variant="body2" color="text.secondary">
@@ -75,10 +75,10 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                 <ToggleButtonGroup size="small" exclusive value={allergenFilter} onChange={(_, value) => value && setAllergenFilter(value)} aria-label="アレルゲンの表示で絞り込む">
                     <ToggleButton value="all">すべて</ToggleButton>
                     <ToggleButton value="warning">
-                        {CATEGORY_EMOJI.Warning} {CATEGORY_LABEL.Warning}
+                        <AllergenCategoryMark category="Warning" />
                     </ToggleButton>
                     <ToggleButton value="blocked">
-                        {CATEGORY_EMOJI.Blocked} {CATEGORY_LABEL.Blocked}
+                        <AllergenCategoryMark category="Blocked" />
                     </ToggleButton>
                 </ToggleButtonGroup>
                 <ToggleButtonGroup size="small" exclusive value={snackFilter} onChange={(_, value) => value && setSnackFilter(value)} aria-label="分類で絞り込む">

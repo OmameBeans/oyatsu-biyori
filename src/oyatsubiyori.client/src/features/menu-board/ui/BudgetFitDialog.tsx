@@ -10,7 +10,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { CATEGORY_EMOJI } from '../../../entities/allergen-judgement';
+import { AllergenCategoryIcon } from '../../../entities/allergen-judgement';
 import { useApplyBudgetFit, useStartBudgetFit } from '../../../entities/menu';
 import type { BudgetFit, MenuDetail } from '../../../entities/menu';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
@@ -77,7 +77,7 @@ export const BudgetFitDialog = ({ menu, isOpen, onClose }: BudgetFitDialogProps)
                                         {option.explanation && <ClaudeText text={option.explanation} color="text.secondary" />}
                                         {option.usesWarningProduct && (
                                             <Typography variant="caption" sx={{ color: 'warning.dark' }}>
-                                                {CATEGORY_EMOJI.Warning} アレルゲンの確認が要る商品を使います
+                                                <AllergenCategoryIcon category="Warning" isInherit /> アレルゲンの確認が要る商品を使います
                                             </Typography>
                                         )}
                                     </CardContent>

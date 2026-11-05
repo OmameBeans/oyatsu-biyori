@@ -8,11 +8,14 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
     test('FR-PROD-01・03 一覧にアレルゲンの表示と理由が出て、🔴 で絞り込める', async ({ page }, testInfo) => {
         await page.goto('/products');
         await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
-        await expect(page.getByRole('region', { name: 'ころころ ココナッツサブレ' }).getByText('🔴 使えません')).toBeVisible();
+        const blockedCard = page.getByRole('region', { name: 'ころころ ココナッツサブレ' });
+        await expect(blockedCard.getByText('使えません', { exact: true })).toBeVisible();
+        // 文字だけでなく、使えません のアイコンも出る（§6.1）
+        await expect(blockedCard.getByTestId('allergen-icon-Blocked')).toBeVisible();
         await captureScreen(page, testInfo, 'sc-06-products');
 
         await page.getByLabel('アレルゲンの表示').click();
-        await page.getByRole('option', { name: '🔴 使えません' }).click();
+        await page.getByRole('option', { name: '使えません', exact: true }).click();
         await expect(page).toHaveURL(/filter=Blocked/);
         await expect(page.getByRole('region', { name: 'しろくまの ヨーグルトゼリー' })).toHaveCount(0);
         await expect(page.getByRole('region', { name: 'ころころ ココナッツサブレ' })).toBeVisible();
@@ -70,7 +73,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
         await page.getByLabel('原材料の全文').fill('さつまいも、植物油、砂糖');
         await expect(packageButton).toBeDisabled();
         await page.getByLabel('サイト', { exact: false }).check();
-        await expect(page.getByText('パッケージ以外の情報では 🟢 使えます にはなりません', { exact: false })).toBeVisible();
+        await expect(page.getByText('パッケージ以外の情報では「使えます」にはなりません', { exact: false })).toBeVisible();
         // パッケージに戻すと、品目を決めるまで記録できない（SR-15）
         await page.getByLabel('パッケージ', { exact: true }).check();
         await expect(packageButton).toBeDisabled();
@@ -82,7 +85,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
         await captureScreen(page, testInfo, 'sc-08-other-source');
         await page.getByRole('button', { name: 'パッケージ以外の情報として記録' }).click();
         await expect(page.getByText('記録しました')).toBeVisible();
-        await expect(page.getByText('🟡 要確認').first()).toBeVisible();
+        await expect(page.getByText('要確認', { exact: true }).first()).toBeVisible();
     });
 
     test('FR-PROD-05 パッケージの画像を準備している間は「読み取る」を押せず、準備が終わると押せる', async ({ page }) => {

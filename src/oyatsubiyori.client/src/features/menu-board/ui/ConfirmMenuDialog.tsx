@@ -10,7 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { acknowledgementSentence, AllergenJudgementLine, CATEGORY_EMOJI, CATEGORY_LABEL, manufacturerCheckText } from '../../../entities/allergen-judgement';
+import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine, manufacturerCheckText } from '../../../entities/allergen-judgement';
 import { useConfirmMenu, useMenuConfirmation } from '../../../entities/menu';
 import type { MenuDetail } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -65,7 +65,7 @@ export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmM
                         {confirmation.acknowledgements.length > 0 && (
                             <Stack>
                                 <Typography sx={{ fontWeight: 700, mb: 0.5 }}>
-                                    {CATEGORY_EMOJI.Warning} {CATEGORY_LABEL.Warning}の商品（1件ずつ確かめてチェックしてください）
+                                    <AllergenCategoryMark category="Warning" />の商品（1件ずつ確かめてチェックしてください）
                                 </Typography>
                                 {confirmation.acknowledgements.map((a) => (
                                     <FormControlLabel

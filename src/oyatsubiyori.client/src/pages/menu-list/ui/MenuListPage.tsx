@@ -10,7 +10,7 @@ import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useSnackbar } from 'notistack';
-import { CATEGORY_EMOJI, judgementText } from '../../../entities/allergen-judgement';
+import { AllergenCategoryIcon, judgementText } from '../../../entities/allergen-judgement';
 import { useCreateMenu, useMenuList } from '../../../entities/menu';
 import type { MenuListRow } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -54,7 +54,7 @@ export const MenuListPage = () => {
                     <Stack spacing={2} sx={{ flexShrink: 0 }}>
                         {list.blockedUsages.length > 0 && (
                             <Alert severity="error" variant="filled">
-                                <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{CATEGORY_EMOJI.Blocked} 使えない商品が献立に入っています。別の商品に替えてください</Typography>
+                                <Typography sx={{ fontWeight: 700, mb: 0.5 }}><AllergenCategoryIcon category="Blocked" isInherit /> 使えない商品が献立に入っています。別の商品に替えてください</Typography>
                                 {list.blockedUsages.map((usage) => (
                                     <Box key={`${usage.menuId}-${usage.date}-${usage.productName}`}>
                                         <Link component={RouterLink} to={menuPath(usage.menuId, 4)} color="inherit" sx={{ fontWeight: 700 }}>

@@ -9,7 +9,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
-import { CATEGORY_EMOJI, CATEGORY_LABEL, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
+import { AllergenCategoryMark, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { useLatestProposalJob, useListedProducts, useRefreshMenu, useStartProposal, useUpdateBudget } from '../../../entities/menu';
 import type { MenuDetail, MenuProposalOutcome } from '../../../entities/menu';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
@@ -216,12 +216,12 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                         <Stack spacing={0.5}>
                             {blocked.length > 0 && (
                                 <Typography sx={{ color: 'error.main', fontWeight: 700 }}>
-                                    {CATEGORY_EMOJI.Blocked} {CATEGORY_LABEL.Blocked} {blocked.length}件（別の商品に替えてください）
+                                    <AllergenCategoryMark category="Blocked" /> {blocked.length}件（別の商品に替えてください）
                                 </Typography>
                             )}
                             {warnings.length > 0 && (
                                 <Typography sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                                    {CATEGORY_EMOJI.Warning} {CATEGORY_LABEL.Warning} {warnings.length}件（確定のときに1件ずつ確かめます）
+                                    <AllergenCategoryMark category="Warning" isInherit /> {warnings.length}件（確定のときに1件ずつ確かめます）
                                 </Typography>
                             )}
                             {duplicates.length > 0 && <Typography>同じ商品を出す期間 {duplicates.length}件</Typography>}

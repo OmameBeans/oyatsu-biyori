@@ -1,4 +1,5 @@
 import { Suspense, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -11,17 +12,17 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { AllergenJudgementLine, CATEGORY_EMOJI, CATEGORY_LABEL, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
+import { AllergenCategoryMark, AllergenJudgementLine, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { PRODUCT_FILTER, useProductList } from '../../../entities/product';
 import type { ProductFilter } from '../../../entities/product';
 import { productPath, SNACK_TYPE_LABEL } from '../../../shared/type';
 import { LoadingFallback, PageLayout } from '../../../shared/ui';
 
-const FILTER_LABEL: Record<ProductFilter, string> = {
+const FILTER_LABEL: Record<ProductFilter, ReactNode> = {
     All: 'すべて',
-    Blocked: `${CATEGORY_EMOJI.Blocked} ${CATEGORY_LABEL.Blocked}`,
-    Warning: `${CATEGORY_EMOJI.Warning} ${CATEGORY_LABEL.Warning}`,
-    Safe: `${CATEGORY_EMOJI.Safe} ${CATEGORY_LABEL.Safe}`,
+    Blocked: <AllergenCategoryMark category="Blocked" />,
+    Warning: <AllergenCategoryMark category="Warning" />,
+    Safe: <AllergenCategoryMark category="Safe" />,
     Package: 'パッケージで確認する商品',
     OtherPackage: 'そのほかの、パッケージで確認する商品',
     FuturePackage: '今日以降の献立で使う、パッケージで確認する商品',

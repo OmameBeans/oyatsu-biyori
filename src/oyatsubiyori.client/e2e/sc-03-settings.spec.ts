@@ -174,9 +174,9 @@ test.describe('#2 見た目（色のテーマ）', () => {
             await page.goto('/products');
             await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
             const colors = [
-                await readBadgeColorsOf(page, '🔴 使えません'),
-                await readBadgeColorsOf(page, '🟡 要確認'),
-                await readBadgeColorsOf(page, '🟢 使えます'),
+                await readBadgeColorsOf(page, '使えません'),
+                await readBadgeColorsOf(page, '要確認'),
+                await readBadgeColorsOf(page, '使えます'),
             ];
             if (baseline === null) {
                 baseline = colors;
@@ -334,9 +334,9 @@ test.describe('#4 見た目（明るさ）', () => {
             await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
             expect(isDarkColor(await readBackground(page))).toBe(true);
             const colors = [
-                await readBadgeColorsOf(page, '🔴 使えません'),
-                await readBadgeColorsOf(page, '🟡 要確認'),
-                await readBadgeColorsOf(page, '🟢 使えます'),
+                await readBadgeColorsOf(page, '使えません'),
+                await readBadgeColorsOf(page, '要確認'),
+                await readBadgeColorsOf(page, '使えます'),
             ];
             if (baseline === null) {
                 baseline = colors;

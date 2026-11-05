@@ -5,7 +5,8 @@ import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { ROUTE } from '../../../shared/type';
-import { CATEGORY_COLOR, CATEGORY_EMOJI, CATEGORY_LABEL, judgementText, manufacturerCheckText } from '../model/text';
+import { CATEGORY_ICON, categoryIconTestId } from '../model/icon';
+import { CATEGORY_COLOR, CATEGORY_LABEL, judgementText, manufacturerCheckText } from '../model/text';
 import type { AllergenJudgement } from '../../../shared/type';
 
 interface AllergenBadgeProps {
@@ -13,16 +14,20 @@ interface AllergenBadgeProps {
     size?: 'small' | 'medium';
 }
 
-/** 3つの表示のバッジ（色・絵文字・文字の3つで示す。D-83） */
-export const AllergenBadge = ({ judgement, size = 'small' }: AllergenBadgeProps) => (
-    <Chip
-        size={size}
-        color={CATEGORY_COLOR[judgement.category]}
-        variant={judgement.category === 'Safe' ? 'outlined' : 'filled'}
-        label={`${CATEGORY_EMOJI[judgement.category]} ${CATEGORY_LABEL[judgement.category]}`}
-        sx={{ fontWeight: 700 }}
-    />
-);
+/** 3つの表示のバッジ（色・アイコン・文字の3つで示す。D-83） */
+export const AllergenBadge = ({ judgement, size = 'small' }: AllergenBadgeProps) => {
+    const Icon = CATEGORY_ICON[judgement.category];
+    return (
+        <Chip
+            size={size}
+            color={CATEGORY_COLOR[judgement.category]}
+            variant={judgement.category === 'Safe' ? 'outlined' : 'filled'}
+            icon={<Icon data-testid={categoryIconTestId(judgement.category)} />}
+            label={CATEGORY_LABEL[judgement.category]}
+            sx={{ fontWeight: 700 }}
+        />
+    );
+};
 
 interface AllergenJudgementLineProps {
     judgement: AllergenJudgement;

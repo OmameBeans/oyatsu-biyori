@@ -10,7 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { CATEGORY_EMOJI, CATEGORY_LABEL } from '../../../entities/allergen-judgement';
+import { CATEGORY_ICON, CATEGORY_LABEL } from '../../../entities/allergen-judgement';
 import type { MenuListRow } from '../../../entities/menu';
 import { formatWeekLabel, formatYen } from '../../../shared/lib';
 import { MENU_STATUS } from '../../../shared/type';
@@ -54,21 +54,24 @@ interface IssueChipsProps {
 }
 
 /** 商品の問題のバッジ（🔴 使えません・🟡 要確認・確認し直し。FR-MENU-34a） */
-export const IssueChips = ({ row }: IssueChipsProps) => (
-    <>
-        {row.blockedCount > 0 && <Chip size="small" color="error" label={`${CATEGORY_EMOJI.Blocked} ${CATEGORY_LABEL.Blocked} ${row.blockedCount}件`} sx={TAG_SX} />}
-        {row.warningCount > 0 && <Chip size="small" color="warning" label={`${CATEGORY_EMOJI.Warning} ${CATEGORY_LABEL.Warning} ${row.warningCount}件`} sx={TAG_SX} />}
-        {row.recheckCount > 0 && (
-            // warning.main の文字は白の上で 4.5:1 に届かないので、文字と枠は warning.dark にする（theme.ts）
-            <Chip
-                size="small"
-                variant="outlined"
-                label={`確認し直し ${row.recheckCount}件`}
-                sx={{ ...TAG_SX, color: 'warning.dark', borderColor: 'warning.dark' }}
-            />
-        )}
-    </>
-);
+export const IssueChips = ({ row }: IssueChipsProps) => {
+    const { Blocked: BlockedIcon, Warning: WarningIcon } = CATEGORY_ICON;
+    return (
+        <>
+            {row.blockedCount > 0 && <Chip size="small" color="error" icon={<BlockedIcon />} label={`${CATEGORY_LABEL.Blocked} ${row.blockedCount}件`} sx={TAG_SX} />}
+            {row.warningCount > 0 && <Chip size="small" color="warning" icon={<WarningIcon />} label={`${CATEGORY_LABEL.Warning} ${row.warningCount}件`} sx={TAG_SX} />}
+            {row.recheckCount > 0 && (
+                // warning.main の文字は白の上で 4.5:1 に届かないので、文字と枠は warning.dark にする（theme.ts）
+                <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`確認し直し ${row.recheckCount}件`}
+                    sx={{ ...TAG_SX, color: 'warning.dark', borderColor: 'warning.dark' }}
+                />
+            )}
+        </>
+    );
+};
 
 interface DraftMenuProps {
     row: MenuListRow;

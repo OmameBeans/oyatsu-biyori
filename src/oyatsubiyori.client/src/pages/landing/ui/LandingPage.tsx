@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -7,11 +8,20 @@ import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { AllergenCategoryMark } from '../../../entities/allergen-judgement';
 import { ROUTE } from '../../../shared/type';
 
-const STEPS = [
+const STEPS: { title: string; text: ReactNode }[] = [
     { title: '撮る', text: 'コープのチラシを撮影するか、画像・PDF を選びます。商品・価格・アレルゲンの表記を読み取ります。' },
-    { title: '確かめる', text: '今週の商品を一覧で見渡します。アレルゲンの表示（🔴 / 🟡 / 🟢）と理由が並びます。' },
+    {
+        title: '確かめる',
+        text: (
+            <>
+                今週の商品を一覧で見渡します。アレルゲンの表示（<AllergenCategoryMark category="Blocked" /> ／ <AllergenCategoryMark category="Warning" /> ／{' '}
+                <AllergenCategoryMark category="Safe" />）と理由が並びます。
+            </>
+        ),
+    },
     { title: '伝える', text: '「金曜は誕生日会なので豪華に」など、週の要望を文章で伝えると、理由つきの献立案が届きます。' },
     { title: '直す', text: 'チャットで直したり、手で入れ替えたりして、確定します。予算に合わせる入れ替え案も出します。' },
 ];
@@ -95,7 +105,8 @@ export const LandingPage = () => (
                             <strong>職員が確定すること：</strong>アレルゲンの最終確認は、必ず職員がパッケージの原材料表示を見て行います。
                         </Typography>
                         <Typography>
-                            <strong>3つの表示：</strong>🔴 使えません ／ 🟡 要確認 ／ 🟢 使えます。理由と、次にすることを必ず添えます。
+                            <strong>3つの表示：</strong>
+                            <AllergenCategoryMark category="Blocked" /> ／ <AllergenCategoryMark category="Warning" /> ／ <AllergenCategoryMark category="Safe" />。理由と、次にすることを必ず添えます。
                         </Typography>
                         <Typography>
                             <strong>29品目に入らない食材：</strong>ヘーゼルナッツなど、アレルゲン表示の対象外の食材も、原材料の全文から探します。

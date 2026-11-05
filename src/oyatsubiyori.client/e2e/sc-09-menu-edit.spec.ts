@@ -219,7 +219,8 @@ test.describe.serial('SC-09 献立作成', () => {
 
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
         const listed = page.getByRole('region', { name: 'ことりのピピ ラムネ' });
-        await expect(listed.getByText('🟡 要確認')).toBeVisible();
+        await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
+        await expect(listed.getByTestId('allergen-icon-Warning')).toBeVisible();
         await expect(listed.getByText('チラシにアレルゲンの表記がありません')).toBeVisible();
         await captureScreen(page, testInfo, 'sc-09-step2-listed');
     });
@@ -324,7 +325,7 @@ test.describe.serial('SC-09 献立作成', () => {
         await openWeek(page, '再来週');
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
         const card = page.getByRole('region', { name: 'ころころ ココナッツサブレ' });
-        await expect(card.getByText('🔴 使えません')).toBeVisible();
+        await expect(card.getByText('使えません', { exact: true })).toBeVisible();
         await expect(card.getByText(/『ココナッツ』があります/)).toBeVisible();
     });
 
