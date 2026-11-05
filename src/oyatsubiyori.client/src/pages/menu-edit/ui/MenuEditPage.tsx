@@ -10,6 +10,8 @@ import Stepper from '@mui/material/Stepper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import type { Theme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSnackbar } from 'notistack';
 import { useFlyerImport } from '../../../entities/flyer';
@@ -18,11 +20,12 @@ import { FlyerImportStep } from '../../../features/flyer-import';
 import { ListedProductsStep } from '../../../features/listed-products';
 import { MenuBoard } from '../../../features/menu-board';
 import { ChatPanel } from '../../../features/menu-chat';
+import { MenuProductPanel } from '../../../features/menu-products';
 import { RequestStep } from '../../../features/menu-request';
 import { isJobFinished } from '../../../shared/api';
 import { formatWeekLabel } from '../../../shared/lib';
-import { MENU_STATUS, ROUTE } from '../../../shared/type';
-import { ConfirmDialog, PageErrorBoundary, PageLayout } from '../../../shared/ui';
+import { MENU_STATUS, PREFERENCE_KEY, ROUTE } from '../../../shared/type';
+import { ConfirmDialog, PageErrorBoundary, PageLayout, ResizableColumns } from '../../../shared/ui';
 
 const STEPS = ['チラシ取り込み', '今週の商品', '要望の入力', '献立案'] as const;
 
@@ -79,8 +82,12 @@ export const MenuEditPage = () => {
     const [params, setParams] = useSearchParams();
     const { data: menu } = useMenu(menuId);
     const { data: flyerImport } = useFlyerImport(menuId);
-    const [mobileTab, setMobileTab] = useState<'board' | 'chat'>('board');
+    const [mobileTab, setMobileTab] = useState<'products' | 'board' | 'chat'>('board');
     const [isBudgetFitRequested, setIsBudgetFitRequested] = useState(false);
+    // 手順4のコマンドバーを出す場所（献立の列がここへ出す）と、3列にするか（広い PC だけ）
+    const [commandBarElement, setCommandBarElement] = useState<HTMLDivElement | null>(null);
+    // 初めから正しい形で出す（一度1列で出てから3列に変わらないように）
+    const isWide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'), { noSsr: true });
     // 今の手順で、離れると消える入力（何が消えるか）。手順は1つずつしか出さないので、1つだけ持つ
     const [unsavedInput, setUnsavedInput] = useState<string | null>(null);
     const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
@@ -139,25 +146,48 @@ export const MenuEditPage = () => {
                 {step === 2 && <ListedProductsStep menuId={menu.id} onBackToFlyer={() => goStep(1)} onNext={() => goStep(3)} />}
                 {step === 3 && <RequestStep menu={menu} onStarted={() => goStep(4)} onManual={() => goStep(4)} onUnsavedInputChange={setUnsavedInput} />}
                 {step === 4 && (
-                    <>
-                        <Tabs value={mobileTab} onChange={(_, value) => setMobileTab(value)} sx={{ display: { md: 'none' }, mb: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', height: { md: '100%' } }}>
+                        {/* コマンドバー（週の実績・予算と「確定」などのボタン）。中身は献立の列（MenuBoard）が出す */}
+                        <Box ref={setCommandBarElement} sx={{ flexShrink: 0, mb: 2 }} />
+                        <Tabs value={mobileTab} onChange={(_, value) => setMobileTab(value)} sx={{ display: { lg: 'none' }, mb: 1, flexShrink: 0 }}>
+                            <Tab value="products" label="使える商品" />
                             <Tab value="board" label="献立" />
                             <Tab value="chat" label="チャット" />
                         </Tabs>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 2fr) minmax(280px, 1fr)' }, gap: 2, height: { md: '100%' } }}>
-                            <Box sx={{ display: { xs: mobileTab === 'board' ? 'block' : 'none', md: 'block' }, minWidth: 0, overflow: { md: 'auto' } }}>
-                                <MenuBoard
-                                    menu={menu}
-                                    isBudgetFitRequested={isBudgetFitRequested}
-                                    onBudgetFitClosed={() => setIsBudgetFitRequested(false)}
-                                    onEditRequest={() => goStep(3)}
-                                />
-                            </Box>
-                            <Box sx={{ display: { xs: mobileTab === 'chat' ? 'block' : 'none', md: 'block' }, minHeight: 0 }}>
-                                <ChatPanel menu={menu} onBudgetFitRequested={() => setIsBudgetFitRequested(true)} onUnsavedInputChange={setUnsavedInput} />
-                            </Box>
+                        {/* 広い PC（lg 以上）は左から「使える商品」「献立」「チャット」の3列。境目をドラッグして幅を変えられる。
+                            商品を献立へドラッグして足せる（FR-MENU-24）。それより狭い幅ではタブで切り替える */}
+                        <Box sx={{ flex: { md: 1 }, minHeight: 0 }}>
+                            <ResizableColumns
+                                isEnabled={isWide}
+                                defaultWidths={{ left: 260, right: 300 }}
+                                minWidths={{ left: 200, right: 240 }}
+                                minCenterWidth={420}
+                                splitterLabels={['使える商品と献立の境目', '献立とチャットの境目']}
+                                storageKey={PREFERENCE_KEY.MENU_COLUMN_WIDTHS}
+                                left={
+                                    <Box sx={{ display: { xs: mobileTab === 'products' ? 'block' : 'none', lg: 'block' }, height: { md: '100%' } }}>
+                                        <MenuProductPanel menu={menu} />
+                                    </Box>
+                                }
+                                center={
+                                    <Box sx={{ display: { xs: mobileTab === 'board' ? 'block' : 'none', lg: 'block' }, overflow: { md: 'auto', lg: 'visible' }, height: { md: '100%', lg: 'auto' } }}>
+                                        <MenuBoard
+                                            menu={menu}
+                                            commandBarContainer={commandBarElement}
+                                            isBudgetFitRequested={isBudgetFitRequested}
+                                            onBudgetFitClosed={() => setIsBudgetFitRequested(false)}
+                                            onEditRequest={() => goStep(3)}
+                                        />
+                                    </Box>
+                                }
+                                right={
+                                    <Box sx={{ display: { xs: mobileTab === 'chat' ? 'block' : 'none', lg: 'block' }, height: { md: '100%' } }}>
+                                        <ChatPanel menu={menu} onBudgetFitRequested={() => setIsBudgetFitRequested(true)} onUnsavedInputChange={setUnsavedInput} />
+                                    </Box>
+                                }
+                            />
                         </Box>
-                    </>
+                    </Box>
                 )}
             </PageErrorBoundary>
             <ConfirmDialog

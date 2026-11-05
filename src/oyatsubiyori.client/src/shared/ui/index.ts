@@ -5,4 +5,5 @@ export * from './JobProgress';
 export * from './LoadingFallback';
 export * from './PageErrorBoundary';
 export * from './PageLayout';
+export * from './ResizableColumns';
 export * from './useImagePicker';

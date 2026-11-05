@@ -521,6 +521,52 @@ public sealed class MenuApplicationService(
         });
     }
 
+    /// <summary>
+    /// 商品を別の日へ動かす（献立案の画面のドラッグ＆ドロップ。FR-MENU-24）。価格は献立に入れた時点のまま、1人あたりの個数も保ち、
+    /// パック数は動かした先の日の人数が違えば求め直す（同じなら上書きした値も残す）。日が変わると重複などの判定も変わるので、確定時の確認は消す（確認し直し。SR-22）。
+    /// </summary>
+    public async Task<Result<MenuDetailView>> MoveItemAsync(string? menuId, string? itemId, DateOnly date, string? rowVersion)
+    {
+        return await EditAsync(menuId, rowVersion, (menu, context) =>
+        {
+            var (from, item) = FindItem(menu, itemId);
+            var to = menu.Days.FirstOrDefault(d => d.Date == date);
+            if (from is null || item is null || to is null)
+            {
+                return Task.FromResult(Result.Error("日か商品が見つかりません。画面を読み込み直してください"));
+            }
+
+            if (from.Id == to.Id)
+            {
+                return Task.FromResult(Result.Error("同じ日には動かせません。別の日に動かしてください"));
+            }
+
+            if (to.Items.Any(i => i.ProductId == item.ProductId))
+            {
+                var name = context.FindProduct(item.ProductId)?.Name ?? "この商品";
+                return Task.FromResult(Result.Error($"「{name}」は動かす先の日にもう入っています。パック数を変えてください"));
+            }
+
+            // 人数が同じ日へ動かすときは、パック数（職員や入れ替え案が上書きした値も）をそのまま残す。人数が違えば式で求め直す（U-04）
+            var isSameChildren = from.ChildrenCount == to.ChildrenCount;
+            // 先に行き先の日へ付け替えてから元の日の一覧から外す（途中で変更の検出が走っても、
+            // 「どの日にも属さない商品」として消されないように）
+            item.MenuDayId = to.Id;
+            item.MenuDay = to;
+            to.Items.Add(item);
+            from.Items.Remove(item);
+            if (!isSameChildren)
+            {
+                MenuItemFactory.RecalculatePackCount(item, to, context.PiecesPerPack(item.ProductId));
+            }
+
+            item.Amount = MenuAmountCalculator.StoredItemAmount(item, to);
+            MenuItemFactory.ClearAcknowledgement(item);
+            item.UpdateDateTime = _timeProvider.GetUtcNow().UtcDateTime;
+            return Task.FromResult(new Result());
+        });
+    }
+
     /// <summary>1人あたりの個数（パック数を式で求め直す）かパック数（上書き）を変える（U-04）</summary>
     public async Task<Result<MenuDetailView>> UpdateItemAsync(string? menuId, string? itemId, int? perChildCount, int? packCount, string? rowVersion)
     {

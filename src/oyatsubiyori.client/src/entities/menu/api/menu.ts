@@ -54,6 +54,8 @@ export const postReplaceItem = (menuId: string, update: ItemUpdate, rowVersion: 
     apiPost<MenuDetail>(ENDPOINT.MENUS_REPLACE_ITEM, { menuId, ...update, rowVersion });
 export const postRemoveItem = (menuId: string, update: ItemUpdate, rowVersion: string) =>
     apiPost<MenuDetail>(ENDPOINT.MENUS_REMOVE_ITEM, { menuId, ...update, rowVersion });
+export const postMoveItem = (menuId: string, update: ItemUpdate, rowVersion: string) =>
+    apiPost<MenuDetail>(ENDPOINT.MENUS_MOVE_ITEM, { menuId, ...update, rowVersion });
 export const postUpdateItem = (menuId: string, update: ItemUpdate, rowVersion: string) =>
     apiPost<MenuDetail>(ENDPOINT.MENUS_UPDATE_ITEM, { menuId, ...update, rowVersion });
 export const postConfirm = (menuId: string, acknowledgements: AcknowledgementInput[], rowVersion: string) =>

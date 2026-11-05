@@ -1,4 +1,5 @@
 export * from './model/types';
+export * from './model/drag';
 export type { DayUpdate, ItemUpdate } from './api/menu';
 export {
     menuKeys,
@@ -9,11 +10,14 @@ export {
     useConfirmMenu,
     useCreateMenu,
     useDeleteMenu,
+    useIsMenuEditing,
+    useIsMenuProposalRunning,
     useLatestProposalJob,
     useListedProducts,
     useMenu,
     useMenuConfirmation,
     useMenuList,
+    useMoveItem,
     useRefreshMenu,
     useRemoveItem,
     useReplaceItem,

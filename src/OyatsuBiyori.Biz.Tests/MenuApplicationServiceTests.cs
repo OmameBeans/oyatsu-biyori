@@ -132,6 +132,154 @@ public class MenuApplicationServiceTests
     }
 
     [Fact]
+    public async Task FR_MENU_24_商品を別の日へ動かすと_価格と1人あたりの個数を保ち_先の日の人数でパック数を求め直す()
+    {
+        var data = new InMemoryData();
+        var snack = Safe("ほしがたクッキー", SnackType.Sweet, pieces: 10, perChild: 2);
+        data.Products.Add(snack);
+        var menu = NewMenu(20000, 50, (snack, 300));
+        var item = Put(menu, 0, snack);
+        menu.Days.Single(d => d.Date == D(2)).ChildrenCount = 33;
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var result = await service.MoveItemAsync(menu.Id, item.Id, D(2), null);
+
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        Assert.Empty(menu.Days.Single(d => d.Date == D(0)).Items);
+        var moved = Assert.Single(menu.Days.Single(d => d.Date == D(2)).Items);
+        Assert.Same(item, moved);
+        Assert.Equal(menu.Days.Single(d => d.Date == D(2)).Id, moved.MenuDayId);
+        Assert.Equal(300, moved.UnitPrice);
+        Assert.Equal(2, moved.PerChildCount);
+        // 33人 × 2個 ÷ 10個入り = 6.6 → 切り上げて7パック
+        Assert.Equal(7, moved.PackCount);
+        Assert.Equal(2100, moved.Amount);
+    }
+
+    [Fact]
+    public async Task FR_MENU_24_人数が同じ日へ動かすと_上書きしたパック数を残す()
+    {
+        var data = new InMemoryData();
+        var snack = Safe("ほしがたクッキー", SnackType.Sweet, pieces: 10);
+        data.Products.Add(snack);
+        var menu = NewMenu(20000, 50, (snack, 300));
+        var item = Put(menu, 0, snack);
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+        await service.UpdateItemAsync(menu.Id, item.Id, null, 8, null);
+
+        var result = await service.MoveItemAsync(menu.Id, item.Id, D(1), null);
+
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        // 50人 × 1個 ÷ 10個入り = 5 だが、職員が直した8パックのまま
+        Assert.Equal(8, item.PackCount);
+        Assert.Equal(2400, item.Amount);
+    }
+
+    [Fact]
+    public async Task D_77_手作りの日へ動かすと_金額は0になる()
+    {
+        var data = new InMemoryData();
+        var snack = Safe("ほしがたクッキー", SnackType.Sweet, pieces: 10);
+        data.Products.Add(snack);
+        var menu = NewMenu(20000, 50, (snack, 300));
+        var item = Put(menu, 0, snack);
+        menu.Days.Single(d => d.Date == D(4)).DayType = DayType.Handmade;
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var result = await service.MoveItemAsync(menu.Id, item.Id, D(4), null);
+
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        Assert.Equal(0, item.Amount);
+        Assert.Equal(300, item.UnitPrice);
+    }
+
+    [Fact]
+    public async Task FR_MENU_24_動かす先の日に同じ商品があれば_動かさない()
+    {
+        var data = new InMemoryData();
+        var snack = Safe("ほしがたクッキー");
+        data.Products.Add(snack);
+        var menu = NewMenu(20000, 50, (snack, 300));
+        var item = Put(menu, 0, snack);
+        Put(menu, 1, snack);
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var result = await service.MoveItemAsync(menu.Id, item.Id, D(1), null);
+
+        Assert.True(result.HasError);
+        Assert.Contains(item, menu.Days.Single(d => d.Date == D(0)).Items);
+        Assert.Single(menu.Days.Single(d => d.Date == D(1)).Items);
+    }
+
+    [Fact]
+    public async Task FR_MENU_24_同じ日や献立にない日へは_動かさない()
+    {
+        var data = new InMemoryData();
+        var snack = Safe("ほしがたクッキー");
+        data.Products.Add(snack);
+        var menu = NewMenu(20000, 50, (snack, 300));
+        var item = Put(menu, 0, snack);
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var same = await service.MoveItemAsync(menu.Id, item.Id, D(0), null);
+        var outside = await service.MoveItemAsync(menu.Id, item.Id, D(6), null);
+
+        Assert.True(same.HasError);
+        Assert.True(outside.HasError);
+        Assert.Contains(item, menu.Days.Single(d => d.Date == D(0)).Items);
+    }
+
+    [Fact]
+    public async Task SR_22_警告の商品を別の日へ動かすと_確定時の確認が消え_確定済みの献立は下書きに戻る()
+    {
+        var (data, menu, item) = WarningMenu();
+        var (service, _) = Create(data);
+        var confirmation = await service.GetConfirmationAsync(menu.Id);
+        var ack = Assert.Single(confirmation.Value!.Acknowledgements);
+        await service.ConfirmAsync(menu.Id, [new AcknowledgementInput(item.Id, ack.Judgement.Kind, ack.Fingerprint)], null);
+        Assert.Equal(MenuStatus.Confirmed, menu.Status);
+        Assert.NotNull(item.AcknowledgedAt);
+
+        var result = await service.MoveItemAsync(menu.Id, item.Id, D(3), null);
+
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        Assert.Null(item.AcknowledgedAt);
+        Assert.Null(item.AcknowledgedJudgementFingerprint);
+        Assert.Equal(MenuStatus.Draft, menu.Status);
+        // 確かめ直さないと、もう一度は確定できない
+        var again = await service.ConfirmAsync(menu.Id, [], null);
+        Assert.True(again.HasError);
+        Assert.Equal(MenuStatus.Draft, menu.Status);
+    }
+
+    [Fact]
+    public async Task SR_21_使えない商品は別の日へ動かしても_確定できない()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var blocked = Snack("たまごボーロ", SnackType.Sweet, 4, 1, ConfirmedAll(Today.AddDays(-5), ["egg"]));
+        data.Products.Add(blocked);
+        var menu = NewMenu(20000, 50, (blocked, 181));
+        var item = Put(menu, 0, blocked);
+        data.Menus.Add(menu);
+        var (service, _) = Create(data);
+
+        var moved = await service.MoveItemAsync(menu.Id, item.Id, D(2), null);
+        var confirmation = await service.GetConfirmationAsync(menu.Id);
+
+        Assert.False(moved.HasError, string.Join(",", moved.ErrorMessages));
+        Assert.False(confirmation.Value!.CanConfirm);
+        var blocking = Assert.Single(confirmation.Value.BlockingIssues);
+        Assert.Equal(D(2), blocking.Date);
+        Assert.Equal(AllergenJudgementCategory.Blocked, blocking.Judgement!.Category);
+    }
+
+    [Fact]
     public async Task 確定済みのまま確認し直せる_判定が変わっていれば止める()
     {
         var (data, menu, item) = WarningMenu();

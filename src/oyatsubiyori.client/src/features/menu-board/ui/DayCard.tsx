@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -12,10 +13,24 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { useSnackbar } from 'notistack';
 import { AllergenCategoryMark, AllergenJudgementLine, acknowledgementSentence } from '../../../entities/allergen-judgement';
-import { useAcknowledge, useAddItem, useRemoveItem, useReplaceItem, useUpdateDay, useUpdateItem } from '../../../entities/menu';
+import {
+    dropTargetSx,
+    endMenuDrag,
+    startMenuDrag,
+    useAcknowledge,
+    useAddItem,
+    useIsMenuEditing,
+    useMenuDropTarget,
+    useMoveItem,
+    useRemoveItem,
+    useReplaceItem,
+    useUpdateDay,
+    useUpdateItem,
+} from '../../../entities/menu';
 import type { ListedProduct, MenuDay, MenuDetail, MenuIssue, MenuItem as MenuItemData } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
 import { formatDateLabel, formatPerChild, formatYen } from '../../../shared/lib';
@@ -34,20 +49,49 @@ interface DayCardProps {
 /**
  * 日ごとのカード（T4-06・T4-07・T4-13）。見出し・日の種類・人数・商品（1人あたりの個数・パック数・金額）・理由・警告。
  * 金額・判定・警告はサーバーが計算したものを出す。「メーカーへの確認が必要」はカードには出さない（03 §6.3）。
+ * カードには、使える商品の一覧から商品をドラッグして足せる。ほかの日のカードの商品をドラッグすると、この日へ動かす（FR-MENU-24）。
  */
 export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps) => {
     const updateDay = useUpdateDay(menu.id);
     const addItem = useAddItem(menu.id);
+    const moveItem = useMoveItem(menu.id);
     const { enqueueSnackbar } = useSnackbar();
     const [adding, setAdding] = useState('');
     const [labelDraft, setLabelDraft] = useState(day.label ?? '');
     const [countDraft, setCountDraft] = useState(String(day.childrenCount));
     const notify = (error: unknown) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' });
     const dayIssues = issues.filter((issue) => issue.menuItemId === null);
-    const isPending = isBusy || updateDay.isPending || addItem.isPending;
+    const isPending = isBusy || updateDay.isPending || addItem.isPending || moveItem.isPending;
+    // ほかのカード・一覧での保存の途中は、ドラッグで落とせなくする（古い row_version で送らないため。入力欄は止めない）
+    const isEditing = useIsMenuEditing(menu.id);
+
+    // 同じ日の商品と、この日にもう入っている商品は受け付けない（光らせない）
+    const { isOver, handlers } = useMenuDropTarget(
+        (payload) => (payload.kind === 'item' ? payload.fromDate !== day.date : true) && !day.items.some((item) => item.productId === payload.productId),
+        (payload) => {
+            const label = formatDateLabel(day.date);
+            if (payload.kind === 'product') {
+                addItem.mutate(
+                    { update: { date: day.date, productId: payload.productId }, rowVersion: menu.rowVersion },
+                    { onSuccess: () => enqueueSnackbar(`${label}に足しました`, { variant: 'success' }), onError: notify },
+                );
+            } else {
+                moveItem.mutate(
+                    { update: { date: day.date, itemId: payload.itemId }, rowVersion: menu.rowVersion },
+                    { onSuccess: () => enqueueSnackbar(`${label}へ動かしました`, { variant: 'success' }), onError: notify },
+                );
+            }
+        },
+        isBusy || isEditing,
+    );
 
     return (
-        <Card component="section" aria-label={`${formatDateLabel(day.date)}の献立`}>
+        <Card
+            component="section"
+            aria-label={`${formatDateLabel(day.date)}の献立`}
+            {...handlers}
+            sx={dropTargetSx(isOver)}
+        >
             <CardContent sx={{ '&:last-child': { pb: 2 } }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' }, mb: 1 }}>
                     <Typography variant="h3" component="h3" sx={{ minWidth: 90 }}>
@@ -106,7 +150,7 @@ export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps)
                     ))}
                     {day.items.length === 0 && (
                         <Typography variant="body2" color="text.secondary">
-                            商品はまだありません
+                            商品はまだありません（使える商品からドラッグして足せます）
                         </Typography>
                     )}
                 </Stack>
@@ -177,14 +221,34 @@ const ItemRow = ({ menu, day, item, issues, candidates, isBusy }: ItemRowProps) 
     const [perChild, setPerChild] = useState(String(item.perChildCount));
     const [packs, setPacks] = useState(String(item.packCount));
     const [isReplacing, setIsReplacing] = useState(false);
+    const rowRef = useRef<HTMLDivElement>(null);
     const notify = (error: unknown) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' });
     const isPending = isBusy || updateItem.isPending || removeItem.isPending || replaceItem.isPending;
+    const isEditing = useIsMenuEditing(menu.id);
     // アレルゲンの警告は共通部品で出すので、ここでは重複・パック数などのほかの警告だけを出す
     const otherIssues = issues.filter((issue) => issue.kind !== 'AllergenWarning' && issue.kind !== 'AllergenBlocked');
 
+    // 入力欄の文字を選べるように、行全体ではなく持ち手だけをつかめるようにする（ドラッグ中の絵は行全体）
+    const handleDragStart = (event: DragEvent) => {
+        startMenuDrag(event.dataTransfer, { kind: 'item', itemId: item.id, productId: item.productId, fromDate: day.date });
+        if (rowRef.current) {
+            event.dataTransfer.setDragImage(rowRef.current, 16, 16);
+        }
+    };
+
     return (
-        <Box>
+        <Box ref={rowRef}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+                <Box
+                    draggable={!isPending && !isEditing}
+                    onDragStart={handleDragStart}
+                    onDragEnd={endMenuDrag}
+                    aria-label={`${item.productName}をつかんで、ほかの日か使える商品へ動かす`}
+                    title="ドラッグして、ほかの日へ動かす・使える商品へ戻して外す"
+                    sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center', cursor: isPending || isEditing ? 'default' : 'grab', color: 'text.disabled', mr: -0.5 }}
+                >
+                    <DragIndicatorIcon fontSize="small" />
+                </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
                         <Typography sx={{ fontWeight: 600 }}>{item.productName}</Typography>

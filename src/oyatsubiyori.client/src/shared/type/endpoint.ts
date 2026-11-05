@@ -34,6 +34,7 @@ export const ENDPOINT = {
     MENUS_ADD_ITEM: '/api/menus/addItem',
     MENUS_REPLACE_ITEM: '/api/menus/replaceItem',
     MENUS_REMOVE_ITEM: '/api/menus/removeItem',
+    MENUS_MOVE_ITEM: '/api/menus/moveItem',
     MENUS_UPDATE_ITEM: '/api/menus/updateItem',
     MENUS_CHAT: '/api/menus/chat',
     MENUS_BUDGET_FIT: '/api/menus/budgetFit',

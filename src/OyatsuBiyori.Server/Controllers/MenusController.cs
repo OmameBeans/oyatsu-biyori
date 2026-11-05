@@ -113,6 +113,11 @@ public sealed class MenusController(MenuApplicationService menuService, MenuProp
     public async Task<IActionResult> RemoveItem([FromBody] ItemRequest request)
         => new JsonResult(await _menuService.RemoveItemAsync(request.MenuId, request.ItemId, request.RowVersion));
 
+    /// <summary>商品を別の日へ動かす</summary>
+    [HttpPost]
+    public async Task<IActionResult> MoveItem([FromBody] ItemRequest request)
+        => new JsonResult(await _menuService.MoveItemAsync(request.MenuId, request.ItemId, request.Date, request.RowVersion));
+
     /// <summary>1人あたりの個数・パック数を変える</summary>
     [HttpPost]
     public async Task<IActionResult> UpdateItem([FromBody] ItemRequest request)

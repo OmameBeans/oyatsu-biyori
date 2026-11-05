@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -25,13 +27,18 @@ interface MenuBoardProps {
     isBudgetFitRequested: boolean;
     onBudgetFitClosed: () => void;
     onEditRequest: () => void;
+    /**
+     * 週の実績・予算と確定などのボタン（コマンドバー）を出す場所。渡さなければ献立の列の上に出す。
+     * null（置き場所がまだできていない）のあいだは出さない（一度列の上に出てから動くのを避ける）
+     */
+    commandBarContainer?: HTMLElement | null;
 }
 
 /**
- * SC-09 手順4 献立案（T4-05・T4-06・T4-07・T4-11）。上部に「要望をこう理解しました」・週の実績 / 週の予算・警告の種類分け、
- * その下に日ごとのカード。作成中は段階を示し、失敗したら要望を残したまま「もう一度作る」を出す。
+ * SC-09 手順4 献立案（T4-05・T4-06・T4-07・T4-11）。週の実績 / 週の予算と確定などのボタン（コマンドバー。ページが用意した
+ * 3列の上の場所に出す）、「要望をこう理解しました」・警告の種類分け、その下に日ごとのカード。作成中は段階を示し、失敗したら要望を残したまま「もう一度作る」を出す。
  */
-export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEditRequest }: MenuBoardProps) => {
+export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEditRequest, commandBarContainer }: MenuBoardProps) => {
     const { data: latest } = useLatestProposalJob(menu.id);
     const { data: listed } = useListedProducts(menu.id);
     const refresh = useRefreshMenu(menu.id);
@@ -73,8 +80,69 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
             onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
         });
 
+    // 週の実績・予算と「確定」などのボタン。ページが場所（コマンドバーの領域）を用意していれば、そこへ出す
+    const commandBar = (
+        <Paper
+            component="section"
+            aria-label="献立の操作"
+            variant="outlined"
+            sx={{ px: 2, py: 1.25, borderRadius: 3, display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 2, rowGap: 1 }}
+        >
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', flex: 1, minWidth: 0 }} useFlexGap>
+                <Chip
+                    color={menu.status === MENU_STATUS.CONFIRMED ? 'success' : 'primary'}
+                    label={menu.status === MENU_STATUS.CONFIRMED ? `確定済み（${menu.confirmedAt ? formatDateTime(menu.confirmedAt) : ''}）` : '下書き'}
+                />
+                <Typography variant="h3" component="p" sx={{ color: menu.week.isOverBudget ? 'error.main' : 'text.primary' }}>
+                    週の実績 {formatYen(menu.week.total)} / 週の予算
+                </Typography>
+                {/* 入力欄と「円」は離さない */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TextField
+                        type="number"
+                        size="small"
+                        value={budgetDraft}
+                        onChange={(event) => setBudgetDraft(event.target.value)}
+                        onBlur={() =>
+                            budgetDraft !== String(menu.weeklyBudget) &&
+                            updateBudget.mutate(
+                                { budget: Number(budgetDraft), rowVersion: menu.rowVersion },
+                                { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
+                            )
+                        }
+                        sx={{ width: 120 }}
+                        slotProps={{ htmlInput: { 'aria-label': 'この週の予算（円）' } }}
+                    />
+                    <Typography>円</Typography>
+                </Box>
+                {menu.week.isOverBudget && (
+                    <Typography sx={{ color: 'error.main', fontWeight: 600 }}>⚠ 週の予算を {formatYen(-menu.week.remaining)} 超えています</Typography>
+                )}
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                {menu.week.isUnderBudget && hasItems && (
+                    <Button variant="outlined" onClick={() => setIsBudgetFitOpen(true)} disabled={isRunning}>
+                        予算に合わせる
+                    </Button>
+                )}
+                <Button onClick={onEditRequest} disabled={isRunning}>
+                    要望を直す
+                </Button>
+                <Button variant="contained" onClick={() => setIsConfirmOpen(true)} disabled={isRunning || !hasItems}>
+                    {menu.status === MENU_STATUS.CONFIRMED ? '確定済み（もう一度確かめる）' : '確定'}
+                </Button>
+            </Stack>
+            {menu.status === MENU_STATUS.CONFIRMED && (
+                <Typography variant="body2" color="text.secondary" sx={{ width: '100%' }}>
+                    商品・個数・日の種類などを直すと下書きに戻ります。直したら、もう一度「確定」を押してください。
+                </Typography>
+            )}
+        </Paper>
+    );
+
     return (
         <Stack spacing={2}>
+            {commandBarContainer === undefined ? commandBar : commandBarContainer && createPortal(commandBar, commandBarContainer)}
             {menu.avoidedAllergenNames.length === 0 && <NoAvoidedAllergenNotice />}
             {isRunning && (
                 <Card>
@@ -105,58 +173,6 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                     {failed.errorMessages.join('\n')}
                 </Alert>
             )}
-
-            <Card>
-                <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, alignItems: { md: 'center' } }}>
-                    <Box sx={{ flex: 1 }}>
-                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
-                            <Chip
-                                color={menu.status === MENU_STATUS.CONFIRMED ? 'success' : 'primary'}
-                                label={menu.status === MENU_STATUS.CONFIRMED ? `確定済み（${menu.confirmedAt ? formatDateTime(menu.confirmedAt) : ''}）` : '下書き'}
-                            />
-                            <Typography variant="h3" component="p" sx={{ color: menu.week.isOverBudget ? 'error.main' : 'text.primary' }}>
-                                週の実績 {formatYen(menu.week.total)} / 週の予算
-                            </Typography>
-                            <TextField
-                                type="number"
-                                value={budgetDraft}
-                                onChange={(event) => setBudgetDraft(event.target.value)}
-                                onBlur={() =>
-                                    budgetDraft !== String(menu.weeklyBudget) &&
-                                    updateBudget.mutate(
-                                        { budget: Number(budgetDraft), rowVersion: menu.rowVersion },
-                                        { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
-                                    )
-                                }
-                                sx={{ width: 120 }}
-                                slotProps={{ htmlInput: { 'aria-label': 'この週の予算（円）' } }}
-                            />
-                            <Typography>円</Typography>
-                        </Stack>
-                        {menu.week.isOverBudget && (
-                            <Typography sx={{ color: 'error.main', fontWeight: 600 }}>⚠ 週の予算を {formatYen(-menu.week.remaining)} 超えています</Typography>
-                        )}
-                        {menu.status === MENU_STATUS.CONFIRMED && (
-                            <Typography variant="body2" color="text.secondary">
-                                商品・個数・日の種類などを直すと下書きに戻ります。直したら、もう一度「確定」を押してください。
-                            </Typography>
-                        )}
-                    </Box>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                        {menu.week.isUnderBudget && hasItems && (
-                            <Button variant="outlined" onClick={() => setIsBudgetFitOpen(true)} disabled={isRunning}>
-                                予算に合わせる
-                            </Button>
-                        )}
-                        <Button onClick={onEditRequest} disabled={isRunning}>
-                            要望を直す
-                        </Button>
-                        <Button variant="contained" onClick={() => setIsConfirmOpen(true)} disabled={isRunning || !hasItems}>
-                            {menu.status === MENU_STATUS.CONFIRMED ? '確定済み（もう一度確かめる）' : '確定'}
-                        </Button>
-                    </Stack>
-                </CardContent>
-            </Card>
 
             {interpreted && (interpreted.days.length > 0 || interpreted.policies.length > 0 || interpreted.rejected.length > 0) && (
                 <Card>
@@ -237,7 +253,7 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                 </Card>
             )}
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 1.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5 }}>
                 {menu.days.map((day) => (
                     <DayCard
                         key={`${day.id}-${day.childrenCount}-${day.label ?? ''}`}

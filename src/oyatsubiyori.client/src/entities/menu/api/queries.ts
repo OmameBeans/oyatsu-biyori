@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { ensureOk, unwrap } from '../../../shared/api';
+import { useIsMutating, useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
+import { ensureOk, isJobFinished, unwrap, useJobPolling } from '../../../shared/api';
 import type { GenericResult } from '../../../shared/type';
-import type { AcknowledgementInput, BudgetFitOption, MenuDetail } from '../model/types';
+import type { AcknowledgementInput, BudgetFitOption, MenuDetail, MenuProposalOutcome } from '../model/types';
 import {
     fetchConfirmation,
     fetchLatestProposalJob,
@@ -16,6 +16,7 @@ import {
     postConfirm,
     postCreateMenu,
     postDeleteMenu,
+    postMoveItem,
     postRemoveItem,
     postReplaceItem,
     postSaveRequest,
@@ -35,6 +36,7 @@ export const menuKeys = {
     listed: (id: string) => [...menuKeys.all, 'listed', id] as const,
     confirmation: (id: string) => [...menuKeys.all, 'confirmation', id] as const,
     proposalJob: (id: string) => [...menuKeys.all, 'proposal-job', id] as const,
+    edit: (id: string) => [...menuKeys.all, 'edit', id] as const,
 };
 
 /** 献立一覧 */
@@ -104,6 +106,7 @@ const useMenuMutation = <TVariables>(menuId: string, action: (variables: TVariab
     const queryClient = useQueryClient();
     const invalidate = useInvalidateMenu(menuId);
     return useMutation({
+        mutationKey: menuKeys.edit(menuId),
         mutationFn: async (variables: TVariables) => unwrap(await action(variables)),
         onSuccess: (detail) => {
             queryClient.setQueryData(menuKeys.detail(menuId), detail);
@@ -142,6 +145,19 @@ export const useSaveRequest = (menuId: string) => {
         },
     });
 };
+/**
+ * 献立案の作成・チャットの組み直しが動いているか（手で直させないために、各列がそれぞれ読む）。
+ * 動いている処理の状態は、献立の列・チャットと同じクエリ（2秒ごとに確かめる）を使うので、問い合わせは増えない
+ */
+export const useIsMenuProposalRunning = (menuId: string) => {
+    const { data: latest } = useLatestProposalJob(menuId);
+    const jobId = latest.job && !isJobFinished(latest.job) ? latest.job.id : null;
+    const chatJobId = latest.chatJob && !isJobFinished(latest.chatJob) ? latest.chatJob.id : null;
+    const { data: job } = useJobPolling<MenuProposalOutcome>(jobId);
+    const { data: chatJob } = useJobPolling<MenuProposalOutcome>(chatJobId);
+    return (!!jobId && !isJobFinished(job)) || (!!chatJobId && !isJobFinished(chatJob));
+};
+
 /** 献立案の作成・組み直しを始めたら、動いている処理を読み直す（献立の画面とチャットの両方で、終わるまで直せなくする） */
 export const useStartProposal = (menuId: string) => {
     const queryClient = useQueryClient();
@@ -175,6 +191,9 @@ export const useReplaceItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postReplaceItem(menuId, update, rowVersion));
 export const useRemoveItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postRemoveItem(menuId, update, rowVersion));
+/** 商品を別の日へ動かす（ドラッグ＆ドロップ） */
+export const useMoveItem = (menuId: string) =>
+    useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postMoveItem(menuId, update, rowVersion));
 export const useUpdateItem = (menuId: string) =>
     useMenuMutation(menuId, ({ update, rowVersion }: { update: ItemUpdate; rowVersion: string }) => postUpdateItem(menuId, update, rowVersion));
 export const useConfirmMenu = (menuId: string) =>
@@ -182,6 +201,12 @@ export const useConfirmMenu = (menuId: string) =>
         postConfirm(menuId, acknowledgements, rowVersion),
     );
 export const useAcknowledge = (menuId: string) => useMenuMutation(menuId, (input: AcknowledgementInput) => postAcknowledge(menuId, input));
+
+/**
+ * 献立を直す操作（足す・動かす・外すなど）が、画面のどこかで実行中か。続けて操作すると古い row_version で送って
+ * 止められるので、終わるまでドラッグなどを受け付けないために使う
+ */
+export const useIsMenuEditing = (menuId: string) => useIsMutating({ mutationKey: menuKeys.edit(menuId) }) > 0;
 
 /** 献立を読み直す（処理が終わったときなど） */
 export const useRefreshMenu = (menuId: string) => useInvalidateMenu(menuId);

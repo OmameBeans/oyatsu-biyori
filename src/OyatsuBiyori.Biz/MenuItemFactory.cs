@@ -110,13 +110,25 @@ public static class MenuItemFactory
 
         foreach (var item in day.Items)
         {
-            if (piecesPerPack(item.ProductId) is int pieces && pieces >= 1 && item.PerChildCount >= 1)
-            {
-                item.PackCount = MenuAmountCalculator.DefaultPackCount(day.ChildrenCount, item.PerChildCount, pieces);
-            }
+            RecalculatePackCount(item, day, piecesPerPack(item.ProductId));
         }
 
         RefreshAmounts(day);
+    }
+
+    /// <summary>
+    /// 1つの商品のパック数を、その日の人数と1人あたりの個数から式で求め直す（U-04）。入数が分からない商品はパック数を変えない。
+    /// 金額は変えないので、呼んだ側で求め直す。
+    /// </summary>
+    public static void RecalculatePackCount(MenuItem item, MenuDay day, int? piecesPerPack)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(day);
+
+        if (piecesPerPack is int pieces && pieces >= 1 && item.PerChildCount >= 1)
+        {
+            item.PackCount = MenuAmountCalculator.DefaultPackCount(day.ChildrenCount, item.PerChildCount, pieces);
+        }
     }
 
     /// <summary>日の種類を変えたあと、商品の金額を求め直す（手作り・おやつなしの日は0。D-77）</summary>

@@ -26,6 +26,19 @@ const openFlyerPicker = async (page: Page) => {
     await expect(page.getByRole('region', { name: 'チラシを取り込む' })).toBeVisible();
 };
 
+/**
+ * ドラッグ＆ドロップをイベントで送る。Playwright の dragTo は、落とす先がスクロールしないと見えない位置にあると
+ * ドラッグを始められないため（実際のブラウザは端に近づけるとスクロールする）、同じ DataTransfer で
+ * dragstart → dragover → drop を順に送る（落としたあと元の要素は動くか消えるので、dragend は送らない）。
+ */
+const dragByEvents = async (page: Page, source: Locator, target: Locator) => {
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+    await source.dispatchEvent('dragstart', { dataTransfer });
+    await target.dispatchEvent('dragenter', { dataTransfer });
+    await target.dispatchEvent('dragover', { dataTransfer });
+    await target.dispatchEvent('drop', { dataTransfer });
+};
+
 /** 要素の外側にある、縦にスクロールしている枠（ページ全体を含む）の数 */
 const countScrollingAncestors = (locator: Locator) =>
     locator.evaluate((el) => {
@@ -390,6 +403,154 @@ test.describe.serial('SC-09 献立作成', () => {
         await page.getByLabel('チャットの依頼').fill('水曜はせんべいにしてください');
         await page.getByRole('button', { name: '送る' }).click();
         await expect(page.getByText('ご依頼に合わせて、商品を組み直しました', { exact: false })).toBeVisible({ timeout: 30_000 });
+    });
+
+    test('FR-MENU-24 PC では使える商品・献立・チャットが左から並び、商品をドラッグして足す・別の日へ動かす・一覧へ戻して外すができる', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホはドラッグの代わりに「＋」から足す（次のテスト）');
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await openWeek(page, '再来週');
+        const panel = page.getByRole('region', { name: '使える商品' });
+        const chat = page.getByText('チャットで直す');
+        const days = page.getByRole('region', { name: /の献立$/ });
+        await expect(panel).toBeVisible();
+        await expect(days.first()).toBeVisible();
+        // 左から「使える商品」「献立」「チャット」の順に並ぶ
+        const panelBox = await panel.boundingBox();
+        const boardBox = await days.first().boundingBox();
+        const chatBox = await chat.boundingBox();
+        expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(boardBox!.x);
+        expect(boardBox!.x + boardBox!.width).toBeLessThanOrEqual(chatBox!.x);
+        // コマンドバー（週の実績・予算と確定）は3列の上に、3列にまたがって出る
+        const commandBar = page.getByRole('region', { name: '献立の操作' });
+        const barBox = await commandBar.boundingBox();
+        expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(panelBox!.y);
+        expect(barBox!.x).toBeLessThanOrEqual(panelBox!.x + 1);
+        expect(barBox!.x + barBox!.width).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 1);
+        await expect(commandBar.getByRole('button', { name: /^確定/ })).toBeVisible();
+
+        // まだ入っていない日が2日以上ある商品を探し、その1日目へドラッグする（データの状態に左右されないように、飛ばさずに探す）
+        const handleOf = (day: Locator, productName: string) => day.getByLabel(`${productName}をつかんで、ほかの日か使える商品へ動かす`, { exact: true });
+        const plusButtons = panel.getByRole('button', { name: /を日を選んで足す$/ });
+        const dayCount = await days.count();
+        let name = '';
+        let emptyDays: Locator[] = [];
+        for (let p = 0; p < (await plusButtons.count()) && emptyDays.length < 2; p++) {
+            name = ((await plusButtons.nth(p).getAttribute('aria-label')) ?? '').replace(/を日を選んで足す$/, '');
+            emptyDays = [];
+            for (let i = 0; i < dayCount; i++) {
+                if ((await handleOf(days.nth(i), name).count()) === 0) {
+                    emptyDays.push(days.nth(i));
+                }
+            }
+        }
+        expect(emptyDays.length, 'まだ入っていない日が2日以上ある商品がない').toBeGreaterThanOrEqual(2);
+        const handleIn = (day: Locator) => handleOf(day, name);
+        const [from, to] = emptyDays;
+        const added = page.waitForResponse((response) => response.url().includes('/api/menus/addItem') && response.ok());
+        await dragByEvents(page, panel.getByLabel(name, { exact: true }), from);
+        await added;
+        await expect(handleIn(from)).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step4-drag');
+
+        // 別の日へ動かす
+        const moved = page.waitForResponse((response) => response.url().includes('/api/menus/moveItem') && response.ok());
+        await dragByEvents(page, handleIn(from), to);
+        await moved;
+        await expect(handleIn(to)).toBeVisible();
+        await expect(handleIn(from)).toHaveCount(0);
+        // 読み込み直しても、動かした先の日に残っている（保存されている）
+        await page.reload();
+        await expect(handleIn(to)).toBeVisible();
+        await expect(handleIn(from)).toHaveCount(0);
+
+        // 使える商品の一覧へ戻すと外れる
+        const removed = page.waitForResponse((response) => response.url().includes('/api/menus/removeItem') && response.ok());
+        await dragByEvents(page, handleIn(to), panel);
+        await removed;
+        await expect(handleIn(to)).toHaveCount(0);
+    });
+
+    test('SC-09 PC では列の境目をドラッグ・矢印キーで動かして幅を変えられ、読み込み直しても残る', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホは1列（タブで切り替える）');
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await openWeek(page, '再来週');
+        const panel = page.getByRole('region', { name: '使える商品' });
+        const leftSplitter = page.getByRole('separator', { name: '使える商品と献立の境目' });
+        const rightSplitter = page.getByRole('separator', { name: '献立とチャットの境目' });
+        await expect(leftSplitter).toBeVisible();
+        const widthOf = async (locator: Locator) => (await locator.boundingBox())!.width;
+        const before = await widthOf(panel);
+
+        // 左の境目を右へ 80px ドラッグすると、使える商品の列が広がる
+        const box = (await leftSplitter.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2, { steps: 5 });
+        await page.mouse.up();
+        await expect.poll(() => widthOf(panel)).toBeGreaterThan(before + 60);
+        const widened = await widthOf(panel);
+
+        // 右の境目は ← キーで動かすと、チャットの列が広がる
+        const chatColumn = page.getByText('チャットで直す');
+        const chatBefore = await rightSplitter.getAttribute('aria-valuenow');
+        await rightSplitter.focus();
+        await page.keyboard.press('ArrowLeft');
+        await expect(rightSplitter).not.toHaveAttribute('aria-valuenow', chatBefore ?? '');
+        expect(Number(await rightSplitter.getAttribute('aria-valuenow'))).toBeGreaterThan(Number(chatBefore));
+        await expect(chatColumn).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step4-splitter');
+
+        // 読み込み直しても、変えた幅のまま
+        await page.reload();
+        await expect(panel).toBeVisible();
+        await expect.poll(() => widthOf(panel)).toBeGreaterThan(widened - 2);
+
+        // いったん狭くして（タブの1列になる）広げ直しても、選んだ幅に戻る
+        await page.setViewportSize({ width: 1000, height: 900 });
+        await expect(leftSplitter).toBeHidden();
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await expect(leftSplitter).toBeVisible();
+        await expect.poll(() => widthOf(panel)).toBeGreaterThan(widened - 2);
+    });
+
+    test('FR-MENU-24 使える商品の「＋」から日を選んで足せる（スマホは「使える商品」のタブ）', async ({ page }, testInfo) => {
+        await openWeek(page, '再来週');
+        const isMobile = testInfo.project.name === 'mobile';
+        if (isMobile) {
+            await page.getByRole('tab', { name: '使える商品' }).click();
+        }
+        // コマンドバー（週の実績・予算と確定）は、どのタブでも見える
+        await expect(page.getByRole('region', { name: '献立の操作' }).getByRole('button', { name: /^確定/ })).toBeVisible();
+        const panel = page.getByRole('region', { name: '使える商品' });
+        const plusButtons = panel.getByRole('button', { name: /を日を選んで足す$/ });
+        await expect(plusButtons.first()).toBeVisible();
+        // まだ入っていない日がある商品を探す（すべての日に入っている商品は、日を選べない）
+        const option = page.getByRole('menuitem', { name: /に足す$/, disabled: false }).first();
+        let name = '';
+        for (let p = 0; p < (await plusButtons.count()); p++) {
+            name = ((await plusButtons.nth(p).getAttribute('aria-label')) ?? '').replace(/を日を選んで足す$/, '');
+            await plusButtons.nth(p).click();
+            await expect(page.getByRole('menuitem').first()).toBeVisible();
+            if ((await option.count()) > 0) {
+                break;
+            }
+            await page.keyboard.press('Escape');
+            await expect(page.getByRole('menu')).toHaveCount(0);
+        }
+        await expect(option, 'まだ入っていない日がある商品がない').toBeVisible();
+        const dayLabel = ((await option.textContent()) ?? '').replace(/に足す$/, '');
+        await option.click();
+        await expect(page.getByText(`${dayLabel}に「${name}」を足しました`)).toBeVisible();
+        if (isMobile) {
+            await captureScreen(page, testInfo, 'sc-09-step4-products');
+            await page.getByRole('tab', { name: '献立', exact: true }).click();
+        }
+        const day = page.getByRole('region', { name: `${dayLabel}の献立` });
+        const remove = day.getByRole('button', { name: `${name}を外す`, exact: true });
+        await expect(remove).toBeVisible();
+        // 後のテストに影響しないように外しておく
+        await remove.click();
+        await expect(remove).toHaveCount(0);
     });
 
     test('FR-MENU-32・SR-04 確定のダイアログで 🟡 の商品にチェックを付けると確定できる', async ({ page }, testInfo) => {
