@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -33,18 +32,7 @@ const HOW_TO_NOTES = [
  * 処理は ImagePicker と同じ（useImagePicker）。PC では親の残りの高さを埋め、追加したチラシの一覧の中だけをスクロールする。
  */
 export const FlyerImagePicker = ({ images, onChange, maxImages, isDisabled, onProcessingChange }: FlyerImagePickerProps) => {
-    const picker = useImagePicker({ images, onChange, maxImages, acceptPdf: true, isDisabled });
-    const { isProcessing } = picker;
-    useEffect(() => {
-        onProcessingChange?.(isProcessing);
-    }, [isProcessing, onProcessingChange]);
-    // 欄が外れたら、準備中の印を戻す（外れたあとに準備が終わった画像は useImagePicker が解放し、親には足さない。#9）。
-    // 外れるときだけ知らせるよう、最新のコールバックは ref で持つ
-    const onProcessingChangeRef = useRef(onProcessingChange);
-    useEffect(() => {
-        onProcessingChangeRef.current = onProcessingChange;
-    }, [onProcessingChange]);
-    useEffect(() => () => onProcessingChangeRef.current?.(false), []);
+    const picker = useImagePicker({ images, onChange, maxImages, acceptPdf: true, isDisabled, onProcessingChange });
 
     return (
         // ドロップは欄全体で受ける（枠の外の「追加したチラシ」欄に落としても、ブラウザがファイルを開いて画面を離れないように）

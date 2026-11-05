@@ -86,6 +86,8 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
     const startExtraction = useStartExtraction(product.id);
     const record = useRecordCheck(product.id);
     const [images, setImages] = useState<PreparedImage[]>([]);
+    // 画像の準備中に送ると、準備できた分だけが送られる（原材料が写った面が読まれない）ので、準備が終わるまで読み取らせない（#15）
+    const [isPreparingImages, setIsPreparingImages] = useState(false);
     const [jobId, setJobId] = useState<string | null>(null);
     const { data: job, isError: isPollError } = useJobPolling<AllergenExtraction>(jobId);
     const [ocrText, setOcrText] = useState<string | null>(null);
@@ -200,11 +202,11 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                     <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
                         1. パッケージの原材料表示を撮る（4枚まで）
                     </Typography>
-                    <ImagePicker images={images} onChange={setImages} maxImages={4} acceptPdf={false} isDisabled={isReading} />
+                    <ImagePicker images={images} onChange={setImages} maxImages={4} acceptPdf={false} isDisabled={isReading || startExtraction.isPending} onProcessingChange={setIsPreparingImages} />
                     <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
                         <Button
                             variant="contained"
-                            disabled={images.length === 0 || isReading || startExtraction.isPending}
+                            disabled={images.length === 0 || isPreparingImages || isReading || startExtraction.isPending}
                             onClick={() => startExtraction.mutate(images, { onSuccess: setJobId })}
                         >
                             {job?.state === JOB_STATE.FAILED ? 'もう一度読み取る' : '読み取る'}

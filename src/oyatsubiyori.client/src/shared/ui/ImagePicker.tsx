@@ -17,14 +17,16 @@ interface ImagePickerProps {
     maxImages: number;
     acceptPdf: boolean;
     isDisabled?: boolean;
+    /** 画像を準備している途中か（変換など）が変わったとき。準備中は親の「読み取る」を押せなくするために使う */
+    onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 /**
  * 画像の取り込み（T0-13）：「カメラで撮る」「ファイルを選ぶ」の2つのボタン、PC ではドラッグ＆ドロップ、
  * サムネイルで外す。画像はこの画面のメモリにだけ持つ。処理は useImagePicker にある。
  */
-export const ImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisabled }: ImagePickerProps) => {
-    const picker = useImagePicker({ images, onChange, maxImages, acceptPdf, isDisabled });
+export const ImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisabled, onProcessingChange }: ImagePickerProps) => {
+    const picker = useImagePicker({ images, onChange, maxImages, acceptPdf, isDisabled, onProcessingChange });
 
     return (
         <Box

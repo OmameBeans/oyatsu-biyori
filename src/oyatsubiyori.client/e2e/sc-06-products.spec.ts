@@ -1,5 +1,8 @@
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { captureScreen } from './helpers';
+
+const PACKAGE_IMAGE = path.resolve(process.cwd(), '../../samples/packages/package-8104-back.png');
 
 test.describe('SC-06・SC-07・SC-08 商品', () => {
     test('FR-PROD-01・03 一覧にアレルゲンの表示と理由が出て、🔴 で絞り込める', async ({ page }, testInfo) => {
@@ -80,5 +83,49 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
         await page.getByRole('button', { name: 'パッケージ以外の情報として記録' }).click();
         await expect(page.getByText('記録しました')).toBeVisible();
         await expect(page.getByText('🟡 要確認').first()).toBeVisible();
+    });
+
+    test('FR-PROD-05 パッケージの画像を準備している間は「読み取る」を押せず、準備が終わると押せる', async ({ page }) => {
+        // 画像の変換（createImageBitmap）を、holdImagePrep() から releaseImagePrep() までの間だけ止められるようにする
+        await page.addInitScript(() => {
+            const original = window.createImageBitmap.bind(window);
+            let gate: Promise<void> = Promise.resolve();
+            let release = () => {};
+            Object.assign(window, {
+                holdImagePrep: () => {
+                    gate = new Promise<void>((resolve) => {
+                        release = resolve;
+                    });
+                },
+                releaseImagePrep: () => release(),
+            });
+            window.createImageBitmap = (async (...args: Parameters<typeof window.createImageBitmap>) => {
+                await gate;
+                return original(...args);
+            }) as typeof window.createImageBitmap;
+        });
+        type ImagePrepControl = { holdImagePrep: () => void; releaseImagePrep: () => void };
+        const thumbnails = page.getByRole('button', { name: /を外す$/ });
+
+        await page.goto('/products');
+        await page.getByRole('region', { name: 'ぽかぽか さつまいもチップス' }).getByRole('link').click();
+        await page.getByRole('link', { name: 'パッケージで確認する' }).click();
+        const readButton = page.getByRole('button', { name: '読み取る', exact: true });
+
+        // 1枚目は準備し終えて、読み取れる状態にする
+        await page.getByTestId('file-input').setInputFiles(PACKAGE_IMAGE);
+        await expect(thumbnails).toHaveCount(1);
+        await expect(readButton).toBeEnabled();
+
+        // 2枚目を準備している間は、1枚目があっても読み取れない
+        await page.evaluate(() => (window as unknown as ImagePrepControl).holdImagePrep());
+        await page.getByTestId('file-input').setInputFiles(PACKAGE_IMAGE);
+        await expect(page.getByText('画像を準備しています…')).toBeVisible();
+        await expect(readButton).toBeDisabled();
+
+        await page.evaluate(() => (window as unknown as ImagePrepControl).releaseImagePrep());
+        await expect(page.getByText('画像を準備しています…')).toBeHidden();
+        await expect(thumbnails).toHaveCount(2);
+        await expect(readButton).toBeEnabled();
     });
 });

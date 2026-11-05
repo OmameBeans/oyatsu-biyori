@@ -112,13 +112,20 @@ test.describe('SC-09 献立作成 手順1 の配置', () => {
         });
 
         await openFlyerPicker(page);
+        const added = page.getByRole('list', { name: '追加したチラシの一覧' }).getByRole('listitem');
+        // 1枚目（画像）は準備し終えて、読み取れる状態にする
+        await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
+        await expect(added).toHaveCount(1);
+        await expect(page.getByRole('button', { name: '読み取る' })).toBeEnabled();
+
+        // PDF を準備している間は、1枚目があっても読み取れない
         await page.getByTestId('file-input').setInputFiles(FLYER_PDF);
         await expect(page.getByText('画像を準備しています…')).toBeVisible();
         await expect(page.getByRole('button', { name: '読み取る' })).toBeDisabled();
 
         releaseWorker();
         await expect(page.getByText('画像を準備しています…')).toBeHidden();
-        await expect(page.getByRole('list', { name: '追加したチラシの一覧' }).getByRole('listitem').first()).toBeVisible();
+        await expect(added.nth(1)).toBeVisible();
         await expect(page.getByRole('button', { name: '読み取る' })).toBeEnabled();
     });
 

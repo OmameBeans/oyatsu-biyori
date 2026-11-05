@@ -419,4 +419,4 @@
 | #12 | あると良い | [チラシの表の「確定済み」のチップを緑にしない](https://github.com/OmameBeans/oyatsu-biyori/issues/12) | 見た目・文言 | 高 | SC-09, SR-20, D-83 | ○ |  |
 | #13 | 余裕があれば | [献立一覧の API の使わなくなった項目を消し、残りと今週の初日のテストを足す](https://github.com/OmameBeans/oyatsu-biyori/issues/13) | 改善 | 高 | FR-LIST-00, SC-10, D-88 |  |  |
 | #14 | 余裕があれば | [チラシの行の状態と案内文をクライアントで組み立てないようにするか決める](https://github.com/OmameBeans/oyatsu-biyori/issues/14) | 改善 | 高 | SC-09, SC-10, D-83, T4-01 | ○ |  |
-| #15 | 必須 | [アレルゲン確認でパッケージの画像を準備している間は「読み取る」を押せないようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/15) | 不具合 | 高 | FR-PROD-05, SC-08 | ○ |  |
+| #15 | 必須 | [アレルゲン確認でパッケージの画像を準備している間は「読み取る」を押せないようにする](https://github.com/OmameBeans/oyatsu-biyori/issues/15) | 不具合 | 高 | FR-PROD-05, SC-08 | ○ | ✅ 2026-11-05 |

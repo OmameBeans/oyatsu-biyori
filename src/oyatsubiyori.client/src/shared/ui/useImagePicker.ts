@@ -9,6 +9,8 @@ interface UseImagePickerOptions {
     maxImages: number;
     acceptPdf: boolean;
     isDisabled?: boolean;
+    /** 選んだファイルを画像にしている途中か（PDF のページ分け・変換など）が変わったとき。欄が外れたときは false を知らせる。準備中の画像はまだ images に入っていない */
+    onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 type HiddenInputProps = InputHTMLAttributes<HTMLInputElement> & { ref: RefObject<HTMLInputElement | null>; 'data-testid': string };
@@ -18,7 +20,7 @@ type HiddenInputProps = InputHTMLAttributes<HTMLInputElement> & { ref: RefObject
  * 「カメラで撮る」「ファイルを選ぶ」の隠した input、ドラッグ＆ドロップ、形式・大きさ・枚数の確かめ、外す、を受け持つ。
  * 画像はこの画面のメモリにだけ持つ（D-41）。
  */
-export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisabled }: UseImagePickerOptions) => {
+export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisabled, onProcessingChange }: UseImagePickerOptions) => {
     const cameraRef = useRef<HTMLInputElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const [errors, setErrors] = useState<string[]>([]);
@@ -33,11 +35,31 @@ export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisab
         };
     }, []);
 
+    // 準備中を親に知らせる（準備中に送ると、準備できた分だけが送られるため。#9・#15）。
+    // コールバックが替わったときも今の状態を知らせる。欄が外れたら準備中の印を戻す（外れるときだけ知らせるよう、最新のコールバックは ref で持つ）
+    const onProcessingChangeRef = useRef(onProcessingChange);
+    useEffect(() => {
+        onProcessingChangeRef.current = onProcessingChange;
+        onProcessingChange?.(isProcessing);
+    }, [isProcessing, onProcessingChange]);
+    useEffect(() => () => onProcessingChangeRef.current?.(false), []);
+
     const addFiles = async (files: File[]) => {
         if (files.length === 0) {
             return;
         }
         setIsProcessing(true);
+        try {
+            await prepareAndAdd(files);
+        } finally {
+            // 途中で思わぬエラーが起きても、準備中のままにしない（親の「読み取る」が押せなくなるため）
+            if (isMountedRef.current) {
+                setIsProcessing(false);
+            }
+        }
+    };
+
+    const prepareAndAdd = async (files: File[]) => {
         const messages: string[] = [];
         const added: PreparedImage[] = [];
         for (const file of files) {
@@ -67,7 +89,6 @@ export const useImagePicker = ({ images, onChange, maxImages, acceptPdf, isDisab
         }
         onChange([...images, ...added.slice(0, room)]);
         setErrors(messages);
-        setIsProcessing(false);
     };
 
     const handleRemove = (id: string) => {
