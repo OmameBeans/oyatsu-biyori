@@ -86,3 +86,15 @@ export const openFlyerItemDetail = async (page: Page, name: string) => {
     await expect(detail).toBeVisible();
     return detail;
 };
+
+/**
+ * 商品一覧の1件（PC は表の行、スマホはカード）。中の商品名のリンクから商品詳細を開ける。
+ */
+export const productItem = (page: Page, name: string): Locator =>
+    page.getByRole('region', { name, exact: true }).or(page.getByRole('row').filter({ has: page.getByRole('link', { name, exact: true }) }));
+
+/**
+ * 献立作成の「今週の商品」の1件（PC は表の行、スマホはカード）。
+ */
+export const listedProductItem = (page: Page, name: string): Locator =>
+    page.getByRole('region', { name, exact: true }).or(page.getByRole('grid', { name: '今週の商品' }).getByRole('row').filter({ has: page.getByText(name, { exact: true }) }));

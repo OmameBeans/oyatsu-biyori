@@ -2,8 +2,14 @@ import { expect, test } from '@playwright/test';
 import { captureScreen } from './helpers';
 
 test.describe('SC-11 献立一覧（カレンダー）', () => {
-    test('FR-LIST-03 「カレンダー」に切り替えると、月のカレンダーが出て、表示と月がクエリ文字列に残る', async ({ page }, testInfo) => {
+    test('FR-LIST-03 はじめて開く献立一覧はカレンダーで出る', async ({ page }) => {
         await page.goto('/menus');
+        await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
+        await expect(page.getByRole('region', { name: '今週とこれから' })).toHaveCount(0);
+    });
+
+    test('FR-LIST-03 「カレンダー」に切り替えると、月のカレンダーが出て、表示と月がクエリ文字列に残る', async ({ page }, testInfo) => {
+        await page.goto('/menus?view=list');
         await page.getByRole('button', { name: 'カレンダー' }).click();
         await expect(page).toHaveURL(/\/menus\?view=calendar&month=\d{4}-\d{2}$/);
         await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
@@ -24,22 +30,27 @@ test.describe('SC-11 献立一覧（カレンダー）', () => {
 
     test('FR-LIST-03 最後に選んだ表示を覚えていて、クエリ文字列のない献立一覧を開くとその表示になる', async ({ page }) => {
         await page.goto('/menus');
-        await expect(page.getByRole('region', { name: '今週とこれから' })).toBeVisible();
-        await page.getByRole('button', { name: 'カレンダー' }).click();
         await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
-
-        await page.goto('/menus');
-        await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
-        await expect(page.getByRole('region', { name: '今週とこれから' })).toHaveCount(0);
-
         await page.getByRole('button', { name: '一覧' }).click();
+        await expect(page.getByRole('region', { name: '今週とこれから' })).toBeVisible();
+
         await page.goto('/menus');
         await expect(page.getByRole('region', { name: '今週とこれから' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toHaveCount(0);
+
+        await page.getByRole('button', { name: 'カレンダー' }).click();
+        await page.goto('/menus');
+        await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
     });
 
     test('FR-LIST-03 クエリ文字列の表示は、覚えている表示より優先する', async ({ page }) => {
         await page.goto('/menus?view=calendar');
         await page.getByRole('button', { name: '一覧' }).click();
+        await page.goto('/menus?view=calendar&month=2026-11');
+        await expect(page.getByRole('heading', { name: '2026年11月' })).toBeVisible();
+        // 覚えている表示がカレンダーでも、クエリ文字列が一覧なら一覧
+        await page.goto('/menus?view=list');
+        await expect(page.getByRole('region', { name: '今週とこれから' })).toBeVisible();
         await page.goto('/menus?view=calendar&month=2026-11');
         await expect(page.getByRole('heading', { name: '2026年11月' })).toBeVisible();
     });

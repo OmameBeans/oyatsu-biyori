@@ -36,7 +36,7 @@
 - フロント：React 19 + TypeScript（Vite）。Visual Studio の「React and ASP.NET Core」テンプレートで作成。開発時は SPA プロキシ（`Microsoft.AspNetCore.SpaProxy`）で Vite を起動し、Vite のプロキシで API に接続する。本番ではビルド結果を ASP.NET Core から配信する（`MapStaticAssets()` + `MapFallbackToFile("/index.html")`）
 - API：ASP.NET Core（.NET 10）。DI・EF Core・リポジトリパターン
 - DB：SQLite（EF Core）
-- Claude の呼び出し：公式 C# SDK（NuGet の `Anthropic` パッケージ）
+- Claude の呼び出し：公式 C# SDK（NuGet の `Anthropic` パッケージ）。献立づくりのエージェントは Claude Managed Agents（D-94。エージェントの定義は `agents/`、`ant apply` で同期する）
 - テスト：xUnit（Biz のロジック）、Playwright（画面の E2E。D-87）。クライアントのユニットテストは置かない
 - 本番：XServer VPS for Windows Server（2GB）+ IIS、`https://oyatsu-biyori.com`
 - Next.js は使わない
@@ -56,6 +56,7 @@ src/
 docs/requirements/           要件定義（md が正。index.html は生成物）
 samples/                     ダミーデータ（架空のチラシ・パッケージ画像・投入データ）。実データは置かない
 tools/                       開発用の道具（アプリには含めない）
+agents/                      Claude Managed Agents のエージェントと環境の定義（ant apply で同期する。D-94）
 ```
 
 - 依存方向は `Server → Data / Claude → Biz`。マイグレーションは `Migrations → Data` で参照し、`Server → Migrations` で読み込む（Data から Migrations は参照しない。Data で `MigrationsAssembly("OyatsuBiyori.Migrations")` を指定する。D-40）
@@ -93,7 +94,7 @@ tools/                       開発用の道具（アプリには含めない）
 - 「探す言葉」は商品名と原材料の全文の両方で探す。チラシの取り込みで「確認済み」の商品に「参考」の記録を足さない（SR-14・SR-20）
 - AI の判定結果はあくまで候補。確定は必ず職員が行う UI にする
 - **29品目に入らない食材がある**（ヘーゼルナッツなど。現場で見落としの実例あり）。施設で追加した品目は、アレルゲン表示ではなく原材料表示の全文から探す。「ナッツ類」はグループとして扱う（詳細は `docs/requirements/03-allergen-safety.md`）
-- 2026年4月の改正で **29品目**（特定原材料9・準ずるもの20）になった。表示義務があるのは特定原材料だけで、カシューナッツは2028-03-31 まで経過措置中。推奨20品目と経過措置中のカシューナッツ（マスタの「表示が確実でない」品目）は表示されないことがあるため、避ける品目に含まれる場合は「表示なし＝安全」とせず「メーカーへの確認が必要」と表示する
+- 2026年4月の改正で **29品目**（特定原材料9・準ずるもの20）になった。表示義務があるのは特定原材料だけで、カシューナッツは2028-03-31 まで経過措置中。推奨20品目と経過措置中のカシューナッツ（マスタの「表示が確実でない」品目）は表示されないことがある。ただし現場の業務ではメーカーに確認しないため、画面に「メーカーへの確認が必要」は出さない（D-93。SR-06 は取り下げ）。マスタの「表示が確実でない」の印は残す
 - アレルゲン確認は上書きせず、履歴（`allergen_checks`）として積み上げる。最新の記録を現在の状態とする。確認日・確認者を記録し、一定期間（例：3か月）経ったら「要再確認」に戻す
 
 ## データ設計の方針

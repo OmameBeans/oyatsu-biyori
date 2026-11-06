@@ -14,7 +14,7 @@ namespace OyatsuBiyori.Claude.Services;
 
 /// <summary>
 /// Claude を1回呼んで、構造化出力（JSON スキーマ）の結果を受け取る共通の処理。
-/// - 1日の呼び出し回数の上限を確かめる（失敗・再試行も含めて数える。D-65）
+/// - 1日の上限（使った金額。ドル。D-95）を確かめる。呼び出しは失敗・再試行も含めて1回ごとに記録する（D-65）
 /// - SDK の自動の再試行は切り、ここで再試行する（1回ごとに api_usage_logs に記録する）
 /// - refusal・max_tokens・形の崩れた JSON は Result のエラーにする（画面から再試行できるように）
 /// - 本文・画像はログに出さない
@@ -279,15 +279,47 @@ public sealed class ClaudeRequestRunner(
             or HttpRequestException;
     }
 
-    /// <summary>今日（日本時間）の呼び出し回数が上限に達したか</summary>
-    private async Task<bool> IsDailyLimitReachedAsync()
+    /// <summary>
+    /// 今日（日本時間）の上限に達したか（Managed Agents 版でも、モデルを呼ぶ前に確かめる）。
+    /// 使った金額（ドル。記録したトークン数とモデルの単価から計算）が上限以上なら達した（D-95）。回数の上限も設定していれば、そちらも見る
+    /// </summary>
+    public async Task<bool> IsDailyLimitReachedAsync()
     {
         var todayStart = JapanDate.StartOfDayUtc(JapanDate.Today(_timeProvider));
-        return await _usageLogs.CountSinceAsync(todayStart) >= _options.DailyCallLimit;
+        if (_options.DailyCallLimit > 0 && await _usageLogs.CountSinceAsync(todayStart) >= _options.DailyCallLimit)
+        {
+            return true;
+        }
+
+        if (_options.DailyCostLimitUsd <= 0)
+        {
+            return false;
+        }
+
+        var reached = ApiCostCalculator.IsLimitReached(await _usageLogs.GetSinceAsync(todayStart), _options.PriceList(), _options.DailyCostLimitUsd);
+        if (reached)
+        {
+            _logger.LogWarning("今日の Claude の利用が金額の上限に達しました: {LimitUsd} ドル", _options.DailyCostLimitUsd);
+        }
+
+        return reached;
     }
 
     /// <summary>呼び出しを記録する（本文・画像は記録しない）</summary>
-    private async Task RecordAsync(ClaudePurpose purpose, string model, BetaUsage? usage, bool succeeded)
+    private Task RecordAsync(ClaudePurpose purpose, string model, BetaUsage? usage, bool succeeded) =>
+        RecordUsageAsync(
+            purpose,
+            model,
+            usage?.InputTokens ?? 0,
+            usage?.OutputTokens ?? 0,
+            usage?.CacheCreationInputTokens ?? 0,
+            usage?.CacheReadInputTokens ?? 0,
+            succeeded);
+
+    /// <summary>
+    /// モデルの呼び出しを1回として記録する（1日の上限に数える。D-65）。Managed Agents 版は、モデルの呼び出しが終わるたびに（span.model_request_end）ここで記録する
+    /// </summary>
+    public async Task RecordUsageAsync(ClaudePurpose purpose, string model, long inputTokens, long outputTokens, long cacheCreationInputTokens, long cacheReadInputTokens, bool succeeded)
     {
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         await _usageLogs.AddAsync(new ApiUsageLog
@@ -295,10 +327,10 @@ public sealed class ClaudeRequestRunner(
             CalledAt = now,
             Purpose = purpose,
             Model = model,
-            InputTokens = usage?.InputTokens ?? 0,
-            OutputTokens = usage?.OutputTokens ?? 0,
-            CacheCreationInputTokens = usage?.CacheCreationInputTokens ?? 0,
-            CacheReadInputTokens = usage?.CacheReadInputTokens ?? 0,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            CacheCreationInputTokens = cacheCreationInputTokens,
+            CacheReadInputTokens = cacheReadInputTokens,
             Succeeded = succeeded,
             UpdateDateTime = now,
         });

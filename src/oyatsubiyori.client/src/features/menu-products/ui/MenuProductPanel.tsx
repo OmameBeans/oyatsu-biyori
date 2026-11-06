@@ -10,9 +10,12 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import KeyboardDoubleArrowLeftIcon from '@mui/icons-material/KeyboardDoubleArrowLeft';
 import { useSnackbar } from 'notistack';
 import { AllergenCategoryMark } from '../../../entities/allergen-judgement';
 import {
@@ -34,6 +37,10 @@ import type { SnackType } from '../../../shared/type';
 
 interface MenuProductPanelProps {
     menu: MenuDetail;
+    /** true のあいだは細い帯だけ出す（広い PC で列を閉じたとき） */
+    isCollapsed?: boolean;
+    /** 開閉のボタンを押したとき。渡さないときは開閉のボタンを出さない（狭い画面はタブで切り替える） */
+    onToggleCollapsed?: () => void;
 }
 
 /**
@@ -41,7 +48,7 @@ interface MenuProductPanelProps {
  * 「＋」ボタンか日のカードへのドラッグ＆ドロップで献立に足せる。献立の商品をここへドラッグして戻すと外せる。
  * ドラッグできない端末（スマホなど）のために、商品ごとの「＋」から日を選んで足すこともできる。
  */
-export const MenuProductPanel = ({ menu }: MenuProductPanelProps) => {
+export const MenuProductPanel = ({ menu, isCollapsed = false, onToggleCollapsed }: MenuProductPanelProps) => {
     const { data: listed } = useListedProducts(menu.id);
     const removeItem = useRemoveItem(menu.id);
     const { enqueueSnackbar } = useSnackbar();
@@ -72,6 +79,26 @@ export const MenuProductPanel = ({ menu }: MenuProductPanelProps) => {
         isBusy,
     );
 
+    if (isCollapsed) {
+        // 閉じているときは細い帯だけ出す。献立の商品をここへ戻して外すことはできる
+        return (
+            <Paper
+                variant="outlined"
+                {...handlers}
+                sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, py: 1, ...dropTargetSx(isOver) }}
+            >
+                <Tooltip title="使える商品を開く" placement="right">
+                    <IconButton aria-label="使える商品を開く" aria-expanded={false} onClick={onToggleCollapsed} color="primary">
+                        <Inventory2OutlinedIcon />
+                    </IconButton>
+                </Tooltip>
+                <Typography variant="body2" color="text.secondary" sx={{ writingMode: 'vertical-rl', letterSpacing: '0.1em', userSelect: 'none' }}>
+                    使える商品 {candidates.length}件
+                </Typography>
+            </Paper>
+        );
+    }
+
     return (
         <Paper
             component="section"
@@ -81,9 +108,18 @@ export const MenuProductPanel = ({ menu }: MenuProductPanelProps) => {
             sx={{ display: 'flex', flexDirection: 'column', height: { md: '100%' }, ...dropTargetSx(isOver) }}
         >
             <Box sx={{ p: 2, pb: 1 }}>
-                <Typography variant="h3" component="h2">
-                    使える商品 {candidates.length}件
-                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Typography variant="h3" component="h2" sx={{ flex: 1 }}>
+                        使える商品 {candidates.length}件
+                    </Typography>
+                    {onToggleCollapsed && (
+                        <Tooltip title="使える商品を閉じる">
+                            <IconButton aria-label="使える商品を閉じる" aria-expanded onClick={onToggleCollapsed} size="small" edge="end">
+                                <KeyboardDoubleArrowLeftIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                </Stack>
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: { xs: 'none', lg: 'block' } }}>
                     「＋」ボタンまたはドラッグ＆ドロップで献立に追加できます。献立の商品をここへ戻すと外せます。
                 </Typography>

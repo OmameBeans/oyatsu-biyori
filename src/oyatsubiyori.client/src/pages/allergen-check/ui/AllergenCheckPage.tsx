@@ -18,7 +18,7 @@ export const AllergenCheckPage = () => {
                     商品の詳細へ
                 </Button>
             }
-            header={<AllergenJudgementLine judgement={product.judgement} isInMenu={product.usages.length > 0} showManufacturerCheck />}
+            header={<AllergenJudgementLine judgement={product.judgement} isInMenu={product.usages.length > 0} />}
         >
             {product.isAvoidedEmpty && <NoAvoidedAllergenNotice />}
             <AllergenCheckForm product={product} />

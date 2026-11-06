@@ -35,7 +35,7 @@ import { WeekCard } from './WeekParts';
  * その下に「今週とこれから」（今週を目立たせ、古い順）。過去の週は「過去の献立」（SC-14）の画面で見る。
  * PC（md 以上）では、注意・見出し・「さらに先の週」・「過去の献立を見る」を固定し、週のカードの部分だけをスクロールする。
  * 「カレンダー」に切り替えると、月のカレンダー（SC-11。FR-LIST-03）を出す。表示と月はクエリ文字列（?view=calendar&month=YYYY-MM）に持つ
- * （再読み込み・戻る・URL の共有で同じ表示になるように）。クエリ文字列に表示がなければ、この端末で最後に選んだ表示（localStorage）にする。
+ * （再読み込み・戻る・URL の共有で同じ表示になるように）。クエリ文字列に表示がなければ、この端末で最後に選んだ表示（localStorage）にし、それもなければカレンダーにする。
  */
 const VIEW_LIST = 'list';
 const VIEW_CALENDAR = 'calendar';
@@ -52,7 +52,7 @@ export const MenuListPage = () => {
     const [issuesMenuId, setIssuesMenuId] = useState<string | null>(null);
     const [searchParams, setSearchParams] = useSearchParams();
     const viewParam = searchParams.get('view');
-    const isCalendar = (isMenuListView(viewParam) ? viewParam : readPreference(PREFERENCE_KEY.MENU_LIST_VIEW, isMenuListView, VIEW_LIST)) === VIEW_CALENDAR;
+    const isCalendar = (isMenuListView(viewParam) ? viewParam : readPreference(PREFERENCE_KEY.MENU_LIST_VIEW, isMenuListView, VIEW_CALENDAR)) === VIEW_CALENDAR;
     const monthParam = searchParams.get('month');
     // 形が違う月は今月にする（API でエラーにしない）
     const month = monthParam && MONTH_PATTERN.test(monthParam) ? monthParam : dayjs().format('YYYY-MM');

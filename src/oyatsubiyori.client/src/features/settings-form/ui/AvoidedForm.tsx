@@ -38,8 +38,9 @@ const SECTIONS = [
 /**
  * SC-04 避ける品目（T2-07）。グループ → 特定原材料 → 準ずるもの → 施設の追加品目の順。
  * 外すとき・探す言葉を消すときは確認のダイアログを出す。規則（消せる言葉など）はサーバーで決める。
+ * 設定画面のタブと、献立作成の手順3の「いつもの条件」のダイアログの両方で使う。
  */
-export const AvoidedTab = () => {
+export const AvoidedForm = () => {
     const { data: master } = useAllergenMaster();
     const { enqueueSnackbar } = useSnackbar();
     const addAvoided = useAddAvoided();
@@ -84,7 +85,7 @@ export const AvoidedTab = () => {
     };
 
     return (
-        <Stack spacing={3} sx={{ maxWidth: 880 }}>
+        <Stack spacing={3}>
             {avoidedCount === 0 ? (
                 <Alert severity="warning">避ける品目が設定されていません。施設で避ける品目を選んでください。</Alert>
             ) : (
@@ -176,7 +177,7 @@ const AllergenRow = ({ allergen, isPending, onToggle }: AllergenRowProps) => {
                         <Typography sx={{ fontWeight: allergen.isAvoided ? 700 : 400 }}>{allergen.name}</Typography>
                         {allergen.labelNotGuaranteed && (
                             <Typography variant="caption" color="text.secondary">
-                                表示されないことがあります（メーカーへの確認が必要）
+                                表示されないことがあります
                             </Typography>
                         )}
                     </Box>

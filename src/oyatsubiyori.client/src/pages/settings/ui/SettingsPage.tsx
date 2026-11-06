@@ -1,11 +1,13 @@
 import { useSearchParams } from 'react-router-dom';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import { useAuthStatus } from '../../../entities/auth';
+import { AvoidedForm, ConditionsForm } from '../../../features/settings-form';
 import { PageErrorBoundary, PageLayout } from '../../../shared/ui';
 import { AppearanceTab } from './AppearanceTab';
-import { AvoidedTab } from './AvoidedTab';
-import { ConditionsTab } from './ConditionsTab';
 import { PasswordTab } from './PasswordTab';
 
 const TABS = ['conditions', 'avoided', 'password', 'appearance'] as const;
@@ -33,8 +35,18 @@ export const SettingsPage = () => {
             }
         >
             <PageErrorBoundary key={tab}>
-                {tab === 'conditions' && <ConditionsTab />}
-                {tab === 'avoided' && <AvoidedTab />}
+                {tab === 'conditions' && (
+                    <Card sx={{ maxWidth: 640 }}>
+                        <CardContent>
+                            <ConditionsForm />
+                        </CardContent>
+                    </Card>
+                )}
+                {tab === 'avoided' && (
+                    <Box sx={{ maxWidth: 880 }}>
+                        <AvoidedForm />
+                    </Box>
+                )}
                 {tab === 'password' && <PasswordTab />}
                 {tab === 'appearance' && <AppearanceTab />}
             </PageErrorBoundary>

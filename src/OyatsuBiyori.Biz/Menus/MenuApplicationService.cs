@@ -16,8 +16,10 @@ public sealed class MenuApplicationService(
     MenuContextFactory contextFactory,
     IUserContext userContext,
     TimeProvider timeProvider,
-    IBackgroundJobService backgroundJobs)
+    IBackgroundJobService backgroundJobs,
+    IMenuAgentSessionCleaner? sessionCleaner = null)
 {
+    private readonly IMenuAgentSessionCleaner _sessionCleaner = sessionCleaner ?? new NoMenuAgentSessionCleaner();
     private readonly IBackgroundJobService _jobs = backgroundJobs ?? throw new ArgumentNullException(nameof(backgroundJobs));
     private readonly IMenuRepository _menus = menuRepository ?? throw new ArgumentNullException(nameof(menuRepository));
     private readonly IProductRepository _products = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
@@ -849,8 +851,15 @@ public sealed class MenuApplicationService(
             return Result.Error("確定済みの献立は削除できません");
         }
 
+        // 献立を消したら、その献立のチャットのセッションも Anthropic 側から消す（D-94）
+        var session = menu.AgentSessionId;
         _menus.Remove(menu);
         await _unitOfWork.SaveChangesAsync();
+        if (session is not null)
+        {
+            await _sessionCleaner.ForgetAsync(session);
+        }
+
         return new Result();
     }
 
@@ -959,7 +968,8 @@ public sealed class MenuApplicationService(
                         product is not null && judgement!.Category == AllergenJudgementCategory.Warning && MenuConfirmationChecker.IsAcknowledged(item, judgement, context.Fingerprint(product)),
                         issueKind == MenuItemIssueKind.Recheck,
                         issueKind,
-                        product is null ? null : context.Fingerprint(product));
+                        product is null ? null : context.Fingerprint(product),
+                        context.PiecesPerPack(item.ProductId));
                 })
                 .ToList();
             days.Add(new MenuDayView(
@@ -1160,7 +1170,9 @@ public sealed record MenuItemView(
     bool IsAcknowledged,
     bool NeedsRecheck,
     MenuItemIssueKind IssueKind,
-    string? JudgementFingerprint);
+    string? JudgementFingerprint,
+    // 1パックの入数（パック数の計算に使う値。画面で「1パック ○個入り」と出す。未入力なら null）
+    int? PiecesPerPack);
 
 /// <summary>週の金額</summary>
 public sealed record WeekAmountView(int Total, int Budget, int Remaining, bool IsOverBudget, bool IsUnderBudget);

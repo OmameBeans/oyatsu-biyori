@@ -118,10 +118,17 @@ const BASE_THEME_OPTIONS = {
     shape: { borderRadius: 4 },
     typography: {
         fontFamily: '"Noto Sans JP", "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif',
-        h1: { fontSize: '1.6rem', fontWeight: 700 },
-        h2: { fontSize: '1.3rem', fontWeight: 700 },
-        h3: { fontSize: '1.1rem', fontWeight: 700 },
-        button: { textTransform: 'none', fontWeight: 600 },
+        // 文字は MUI の既定より少し小さくする（rem で指定。1rem = 16px）
+        h1: { fontSize: '1.5rem', fontWeight: 700 },
+        h2: { fontSize: '1.2rem', fontWeight: 700 },
+        h3: { fontSize: '1rem', fontWeight: 700 },
+        subtitle1: { fontSize: '0.9375rem' },
+        subtitle2: { fontSize: '0.8125rem' },
+        body1: { fontSize: '0.9375rem' },
+        body2: { fontSize: '0.8125rem' },
+        caption: { fontSize: '0.6875rem' },
+        overline: { fontSize: '0.6875rem' },
+        button: { fontSize: '0.8125rem', textTransform: 'none', fontWeight: 600 },
     },
     components: {
         MuiButton: {

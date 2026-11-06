@@ -55,7 +55,7 @@ export const ProductDetailPage = () => {
                     パッケージで確認する
                 </Button>
             }
-            header={<AllergenJudgementLine judgement={product.judgement} isInMenu={product.usages.length > 0} showManufacturerCheck />}
+            header={<AllergenJudgementLine judgement={product.judgement} isInMenu={product.usages.length > 0} />}
         >
             <Stack spacing={2}>
                 {product.isAvoidedEmpty && <NoAvoidedAllergenNotice />}

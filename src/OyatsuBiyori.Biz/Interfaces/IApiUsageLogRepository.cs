@@ -12,4 +12,7 @@ public interface IApiUsageLogRepository
 
     /// <summary>指定した日時（UTC）以降の呼び出しの回数（失敗・再試行も含む）</summary>
     Task<int> CountSinceAsync(DateTime sinceUtc);
+
+    /// <summary>指定した日時（UTC）以降の呼び出しの記録（1日の金額の上限に使う。D-95）</summary>
+    Task<IReadOnlyList<ApiUsageLog>> GetSinceAsync(DateTime sinceUtc);
 }

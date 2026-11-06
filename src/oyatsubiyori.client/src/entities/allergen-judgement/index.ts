@@ -5,7 +5,6 @@ export {
     CATEGORY_LABEL,
     ISSUE_GUIDE,
     judgementText,
-    manufacturerCheckText,
     needsPackageCheck,
 } from './model/text';
 export { CATEGORY_ICON } from './model/icon';

@@ -129,10 +129,6 @@ export const ISSUE_GUIDE = {
     MISSING_PRODUCT: '商品が見つかりません。献立を開いて、別の商品に替えてください',
 } as const;
 
-/** 「メーカーへの確認が必要」の文（SR-06）。なければ null */
-export const manufacturerCheckText = (allergens: string[]): string | null =>
-    allergens.length === 0 ? null : `メーカーへの確認が必要（${allergens.join('・')}は表示されないことがあります）`;
-
 /** 「パッケージで確認する商品」か（🟡 と、情報がないため 🔴 の商品） */
 export const needsPackageCheck = (judgement: AllergenJudgement): boolean =>
     judgement.category === JUDGEMENT_CATEGORY.WARNING || (judgement.category === JUDGEMENT_CATEGORY.BLOCKED && judgement.kind === JUDGEMENT_KIND.UNKNOWN);

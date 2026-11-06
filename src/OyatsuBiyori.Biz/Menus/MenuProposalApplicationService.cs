@@ -19,7 +19,8 @@ public sealed class MenuProposalApplicationService(
     IBackgroundJobService backgroundJobs,
     IUserContext userContext,
     TimeProvider timeProvider,
-    MenuProposalOptions options)
+    MenuProposalOptions options,
+    IMenuAgentSessionCleaner? sessionCleaner = null)
 {
     /// <summary>献立案の作成の処理の種類（チャットとあわせて、同じ献立で同時に1つだけ）</summary>
     public const string ProposalJobKind = "menu-proposal";
@@ -40,6 +41,7 @@ public sealed class MenuProposalApplicationService(
     private readonly IUserContext _userContext = userContext ?? throw new ArgumentNullException(nameof(userContext));
     private readonly TimeProvider _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
     private readonly MenuProposalOptions _options = options ?? throw new ArgumentNullException(nameof(options));
+    private readonly IMenuAgentSessionCleaner _sessionCleaner = sessionCleaner ?? new NoMenuAgentSessionCleaner();
 
     private const string NotFound = "献立が見つかりません。献立一覧から開き直してください";
 
@@ -153,7 +155,17 @@ public sealed class MenuProposalApplicationService(
             }
 
             _menus.RemoveMessages(await _menus.GetMessagesAsync(menu.Id));
+
+            // 消した履歴を Claude 側にも残さない：セッションを消し、次の依頼は新しいセッションで始める（D-94）
+            var previousSession = menu.AgentSessionId;
+            menu.AgentSessionId = null;
+            menu.AgentSessionFingerprint = null;
             await _unitOfWork.SaveChangesAsync();
+            if (previousSession is not null)
+            {
+                await _sessionCleaner.ForgetAsync(previousSession);
+            }
+
             return new Result();
         }
         finally
@@ -195,7 +207,12 @@ public sealed class MenuProposalApplicationService(
 
         progress.Report(mode == MenuAgentMode.Create ? "要望を読み取って、献立を考えています" : "ご依頼を読んでいます");
         var weekRequest = mode == MenuAgentMode.Chat ? MenuAgentTools.BuildWeekRequestText(menu) : null;
-        var request = new MenuAgentRequest(mode, tools.BuildConditionsText(setting, recent), text, history, weekRequest);
+        // チャットは前のセッションを続ける（作成は新しく始める。D-94）。避ける品目・確認の記録・掲載品が変わっていたら、
+        // 前のセッションは古い候補を覚えているので続けない。続けられなければ、エージェントが新しく始めて履歴を渡す
+        var fingerprint = tools.SessionFingerprint();
+        var previousSession = menu.AgentSessionId;
+        var sessionId = mode == MenuAgentMode.Chat && menu.AgentSessionFingerprint == fingerprint ? previousSession : null;
+        var request = new MenuAgentRequest(mode, tools.BuildConditionsText(setting, recent), text, history, weekRequest, sessionId);
         Result<MenuAgentRunResult> run;
         try
         {
@@ -208,15 +225,28 @@ public sealed class MenuProposalApplicationService(
         }
 
         var replyText = run.HasError ? string.Empty : run.Value?.ReplyText?.Trim() ?? string.Empty;
+
+        // 次のチャットで続けるセッション（失敗したとき・Messages API 版のときは null にして、次は新しく始める）
+        var nextSessionId = run.HasError ? null : run.Value?.SessionId;
         var submission = tools.AcceptedSubmission ?? tools.LastSubmission;
         if (submission is null && mode == MenuAgentMode.Chat && replyText.Length > 0)
         {
             // 案を出さずに文章だけで答えた ＝ 質問への返答。献立は変えない（確定済みも下書きに戻さない。D-91）
-            return await SaveAnswerAsync(menu, replyText);
+            var answered = await SaveAnswerAsync(menu, replyText, nextSessionId, fingerprint);
+            if (answered.HasError)
+            {
+                await ForgetUnsavedSessionAsync(previousSession, nextSessionId);
+                return answered;
+            }
+
+            await ForgetReplacedSessionAsync(previousSession, nextSessionId);
+            return answered;
         }
 
         if (submission is null)
         {
+            // 案が出なかった：このターンで新しく作ったセッションは献立に覚えないので、ここで消す（前のセッションは献立に残っているので消さない。D-94）
+            await ForgetUnsavedSessionAsync(previousSession, nextSessionId);
             var error = new Result<MenuProposalOutcome>();
             error.ErrorMessages.AddRange(run.ErrorMessages);
             error.ErrorMessages.Add("献立案を作れませんでした。もう一度試すか、「自分で組む」で手で作ってください。");
@@ -294,6 +324,8 @@ public sealed class MenuProposalApplicationService(
             UpdateDateTime = now,
             UpdateUserId = user?.UserId,
         });
+        menu.AgentSessionId = nextSessionId;
+        menu.AgentSessionFingerprint = nextSessionId is null ? null : fingerprint;
         menu.UpdateDateTime = now;
         menu.UpdateUserId = user?.UserId;
         try
@@ -302,8 +334,11 @@ public sealed class MenuProposalApplicationService(
         }
         catch (ConcurrencyConflictException)
         {
+            await ForgetUnsavedSessionAsync(previousSession, nextSessionId);
             return Result<MenuProposalOutcome>.Error("考えているあいだに、別の画面で献立が変わったため、案を保存できませんでした。献立を読み込み直して、もう一度試してください。");
         }
+
+        await ForgetReplacedSessionAsync(previousSession, nextSessionId);
 
         return Result<MenuProposalOutcome>.Ok(new MenuProposalOutcome(tools.IsAccepted, removed, applied.NotApplied.Select(n => $"{n.Text}：{n.Reason}").ToList(), submission.IsBudgetFitRequest && mode == MenuAgentMode.Chat));
     }
@@ -318,7 +353,28 @@ public sealed class MenuProposalApplicationService(
     /// </summary>
     public const string AnswerNote = "※ この返答では献立を変えていません（アプリの記録）。直したいときは「水曜を○○に替えて」のように頼んでください。";
 
-    private async Task<Result<MenuProposalOutcome>> SaveAnswerAsync(Menu menu, string replyText)
+    /// <summary>使わなくなった前のセッションを Anthropic 側から消す（D-94）</summary>
+    private async Task ForgetReplacedSessionAsync(string? previousSession, string? nextSessionId)
+    {
+        if (previousSession is not null && previousSession != nextSessionId)
+        {
+            await _sessionCleaner.ForgetAsync(previousSession);
+        }
+    }
+
+    /// <summary>
+    /// 献立に覚えられなかった新しいセッション（案が出なかった・保存がぶつかった）を Anthropic 側から消す（D-94）。
+    /// 前のセッションを続けていた場合は、献立がまだその ID を持っているので消さない
+    /// </summary>
+    private async Task ForgetUnsavedSessionAsync(string? previousSession, string? nextSessionId)
+    {
+        if (nextSessionId is not null && nextSessionId != previousSession)
+        {
+            await _sessionCleaner.ForgetAsync(nextSessionId);
+        }
+    }
+
+    private async Task<Result<MenuProposalOutcome>> SaveAnswerAsync(Menu menu, string replyText, string? nextSessionId, string fingerprint)
     {
         var user = await _userContext.GetCurrentUserInfoAsync();
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -331,7 +387,24 @@ public sealed class MenuProposalApplicationService(
             UpdateDateTime = now,
             UpdateUserId = user?.UserId,
         });
-        await _unitOfWork.SaveChangesAsync(CancellationToken.None);
+
+        // 次のチャットで続けるセッションだけは覚える（献立の中身・状態・更新日時は変えない。同じ ID なら書き込まない）
+        if (menu.AgentSessionId != nextSessionId)
+        {
+            menu.AgentSessionId = nextSessionId;
+            menu.AgentSessionFingerprint = nextSessionId is null ? null : fingerprint;
+        }
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            // セッション ID を書くので、献立の行の版がぶつかることがある（献立の中身は変えていない）
+            return Result<MenuProposalOutcome>.Error("答えているあいだに、別の画面で献立が変わったため、返答を残せませんでした。献立を読み込み直して、もう一度聞いてください。");
+        }
+
         return Result<MenuProposalOutcome>.Ok(new MenuProposalOutcome(false, [], [], false, IsAnswer: true));
     }
 

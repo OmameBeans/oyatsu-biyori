@@ -22,17 +22,19 @@ import { MenuBoard } from '../../../features/menu-board';
 import { ChatPanel } from '../../../features/menu-chat';
 import { MenuProductPanel } from '../../../features/menu-products';
 import { RequestStep } from '../../../features/menu-request';
+import { ConditionsDialog } from '../../../features/settings-form';
 import { isJobFinished } from '../../../shared/api';
 import { formatWeekLabel, readPreference, writePreference } from '../../../shared/lib';
 import { MENU_STATUS, PREFERENCE_KEY, ROUTE } from '../../../shared/type';
+import type { PreferenceKey } from '../../../shared/type';
 import { ConfirmDialog, PageErrorBoundary, PageLayout, ResizableColumns } from '../../../shared/ui';
 
 const STEPS = ['チラシ取り込み', '今週の商品', '要望の入力', '献立案'] as const;
 
 const isBooleanText = (value: unknown): value is 'true' | 'false' => value === 'true' || value === 'false';
 
-/** 保存した AI チャットの開閉を読む。保存がない・読めないときは開いた状態で始める */
-const readIsChatCollapsed = (): boolean => readPreference(PREFERENCE_KEY.MENU_CHAT_COLLAPSED, isBooleanText, 'false') === 'true';
+/** 保存した列の開閉を読む。保存がない・読めないときは開いた状態で始める */
+const readIsCollapsed = (key: PreferenceKey): boolean => readPreference(key, isBooleanText, 'false') === 'true';
 
 /** 文字が実際に描かれている範囲（ラベルの要素は幅いっぱいに広がるので、要素ではなく文字の範囲を測る） */
 const textRectOf = (element: Element) => {
@@ -93,8 +95,14 @@ export const MenuEditPage = () => {
     const [commandBarElement, setCommandBarElement] = useState<HTMLDivElement | null>(null);
     // 初めから正しい形で出す（一度1列で出てから3列に変わらないように）
     const isWide = useMediaQuery((theme: Theme) => theme.breakpoints.up('lg'), { noSsr: true });
-    // AI チャットの列を閉じているか（広い PC だけ。次に開いたときも同じにする）
-    const [isChatCollapsed, setIsChatCollapsed] = useState(readIsChatCollapsed);
+    // 使える商品・AI チャットの列を閉じているか（広い PC だけ。次に開いたときも同じにする）
+    const [isProductsCollapsed, setIsProductsCollapsed] = useState(() => readIsCollapsed(PREFERENCE_KEY.MENU_PRODUCTS_COLLAPSED));
+    const toggleProducts = () => {
+        const next = !isProductsCollapsed;
+        setIsProductsCollapsed(next);
+        writePreference(PREFERENCE_KEY.MENU_PRODUCTS_COLLAPSED, String(next));
+    };
+    const [isChatCollapsed, setIsChatCollapsed] = useState(() => readIsCollapsed(PREFERENCE_KEY.MENU_CHAT_COLLAPSED));
     const toggleChat = () => {
         const next = !isChatCollapsed;
         setIsChatCollapsed(next);
@@ -103,6 +111,8 @@ export const MenuEditPage = () => {
     // 今の手順で、離れると消える入力（何が消えるか）。手順は1つずつしか出さないので、1つだけ持つ
     const [unsavedInput, setUnsavedInput] = useState<string | null>(null);
     const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+    // 手順3の「いつもの条件」の変更ダイアログ
+    const [isConditionsOpen, setIsConditionsOpen] = useState(false);
     const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
     const stepperRef = useRef<HTMLDivElement>(null);
@@ -162,10 +172,10 @@ export const MenuEditPage = () => {
                     />
                 )}
                 {step === 2 && <ListedProductsStep menuId={menu.id} onBackToFlyer={() => goStep(1)} onNext={() => goStep(3)} />}
-                {step === 3 && <RequestStep menu={menu} onStarted={() => goStep(4)} onManual={() => goStep(4)} onUnsavedInputChange={setUnsavedInput} />}
+                {step === 3 && <RequestStep menu={menu} onStarted={() => goStep(4)} onManual={() => goStep(4)} onEditConditions={() => setIsConditionsOpen(true)} />}
                 {step === 4 && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', height: { md: '100%' } }}>
-                        {/* コマンドバー（週の実績・予算と「確定」などのボタン）。中身は献立の列（MenuBoard）が出す */}
+                        {/* コマンドバー（週の実績・予算と「確定して保存」などのボタン）。中身は献立の列（MenuBoard）が出す */}
                         <Box ref={setCommandBarElement} sx={{ flexShrink: 0, mb: 2 }} />
                         <Tabs value={mobileTab} onChange={(_, value) => setMobileTab(value)} sx={{ display: { lg: 'none' }, mb: 1, flexShrink: 0 }}>
                             <Tab value="products" label="使える商品" />
@@ -177,6 +187,7 @@ export const MenuEditPage = () => {
                         <Box sx={{ flex: { md: 1 }, minHeight: 0 }}>
                             <ResizableColumns
                                 isEnabled={isWide}
+                                isLeftCollapsed={isWide && isProductsCollapsed}
                                 isRightCollapsed={isWide && isChatCollapsed}
                                 defaultWidths={{ left: 260, right: 300 }}
                                 minWidths={{ left: 200, right: 240 }}
@@ -185,11 +196,15 @@ export const MenuEditPage = () => {
                                 storageKey={PREFERENCE_KEY.MENU_COLUMN_WIDTHS}
                                 left={
                                     <Box sx={{ display: { xs: mobileTab === 'products' ? 'block' : 'none', lg: 'block' }, height: { md: '100%' } }}>
-                                        <MenuProductPanel menu={menu} />
+                                        <MenuProductPanel
+                                            menu={menu}
+                                            isCollapsed={isWide && isProductsCollapsed}
+                                            onToggleCollapsed={isWide ? toggleProducts : undefined}
+                                        />
                                     </Box>
                                 }
                                 center={
-                                    <Box sx={{ display: { xs: mobileTab === 'board' ? 'block' : 'none', lg: 'block' }, overflow: { md: 'auto', lg: 'visible' }, height: { md: '100%', lg: 'auto' } }}>
+                                    <Box sx={{ display: { xs: mobileTab === 'board' ? 'block' : 'none', lg: 'block' }, overflow: { md: 'auto', lg: 'visible' }, height: { md: '100%' } }}>
                                         <MenuBoard
                                             menu={menu}
                                             commandBarContainer={commandBarElement}
@@ -215,6 +230,7 @@ export const MenuEditPage = () => {
                     </Box>
                 )}
             </PageErrorBoundary>
+            <ConditionsDialog menu={menu} isOpen={isConditionsOpen} onClose={() => setIsConditionsOpen(false)} />
             <ConfirmDialog
                 isOpen={isLeaveConfirmOpen}
                 title="作成を中断して一覧へ戻りますか？"

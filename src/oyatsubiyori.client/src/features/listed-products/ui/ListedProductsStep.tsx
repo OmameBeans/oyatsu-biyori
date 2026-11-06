@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -8,19 +7,20 @@ import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
-import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { useSnackbar } from 'notistack';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { AllergenCategoryMark, AllergenJudgementLine, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
-import { useListedProducts, useSetExcluded, useSetListedValues } from '../../../entities/menu';
+import { useListedProducts } from '../../../entities/menu';
 import type { ListedProduct } from '../../../entities/menu';
-import { errorMessageOf } from '../../../shared/api';
 import { formatYen } from '../../../shared/lib';
 import { allergenCheckPath, JUDGEMENT_CATEGORY, SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
+import { ListedProductGrid } from './ListedProductGrid';
+import { isMissingValues } from '../model/missingValues';
+import { ExcludeSwitch, MissingValuesForm } from './ListedProductParts';
 
 interface ListedProductsStepProps {
     menuId: string;
@@ -32,12 +32,14 @@ type AllergenFilter = 'all' | 'warning' | 'blocked';
 
 /**
  * SC-09 手順2 今週の商品（T4-02）。Claude に献立を作らせる前に、候補とアレルゲンの表示を見渡す。
- * 判定・候補かどうかはサーバーが決める。「今週は使わない」は切り替えるたびに保存する。
+ * 判定・候補かどうかはサーバーが決める。「今週使う」は切り替えるたびに保存する。
  */
 export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProductsStepProps) => {
     const { data } = useListedProducts(menuId);
     const [allergenFilter, setAllergenFilter] = useState<AllergenFilter>('all');
     const [snackFilter, setSnackFilter] = useState<SnackType | 'all'>('all');
+    const theme = useTheme();
+    const isWide = useMediaQuery(theme.breakpoints.up('md'));
 
     const items = data.items.filter(
         (item) =>
@@ -48,7 +50,8 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
     );
 
     return (
-        <Stack spacing={2}>
+        // PC は見出し・絞り込みを固定し、表の中だけをスクロールする
+        <Stack spacing={2} sx={{ height: { md: '100%' }, '& > *': { flexShrink: { md: 0 } } }}>
             {data.isAvoidedEmpty && <NoAvoidedAllergenNotice />}
             <Card>
                 <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, alignItems: { md: 'center' } }}>
@@ -59,7 +62,7 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                         </Typography>
                         {data.excludedCount > 0 && (
                             <Typography variant="body2" color="text.secondary">
-                                今週は使わない：{data.excludedCount}件
+                                今週使わない商品：{data.excludedCount}件
                             </Typography>
                         )}
                     </Box>
@@ -90,12 +93,20 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                     ))}
                 </ToggleButtonGroup>
             </Stack>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.5 }}>
-                {items.map((item) => (
-                    <ListedProductCard key={item.productId} menuId={menuId} item={item} />
-                ))}
-            </Box>
-            {items.length === 0 && <Typography color="text.secondary">当てはまる商品はありません。</Typography>}
+            {isWide ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, flexShrink: 1, minHeight: 320 }}>
+                    <ListedProductGrid menuId={menuId} items={items} />
+                </Box>
+            ) : (
+                <>
+                    <Stack spacing={1.5}>
+                        {items.map((item) => (
+                            <ListedProductCard key={item.productId} menuId={menuId} item={item} />
+                        ))}
+                    </Stack>
+                    {items.length === 0 && <Typography color="text.secondary">当てはまる商品はありません。</Typography>}
+                </>
+            )}
         </Stack>
     );
 };
@@ -105,93 +116,49 @@ interface ListedProductCardProps {
     item: ListedProduct;
 }
 
-const ListedProductCard = ({ menuId, item }: ListedProductCardProps) => {
-    const setExcluded = useSetExcluded(menuId);
-    const setValues = useSetListedValues(menuId);
-    const { enqueueSnackbar } = useSnackbar();
-    const [price, setPrice] = useState(item.price?.toString() ?? '');
-    const [pieces, setPieces] = useState(item.piecesPerPack?.toString() ?? '');
-    const isMissing = item.exclusions.includes('MissingPrice') || item.exclusions.includes('MissingPieces');
-
-    const handleSave = () => {
-        setValues.mutate(
-            { productId: item.productId, price: item.price === null && price ? Number(price) : null, piecesPerPack: item.piecesPerPack === null && pieces ? Number(pieces) : null },
-            {
-                onSuccess: (note) => enqueueSnackbar(note ?? '保存しました', { variant: 'success' }),
-                onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
-            },
-        );
-    };
-
-    return (
-        <Card component="section" aria-label={item.name} sx={{ opacity: item.isExcludedThisWeek ? 0.6 : 1, borderColor: item.judgement.category === JUDGEMENT_CATEGORY.BLOCKED ? 'error.light' : undefined }}>
-            <CardContent sx={{ '&:last-child': { pb: 2 } }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 700 }}>{item.name}</Typography>
-                        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }} useFlexGap>
-                            <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />
-                            {item.tags.map((tag) => (
-                                <Chip key={`${tag.kind}-${tag.value}`} size="small" variant="outlined" label={tag.value} />
-                            ))}
-                            <Typography variant="body2" color="text.secondary">
-                                {item.price !== null ? formatYen(item.price) : '税込価格なし'}・{item.piecesPerPack !== null ? `${item.piecesPerPack}人分` : '入数なし'}
-                                {item.volume ? `・${item.volume}` : ''}
-                            </Typography>
-                        </Stack>
-                    </Box>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={item.isExcludedThisWeek}
-                                disabled={setExcluded.isPending}
-                                onChange={(event) =>
-                                    setExcluded.mutate(
-                                        { productId: item.productId, excluded: event.target.checked },
-                                        { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
-                                    )
-                                }
-                            />
-                        }
-                        label="今週は使わない"
-                        sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: 13 } }}
-                    />
-                </Stack>
-                <Box sx={{ mt: 1 }}>
-                    <AllergenJudgementLine judgement={item.judgement} showManufacturerCheck />
-                    {item.judgement.category !== 'Safe' && (
-                        <Button component={RouterLink} to={allergenCheckPath(item.productId)} size="small" sx={{ mt: 0.5 }}>
-                            パッケージで確認する
-                        </Button>
-                    )}
-                </Box>
-                {item.daysSinceServed !== null && (
-                    <Typography variant="body2" sx={{ mt: 0.5, color: 'warning.dark' }}>
-                        {item.daysSinceServed}日前に出しました
-                    </Typography>
-                )}
-                {item.isDisabled && (
-                    <Typography variant="body2" color="text.secondary">
-                        「使わない」にした商品です
-                    </Typography>
-                )}
-                {isMissing && (
-                    <Alert severity="warning" sx={{ mt: 1 }}>
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                            {item.price === null ? '税込価格' : ''}
-                            {item.price === null && item.piecesPerPack === null ? 'と' : ''}
-                            {item.piecesPerPack === null ? '入数' : ''}を入れてください（入れるまで献立に入れられません）
+/** スマホはカード */
+const ListedProductCard = ({ menuId, item }: ListedProductCardProps) => (
+    <Card component="section" aria-label={item.name} sx={{ opacity: item.isExcludedThisWeek ? 0.6 : 1, borderColor: item.judgement.category === JUDGEMENT_CATEGORY.BLOCKED ? 'error.light' : undefined }}>
+        <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700 }}>{item.name}</Typography>
+                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }} useFlexGap>
+                        <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />
+                        {item.tags.map((tag) => (
+                            <Chip key={`${tag.kind}-${tag.value}`} size="small" variant="outlined" label={tag.value} />
+                        ))}
+                        <Typography variant="body2" color="text.secondary">
+                            {item.price !== null ? formatYen(item.price) : '税込価格なし'}・{item.piecesPerPack !== null ? `${item.piecesPerPack}人分` : '入数なし'}
+                            {item.volume ? `・${item.volume}` : ''}
                         </Typography>
-                        <Stack direction="row" spacing={1}>
-                            {item.price === null && <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} sx={{ width: 140 }} />}
-                            {item.piecesPerPack === null && <TextField label="入数" type="number" value={pieces} onChange={(event) => setPieces(event.target.value)} sx={{ width: 100 }} />}
-                            <Button onClick={handleSave} disabled={setValues.isPending}>
-                                保存
-                            </Button>
-                        </Stack>
-                    </Alert>
+                    </Stack>
+                </Box>
+                <FormControlLabel
+                    control={<ExcludeSwitch menuId={menuId} item={item} />}
+                    label="今週使う"
+                    sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: 13 } }}
+                />
+            </Stack>
+            <Box sx={{ mt: 1 }}>
+                <AllergenJudgementLine judgement={item.judgement} />
+                {item.judgement.category !== 'Safe' && (
+                    <Button component={RouterLink} to={allergenCheckPath(item.productId)} size="small" sx={{ mt: 0.5 }}>
+                        パッケージで確認する
+                    </Button>
                 )}
-            </CardContent>
-        </Card>
-    );
-};
+            </Box>
+            {item.daysSinceServed !== null && (
+                <Typography variant="body2" sx={{ mt: 0.5, color: 'warning.dark' }}>
+                    {item.daysSinceServed}日前に出しました
+                </Typography>
+            )}
+            {item.isDisabled && (
+                <Typography variant="body2" color="text.secondary">
+                    「使わない」にした商品です
+                </Typography>
+            )}
+            {isMissingValues(item) && <MissingValuesForm menuId={menuId} item={item} />}
+        </CardContent>
+    </Card>
+);

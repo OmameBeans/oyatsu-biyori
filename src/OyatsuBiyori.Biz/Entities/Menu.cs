@@ -37,6 +37,18 @@ public sealed class Menu : EntityBase
     /// <summary>確定した職員</summary>
     public string? ConfirmedBy { get; set; }
 
+    /// <summary>
+    /// チャットで続けて使う献立づくりのエージェントのセッション（Managed Agents。D-94）。
+    /// 献立案を作り直したとき・チャットの履歴を消したときは新しいセッションにする。中身（会話）は Anthropic 側にあり、ここには ID だけを持つ
+    /// </summary>
+    public string? AgentSessionId { get; set; }
+
+    /// <summary>
+    /// セッションを始めたときの条件の指紋（避ける品目と、候補とその要確認の印。D-94）。
+    /// 避ける品目・確認の記録・掲載品が変わったら、前のセッション（古い候補やツールの結果を覚えている）は続けない
+    /// </summary>
+    public string? AgentSessionFingerprint { get; set; }
+
     /// <summary>同時に保存したときの衝突を見つける値（SQLite のトリガーで更新する。D-46）</summary>
     public byte[]? RowVersion { get; set; }
 

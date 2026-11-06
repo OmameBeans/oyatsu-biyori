@@ -5,7 +5,7 @@ import type { ColorMode } from '../src/shared/type/colorMode';
 import { COLOR_THEME } from '../src/shared/type/colorTheme';
 import type { ColorTheme } from '../src/shared/type/colorTheme';
 import { PREFERENCE_KEY } from '../src/shared/type/preferenceKey';
-import { captureScreen, expectReadable } from './helpers';
+import { captureScreen, expectReadable, productItem } from './helpers';
 
 /**
  * 横スクロールが出ないこと：ページ全体の幅が画面の幅を超えず（スマホ）、渡した要素の右端が main の右端の中にある。
@@ -367,7 +367,7 @@ test.describe('#4 見た目（明るさ）', () => {
         await storeAppearance(page, { mode: COLOR_MODE.DARK });
 
         // 献立一覧
-        await page.goto('/menus');
+        await page.goto('/menus?view=list');
         await expect(page.getByRole('heading', { name: '献立一覧' })).toBeVisible();
         expect(isDarkColor(await readBackground(page))).toBe(true);
         // ダークでも、丸み（BASE_THEME_OPTIONS の shape.borderRadius: 4）が引き継がれている
@@ -385,13 +385,13 @@ test.describe('#4 見た目（明るさ）', () => {
 
         // 商品詳細
         await page.goto('/products');
-        await page.getByRole('region', { name: 'うさぎのミミ いちごゼリー' }).getByRole('link').click();
+        await productItem(page, 'うさぎのミミ いちごゼリー').getByRole('link').click();
         await expect(page.getByRole('heading', { name: 'うさぎのミミ いちごゼリー' })).toBeVisible();
         await captureScreen(page, testInfo, 'dark-sc-07-product-detail');
 
         // アレルゲン確認（記録はしない）
         await page.goto('/products');
-        await page.getByRole('region', { name: 'ぽかぽか さつまいもチップス' }).getByRole('link').click();
+        await productItem(page, 'ぽかぽか さつまいもチップス').getByRole('link').click();
         await page.getByRole('link', { name: 'パッケージで確認する' }).click();
         await expect(page.getByRole('button', { name: 'パッケージで確認して記録' })).toBeVisible();
         await captureScreen(page, testInfo, 'dark-sc-08-allergen-check');

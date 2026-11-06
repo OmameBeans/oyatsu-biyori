@@ -6,7 +6,7 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { ROUTE } from '../../../shared/type';
 import { CATEGORY_ICON, categoryIconTestId } from '../model/icon';
-import { CATEGORY_COLOR, CATEGORY_LABEL, judgementText, manufacturerCheckText } from '../model/text';
+import { CATEGORY_COLOR, CATEGORY_LABEL, judgementText } from '../model/text';
 import type { AllergenJudgement } from '../../../shared/type';
 
 interface AllergenBadgeProps {
@@ -32,17 +32,14 @@ export const AllergenBadge = ({ judgement, size = 'small' }: AllergenBadgeProps)
 interface AllergenJudgementLineProps {
     judgement: AllergenJudgement;
     isInMenu?: boolean;
-    showManufacturerCheck?: boolean;
     showNextSteps?: boolean;
 }
 
 /**
  * アレルゲンの表示と理由・次にすること（T4-01）。文言はこの部品からだけ出す。
- * 「メーカーへの確認が必要」は、献立の日ごとのカードでは出さない（showManufacturerCheck を false にする。03 §6.3）。
  */
-export const AllergenJudgementLine = ({ judgement, isInMenu = false, showManufacturerCheck = false, showNextSteps = true }: AllergenJudgementLineProps) => {
+export const AllergenJudgementLine = ({ judgement, isInMenu = false, showNextSteps = true }: AllergenJudgementLineProps) => {
     const { reasons, nextSteps } = judgementText(judgement, isInMenu);
-    const manufacturer = showManufacturerCheck ? manufacturerCheckText(judgement.manufacturerCheckAllergens) : null;
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -56,11 +53,6 @@ export const AllergenJudgementLine = ({ judgement, isInMenu = false, showManufac
             {showNextSteps && nextSteps.length > 0 && (
                 <Typography variant="caption" color="text.secondary">
                     {nextSteps.join('。')}
-                </Typography>
-            )}
-            {manufacturer && (
-                <Typography variant="caption" color="text.secondary">
-                    {manufacturer}
                 </Typography>
             )}
         </Box>

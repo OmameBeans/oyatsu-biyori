@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Browser, TestInfo } from '@playwright/test';
 import { COLOR_MODE } from '../src/shared/type/colorMode';
 import { PREFERENCE_KEY } from '../src/shared/type/preferenceKey';
-import { captureScreen, captureScreenAs, expectReadable, openFlyerItemDetail } from './helpers';
+import { captureScreen, captureScreenAs, expectReadable, listedProductItem, openFlyerItemDetail } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
 const PACKAGE_IMAGE = path.resolve(process.cwd(), '../../samples/packages/package-8104-back.png');
@@ -31,7 +31,7 @@ const checkBlockedNoticesInDark = async (browser: Browser, testInfo: TestInfo, u
         const page = await context.newPage();
         try {
             // 献立一覧の最上部の 🔴 の警告（filled の Alert）
-            await page.goto('/menus');
+            await page.goto('/menus?view=list');
             await expectReadable(page.getByText('使えない商品が献立に入っています', { exact: false }));
             await expectReadable(page.getByText('原材料に『ヘーゼルナッツ』があります（ヘーゼルナッツ）', { exact: false }).first());
             await captureScreenAs(page, `dark-sc-10-blocked-alert-${projectName}`);
@@ -44,11 +44,11 @@ const checkBlockedNoticesInDark = async (browser: Browser, testInfo: TestInfo, u
 
             // 確定のダイアログ：🔴 の確定できない理由と、次にすること
             await page.goto(urls.menu);
-            await page.getByRole('button', { name: /^確定/ }).click();
+            await page.getByRole('button', { name: '確定して保存', exact: true }).click();
             const dialog = page.getByRole('dialog');
             // ダイアログの地に、MUI のダークの白の重ね（背景画像）がない（重ねると文字との比が計算と合わなくなる）
             await expect.poll(() => dialog.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none');
-            await expectReadable(dialog.getByText('次の問題があるため、確定できません'));
+            await expectReadable(dialog.getByText('次の問題があるため、保存できません'));
             await expectReadable(dialog.getByText('原材料に『ヘーゼルナッツ』があります（ヘーゼルナッツ）').first());
             await expectReadable(dialog.getByText('別の商品に替えてください', { exact: false }).first());
             await captureScreenAs(page, `dark-sc-09-confirm-dialog-blocked-${projectName}`);
@@ -72,7 +72,7 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         // ダークの確認（PC とスマホ）を足したぶん、時間を長めにとる
         test.setTimeout(180_000);
         // 1. 来週の献立でチラシを取り込み、「ことりのさくさくショコラ」を新しい商品として確定する
-        await page.goto('/menus');
+        await page.goto('/menus?view=list');
         await page.getByRole('region', { name: /^来週 / }).getByRole('button', { name: /献立を作る|開く/ }).click();
         await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
         await page.getByRole('button', { name: '読み取る' }).click();
@@ -84,7 +84,7 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
 
         // 2. 今週の商品では 🟡 要確認（チラシの情報だけ）で、献立に入れられる
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        const listed = page.getByRole('region', { name: 'ことりのさくさくショコラ' });
+        const listed = listedProductItem(page, 'ことりのさくさくショコラ');
         await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
 
         // 3. 手で水曜に入れる（自分で組む）
@@ -123,7 +123,7 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         await captureScreen(page, testInfo, 'sc-08-recorded');
 
         // 7. 献立一覧の最上部に警告が出て、そこから献立を開ける
-        await page.goto('/menus');
+        await page.goto('/menus?view=list');
         await expect(page.getByText('使えない商品が献立に入っています', { exact: false })).toBeVisible();
         await expect(page.getByText('「ことりのさくさくショコラ」原材料に『ヘーゼルナッツ』があります（ヘーゼルナッツ）')).toBeVisible();
         await captureScreen(page, testInfo, 'sc-10-blocked-alert');

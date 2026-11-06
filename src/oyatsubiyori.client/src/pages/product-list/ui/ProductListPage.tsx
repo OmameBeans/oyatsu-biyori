@@ -12,11 +12,14 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { AllergenCategoryMark, AllergenJudgementLine, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { PRODUCT_FILTER, useProductList } from '../../../entities/product';
-import type { ProductFilter } from '../../../entities/product';
+import type { ProductFilter, ProductListItem } from '../../../entities/product';
 import { productPath, SNACK_TYPE_LABEL } from '../../../shared/type';
 import { LoadingFallback, PageLayout } from '../../../shared/ui';
+import { ProductGrid } from './ProductGrid';
 
 const FILTER_LABEL: Record<ProductFilter, ReactNode> = {
     All: 'すべて',
@@ -34,6 +37,7 @@ const toFilter = (value: string | null): ProductFilter =>
 /**
  * SC-06 商品一覧（T6-01）。検索（正規化名の部分一致）・アレルゲンの表示での絞り込みは、サーバーで行う。
  * 「使わない」商品は既定で隠す。絞り込みは URL の ?filter= で持つ（献立一覧の件数から開くため）。
+ * PC は DataGrid（並べ替えできる表）、スマホはカード。
  */
 export const ProductListPage = () => {
     const [params, setParams] = useSearchParams();
@@ -86,36 +90,56 @@ interface ProductCardsProps {
 
 const ProductCards = ({ query, filter, includeDisabled }: ProductCardsProps) => {
     const { data } = useProductList(query, filter, includeDisabled);
+    const theme = useTheme();
+    const isWide = useMediaQuery(theme.breakpoints.up('md'));
     return (
-        <Stack spacing={1.5}>
+        <Stack spacing={1.5} sx={{ height: { md: '100%' } }}>
             {data.isAvoidedEmpty && <NoAvoidedAllergenNotice />}
             <Typography variant="body2" color="text.secondary">
                 {data.items.length}件
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.5 }}>
-                {data.items.map((item) => (
-                    <Card key={item.id} component="section" aria-label={item.name} sx={{ opacity: item.isDisabled ? 0.65 : 1 }}>
-                        <CardActionArea component={RouterLink} to={productPath(item.id)}>
-                            <CardContent>
-                                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
-                                    <Typography sx={{ fontWeight: 700 }}>{item.name}</Typography>
-                                    <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />
-                                    {item.isDisabled && <Chip size="small" variant="outlined" label="使わない" />}
-                                    {item.isUsedInFutureMenus && <Chip size="small" color="primary" variant="outlined" label="今日以降の献立で使う" />}
-                                </Stack>
-                                <Typography variant="body2" color="text.secondary">
-                                    {[item.maker, item.volume].filter(Boolean).join('・')}
-                                    {item.lastCheckedDate ? `・最終確認 ${item.lastCheckedDate.replace(/-/g, '/')}` : '・確認の記録なし'}
-                                </Typography>
-                                <Box sx={{ mt: 1 }}>
-                                    <AllergenJudgementLine judgement={item.judgement} showManufacturerCheck />
-                                </Box>
-                            </CardContent>
-                        </CardActionArea>
-                    </Card>
-                ))}
-            </Box>
-            {data.items.length === 0 && <Typography color="text.secondary">当てはまる商品はありません。</Typography>}
+            {isWide ? (
+                // PC は表（画面の高さいっぱい。表の中だけをスクロール）
+                <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 320 }}>
+                    <ProductGrid items={data.items} />
+                </Box>
+            ) : (
+                <ProductCardList items={data.items} />
+            )}
         </Stack>
     );
 };
+
+interface ProductCardListProps {
+    items: ProductListItem[];
+}
+
+/** スマホはカード */
+const ProductCardList = ({ items }: ProductCardListProps) => (
+    <>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1.5 }}>
+            {items.map((item) => (
+                <Card key={item.id} component="section" aria-label={item.name} sx={{ opacity: item.isDisabled ? 0.65 : 1 }}>
+                    <CardActionArea component={RouterLink} to={productPath(item.id)}>
+                        <CardContent>
+                            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+                                <Typography sx={{ fontWeight: 700 }}>{item.name}</Typography>
+                                <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />
+                                {item.isDisabled && <Chip size="small" variant="outlined" label="使わない" />}
+                                {item.isUsedInFutureMenus && <Chip size="small" color="primary" variant="outlined" label="今日以降の献立で使う" />}
+                            </Stack>
+                            <Typography variant="body2" color="text.secondary">
+                                {[item.maker, item.volume].filter(Boolean).join('・')}
+                                {item.lastCheckedDate ? `・最終確認 ${item.lastCheckedDate.replace(/-/g, '/')}` : '・確認の記録なし'}
+                            </Typography>
+                            <Box sx={{ mt: 1 }}>
+                                <AllergenJudgementLine judgement={item.judgement} />
+                            </Box>
+                        </CardContent>
+                    </CardActionArea>
+                </Card>
+            ))}
+        </Box>
+        {items.length === 0 && <Typography color="text.secondary">当てはまる商品はありません。</Typography>}
+    </>
+);

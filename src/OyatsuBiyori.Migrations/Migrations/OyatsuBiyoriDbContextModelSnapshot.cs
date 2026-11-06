@@ -1209,6 +1209,12 @@ namespace OyatsuBiyori.Migrations.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AgentSessionFingerprint")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AgentSessionId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("TEXT");
 

@@ -25,6 +25,9 @@ internal sealed class InMemoryData
 
     public int SaveCount { get; set; }
 
+    /// <summary>true なら、保存のときに別の画面の更新とぶつかったことにする（ConcurrencyConflictException）</summary>
+    public bool IsSaveConflicting { get; set; }
+
     public void Avoid(params string[] codes)
     {
         foreach (var code in codes)
@@ -151,6 +154,11 @@ internal sealed class FakeUnitOfWork(InMemoryData data) : IUnitOfWork
 {
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (data.IsSaveConflicting)
+        {
+            throw new ConcurrencyConflictException();
+        }
+
         data.SaveCount++;
         return Task.CompletedTask;
     }

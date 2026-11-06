@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { captureScreen } from './helpers';
+import { captureScreen, productItem } from './helpers';
 
 const PACKAGE_IMAGE = path.resolve(process.cwd(), '../../samples/packages/package-8104-back.png');
 
@@ -8,33 +8,47 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
     test('FR-PROD-01・03 一覧にアレルゲンの表示と理由が出て、🔴 で絞り込める', async ({ page }, testInfo) => {
         await page.goto('/products');
         await expect(page.getByRole('heading', { name: '商品一覧' })).toBeVisible();
-        const blockedCard = page.getByRole('region', { name: 'ころころ ココナッツサブレ' });
+        const blockedCard = productItem(page, 'ころころ ココナッツサブレ');
         await expect(blockedCard.getByText('使えません', { exact: true })).toBeVisible();
         // 文字だけでなく、使えません のアイコンも出る（§6.1）
         await expect(blockedCard.getByTestId('allergen-icon-Blocked')).toBeVisible();
         await captureScreen(page, testInfo, 'sc-06-products');
 
-        await page.getByLabel('アレルゲンの表示').click();
+        await page.getByRole('combobox', { name: 'アレルゲンの表示' }).click();
         await page.getByRole('option', { name: '使えません', exact: true }).click();
         await expect(page).toHaveURL(/filter=Blocked/);
-        await expect(page.getByRole('region', { name: 'しろくまの ヨーグルトゼリー' })).toHaveCount(0);
-        await expect(page.getByRole('region', { name: 'ころころ ココナッツサブレ' })).toBeVisible();
+        await expect(productItem(page, 'しろくまの ヨーグルトゼリー')).toHaveCount(0);
+        await expect(productItem(page, 'ころころ ココナッツサブレ')).toBeVisible();
+    });
+
+    test('FR-PROD-01 PC では表になり、アレルゲンの表示の見出しで「使えません」を上に並べ替えられる', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホはカードのまま');
+        await page.goto('/products');
+        const grid = page.getByRole('grid', { name: '商品一覧' });
+        await expect(grid).toBeVisible();
+        await grid.getByRole('columnheader', { name: 'アレルゲンの表示' }).click();
+        const firstRow = grid.getByRole('row').nth(1);
+        await expect(firstRow.getByText('使えません', { exact: true })).toBeVisible();
+        // 行を押すと商品詳細が開く
+        const name = await firstRow.getByRole('link').innerText();
+        await firstRow.getByRole('gridcell').last().click();
+        await expect(page.getByRole('heading', { name })).toBeVisible();
     });
 
     test('FR-PROD-02・09 商品名で探せて、「使わない」商品は既定で隠れる', async ({ page }) => {
         await page.goto('/products');
-        await expect(page.getByRole('region', { name: 'どんぐり きなこクッキー' })).toHaveCount(0);
+        await expect(productItem(page, 'どんぐり きなこクッキー')).toHaveCount(0);
         await page.getByLabel('「使わない」商品も出す').check();
-        await expect(page.getByRole('region', { name: 'どんぐり きなこクッキー' })).toBeVisible();
+        await expect(productItem(page, 'どんぐり きなこクッキー')).toBeVisible();
 
         await page.getByLabel('商品名で探す').fill('ゼリー');
         await page.getByLabel('商品名で探す').press('Enter');
-        await expect(page.getByRole('region', { name: 'しろくまの ヨーグルトゼリー' })).toBeVisible();
-        await expect(page.getByRole('region', { name: 'ころころ ココナッツサブレ' })).toHaveCount(0);
+        await expect(productItem(page, 'しろくまの ヨーグルトゼリー')).toBeVisible();
+        await expect(productItem(page, 'ころころ ココナッツサブレ')).toHaveCount(0);
     });
 
     test('SC-10 献立一覧の注意から、今日以降の献立で使うパッケージで確認する商品の一覧を開ける', async ({ page }) => {
-        await page.goto('/menus');
+        await page.goto('/menus?view=list');
         await page.getByRole('link', { name: '商品を確認する' }).click();
         await expect(page).toHaveURL(/filter=FuturePackage/);
         await expect(page.getByRole('heading', { level: 1, name: '商品一覧' })).toBeVisible();
@@ -44,7 +58,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
 
     test('FR-PROD-07・SR-16 商品詳細に今の表示と、ステータスつきの確認の履歴が出る', async ({ page }, testInfo) => {
         await page.goto('/products');
-        await page.getByRole('region', { name: 'うさぎのミミ いちごゼリー' }).getByRole('link').click();
+        await productItem(page, 'うさぎのミミ いちごゼリー').getByRole('link').click();
         await expect(page.getByRole('heading', { name: 'うさぎのミミ いちごゼリー' })).toBeVisible();
         await expect(page.getByText(/前回の確認から\d+日たちました/)).toBeVisible();
         await expect(page.getByText('アレルゲン確認の履歴')).toBeVisible();
@@ -54,7 +68,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
 
     test('FR-PROD-04・08 基本情報とメモを保存できる（子どもの名前を書かない注意が出る）', async ({ page }) => {
         await page.goto('/products');
-        await page.getByRole('region', { name: 'もぐもぐ おこめスナック' }).getByRole('link').click();
+        await productItem(page, 'もぐもぐ おこめスナック').getByRole('link').click();
         await expect(page.getByText('子どもの名前は書かないでください（献立の提案のため AI に送ります）')).toBeVisible();
         const memo = `子どもに人気（${test.info().project.name}）`;
         await page.getByLabel('メモ').fill(memo);
@@ -66,7 +80,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
 
     test('SR-12・FR-PROD-06b 全文と品目がそろうまでパッケージでは記録できず、パッケージ以外なら 🟢 にならない', async ({ page }, testInfo) => {
         await page.goto('/products');
-        await page.getByRole('region', { name: 'ぽかぽか さつまいもチップス' }).getByRole('link').click();
+        await productItem(page, 'ぽかぽか さつまいもチップス').getByRole('link').click();
         await page.getByRole('link', { name: 'パッケージで確認する' }).click();
         const packageButton = page.getByRole('button', { name: 'パッケージで確認して記録' });
         await expect(packageButton).toBeDisabled();
@@ -111,7 +125,7 @@ test.describe('SC-06・SC-07・SC-08 商品', () => {
         const thumbnails = page.getByRole('button', { name: /を外す$/ });
 
         await page.goto('/products');
-        await page.getByRole('region', { name: 'ぽかぽか さつまいもチップス' }).getByRole('link').click();
+        await productItem(page, 'ぽかぽか さつまいもチップス').getByRole('link').click();
         await page.getByRole('link', { name: 'パッケージで確認する' }).click();
         const readButton = page.getByRole('button', { name: '読み取る', exact: true });
 

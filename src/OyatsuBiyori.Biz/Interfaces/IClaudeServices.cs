@@ -157,6 +157,23 @@ public interface IMenuPlannerAgent
     Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// 使い終わった献立づくりのセッションを、Anthropic 側から消す（Managed Agents。D-94）。
+/// 職員のチャットの文章・週の要望が、使わなくなったセッションに残り続けないようにする。失敗しても例外にせず、ログだけ残す
+/// </summary>
+public interface IMenuAgentSessionCleaner
+{
+    /// <summary>セッションを消す</summary>
+    Task ForgetAsync(string sessionId);
+}
+
+/// <summary>何もしない後片付け（Managed Agents を使わないとき・テスト）</summary>
+public sealed class NoMenuAgentSessionCleaner : IMenuAgentSessionCleaner
+{
+    /// <inheritdoc />
+    public Task ForgetAsync(string sessionId) => Task.CompletedTask;
+}
+
 /// <summary>エージェントの動かし方</summary>
 public enum MenuAgentMode
 {
@@ -173,13 +190,15 @@ public enum MenuAgentMode
 /// <param name="RequestText">週の要望（作成）か、チャットの依頼</param>
 /// <param name="History">チャットの履歴（Claude 側の説明文と職員の依頼）</param>
 /// <param name="WeekRequestText">チャットのとき、作成時の週の要望と読み取った方針（守ったまま組み直させる。FR-MENU-22）。作成のときは null</param>
-public sealed record MenuAgentRequest(MenuAgentMode Mode, string ConditionsText, string? RequestText, IReadOnlyList<MenuMessage> History, string? WeekRequestText = null);
+/// <param name="SessionId">続けて使うエージェントのセッション（Managed Agents 版のチャットだけ。D-94）。なければ新しく始める</param>
+public sealed record MenuAgentRequest(MenuAgentMode Mode, string ConditionsText, string? RequestText, IReadOnlyList<MenuMessage> History, string? WeekRequestText = null, string? SessionId = null);
 
 /// <summary>エージェントの結果（受け付けた案は tools 側が持つ）</summary>
 /// <param name="Accepted">submit_menu で案を受け付けたか</param>
 /// <param name="Iterations">ループの回数</param>
 /// <param name="ReplyText">チャットの返答の文章（Claude が書いた Markdown。質問への返答か、何を変えたかの説明。なければ空）</param>
-public sealed record MenuAgentRunResult(bool Accepted, int Iterations, string ReplyText = "");
+/// <param name="SessionId">次のチャットで続けて使えるセッション（Managed Agents 版だけ。D-94）。続けられないときは null</param>
+public sealed record MenuAgentRunResult(bool Accepted, int Iterations, string ReplyText = "", string? SessionId = null);
 
 /// <summary>
 /// 献立づくりの道具（判断のロジックは Biz。NFR-MNT-05）。入出力は文字列（JSON）で、Claude の道具の定義は Claude プロジェクトに置く。

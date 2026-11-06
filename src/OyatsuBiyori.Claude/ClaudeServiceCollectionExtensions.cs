@@ -1,6 +1,7 @@
 ﻿using Anthropic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using OyatsuBiyori.Biz.Interfaces;
 using OyatsuBiyori.Claude.Services;
 
@@ -30,7 +31,17 @@ public static class ClaudeServiceCollectionExtensions
         services.AddScoped<IFlyerReader, FlyerReader>();
         services.AddScoped<IFlyerReviewer, FlyerReviewer>();
         services.AddScoped<IProductMatchJudge, ProductMatchJudge>();
-        services.AddScoped<IMenuPlannerAgent, MenuPlannerAgent>();
+
+        // 献立づくりのエージェントは、設定で Messages API 版と Managed Agents 版を切り替える（D-94）
+        services.AddScoped<MenuPlannerAgent>();
+        services.AddScoped<ManagedMenuPlannerAgent>();
+        services.AddScoped<MenuAgentSessionCleaner>();
+        services.AddScoped<IMenuAgentSessionCleaner>(provider => provider.GetRequiredService<MenuAgentSessionCleaner>());
+        services.AddScoped<IMenuPlannerAgent>(provider =>
+            provider.GetRequiredService<IOptions<ClaudeOptions>>().Value.MenuPlannerEngine == MenuPlannerEngine.ManagedAgents
+                ? provider.GetRequiredService<ManagedMenuPlannerAgent>()
+                : provider.GetRequiredService<MenuPlannerAgent>());
+
         services.AddScoped<IBudgetFitExplainer, BudgetFitExplainer>();
         services.AddScoped<IAllergenExtractor, AllergenExtractor>();
         return services;

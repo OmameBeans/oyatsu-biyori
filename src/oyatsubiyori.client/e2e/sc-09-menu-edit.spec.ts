@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { captureScreen, captureScreenAs, openFlyerItemDetail } from './helpers';
+import { captureScreen, captureScreenAs, listedProductItem, openFlyerItemDetail } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
 const FLYER_PDF = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.pdf');
@@ -12,7 +12,7 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 
 /** 献立一覧から、指定した週（今週・来週・再来週）の献立を開く */
 const openWeek = async (page: Page, label: '来週' | '再来週') => {
-    await page.goto('/menus');
+    await page.goto('/menus?view=list');
     const card = page.getByRole('region', { name: new RegExp('^' + label + ' ') });
     await card.getByRole('button', { name: /献立を作る|開く/ }).click();
     await expect(page).toHaveURL(/\/menus\/[0-9a-f-]+/);
@@ -231,7 +231,7 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(page.getByText('「ことりのピピ ラムネ」を確定しました')).toBeVisible();
 
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        const listed = page.getByRole('region', { name: 'ことりのピピ ラムネ' });
+        const listed = listedProductItem(page, 'ことりのピピ ラムネ');
         await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
         await expect(listed.getByTestId('allergen-icon-Warning')).toBeVisible();
         await expect(listed.getByText('チラシにアレルゲンの表記がありません')).toBeVisible();
@@ -321,23 +321,23 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(grid.getByRole('row', { name: new RegExp('確定済み .*' + escapeRegExp(firstName)) })).toBeVisible();
     });
 
-    test('FR-MENU-07a 「今週は使わない」は切り替えるたびに保存される', async ({ page }) => {
+    test('FR-MENU-07a 「今週使う」は初めはオンで、切り替えるたびに保存される', async ({ page }) => {
         await openWeek(page, '再来週');
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        const card = page.getByRole('region', { name: 'きらきら 星のラムネ' });
-        const toggle = card.getByLabel('今週は使わない');
+        const card = listedProductItem(page, 'きらきら 星のラムネ');
+        const toggle = card.getByLabel('今週使う');
         const before = await toggle.isChecked();
         const saved = page.waitForResponse((response) => response.url().includes('/api/menus/setExcluded') && response.ok());
         await toggle.click();
         await saved;
         await page.reload();
-        await expect(page.getByRole('region', { name: 'きらきら 星のラムネ' }).getByLabel('今週は使わない')).toBeChecked({ checked: !before });
+        await expect(listedProductItem(page, 'きらきら 星のラムネ').getByLabel('今週使う')).toBeChecked({ checked: !before });
     });
 
     test('SR-14 原材料に探す言葉がある商品は、今週の商品で 🔴 使えません と理由が出る', async ({ page }) => {
         await openWeek(page, '再来週');
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        const card = page.getByRole('region', { name: 'ころころ ココナッツサブレ' });
+        const card = listedProductItem(page, 'ころころ ココナッツサブレ');
         await expect(card.getByText('使えません', { exact: true })).toBeVisible();
         await expect(card.getByText(/『ココナッツ』があります/)).toBeVisible();
     });
@@ -359,12 +359,67 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(page.getByText(/実績 [\d,]+円 \/ 予算/)).toBeVisible();
         await expect(page.getByText('理由').first()).toBeVisible();
         await captureScreen(page, testInfo, 'sc-09-step4-board');
+
+        // 「要望をこう理解しました」は折りたためる（見出しは残る）
+        const hint = page.getByText('人数・種別・見出しは、日ごとのカードの「詳細設定」で直せます。');
+        await expect(hint).toBeVisible();
+        await page.getByRole('button', { name: '要望の読み取りを折りたたむ' }).click();
+        await expect(hint).toBeHidden();
+        await expect(page.getByText('要望をこう理解しました')).toBeVisible();
+        await page.getByRole('button', { name: '要望の読み取りを開く' }).click();
+        await expect(hint).toBeVisible();
+    });
+
+    test('SR-04 上部の「確かめること」に、日ごとのカードの 🔴 使えません・🟡 要確認 の件数がまとめて出る（画面の外の日も数える）', async ({ page }, testInfo) => {
+        await openWeek(page, '再来週');
+        if (testInfo.project.name === 'mobile') {
+            await page.getByRole('tab', { name: '献立', exact: true }).click();
+        }
+        const days = page.getByRole('region', { name: /の献立$/ });
+        await expect(days.first()).toBeVisible();
+        const summary = page.getByRole('region', { name: '確かめること' });
+        for (const label of ['使えません', '要確認']) {
+            // 日ごとのカードの商品に付いた表示の数（横にスクロールしないと見えない日も DOM にはある）
+            const count = await days.getByText(label, { exact: true }).count();
+            if (count === 0) {
+                await expect(summary.getByText(new RegExp(`^${label} \\d+件`))).toHaveCount(0);
+            } else {
+                await expect(summary.getByText(new RegExp(`^${label} ${count}件（`))).toBeVisible();
+            }
+        }
+    });
+
+    test('FR-COND-02 手順3の「いつもの条件」の「変更」からダイアログで条件を変えられ、この週の予算がすぐ反映される', async ({ page }, testInfo) => {
+        await openWeek(page, '再来週');
+        await page.getByRole('tab', { name: '要望の入力', exact: true }).click();
+        const budgetLine = page.getByText(/^週の予算：/);
+        const before = (await budgetLine.textContent()) ?? '';
+        const original = before.replace(/[^\d]/g, '');
+        await page.getByRole('button', { name: 'いつもの条件を変更' }).click();
+        const dialog = page.getByRole('dialog', { name: 'いつもの条件を変える' });
+        await expect(dialog.getByRole('tab', { name: '人数・予算・重複' })).toBeVisible();
+        await expect(dialog.getByRole('tab', { name: '避ける品目' })).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step3-conditions-dialog');
+
+        // この週の予算を変えて、手順3の表示に出ることを確かめてから元に戻す（ほかのテストに響かないように）
+        const field = dialog.getByLabel('この週の予算（税込）');
+        await field.fill('12345');
+        await dialog.getByRole('button', { name: '保存する' }).click();
+        await expect(budgetLine).toHaveText(/12,345円/);
+        await field.fill(original);
+        await dialog.getByRole('button', { name: '保存する' }).click();
+        await expect(budgetLine).toHaveText(before);
+
+        await dialog.getByRole('tab', { name: '避ける品目' }).click();
+        await expect(dialog.getByText(/いま避けている品目：/)).toBeVisible();
+        await dialog.getByRole('button', { name: '閉じる' }).click();
+        await expect(dialog).toBeHidden();
     });
 
     test('FR-MENU-28・30 予算に届かないときだけ「予算に合わせる」が出て、案を選ぶと反映される', async ({ page }, testInfo) => {
         await openWeek(page, '再来週');
         await expect(page.getByText(/実績 [\d,]+円 \/ 予算/)).toBeVisible();
-        await expect(page.getByRole('button', { name: /^確定/ })).toBeEnabled();
+        await expect(page.getByRole('button', { name: '確定して保存', exact: true })).toBeEnabled();
         const fit = page.getByRole('button', { name: '予算に合わせる' });
         if (!(await fit.isVisible())) {
             test.skip(true, '今の献立は予算に届いているため、ボタンが出ない（D-67）');
@@ -380,17 +435,24 @@ test.describe.serial('SC-09 献立作成', () => {
 
     test('FR-MENU-24 パック数を変えると、金額をサーバーが計算し直す', async ({ page }) => {
         await openWeek(page, '再来週');
-        const packInput = page.getByLabel(/のパック数$/).first();
-        await expect(packInput).toBeVisible();
-        const current = Number(await packInput.inputValue());
-        const line = page.getByText(/円 × \d+パック = [\d,]+円/).first();
+        // 商品のカードの「個数設定」から、ダイアログでパック数を直す
+        const card = page.getByRole('region', { name: /の献立$/ }).first();
+        const line = card.getByText(/^[\d,]+円 × \d+パック$/).first();
+        await expect(line).toBeVisible();
         const match = /([\d,]+)円 × (\d+)パック/.exec((await line.textContent()) ?? '');
         const unitPrice = Number((match?.[1] ?? '0').replace(/,/g, ''));
+        const current = Number(match?.[2] ?? '0');
+        await card.getByRole('button', { name: /の個数設定$/ }).first().click();
+        const dialog = page.getByRole('dialog', { name: /の個数$/ });
+        const packInput = dialog.getByLabel('買うパック数');
+        await expect(packInput).toHaveValue(String(current));
         await packInput.fill(String(current + 1));
-        await packInput.blur();
+        await dialog.getByRole('button', { name: '保存する' }).click();
+        await expect(dialog).toBeHidden();
         // 金額（単価 × パック数）はサーバーが計算し直した値が出る
         const expected = (unitPrice * (current + 1)).toLocaleString('ja-JP');
-        await expect(page.getByText(`× ${current + 1}パック = ${expected}円`).first()).toBeVisible();
+        await expect(card.getByText(`${match?.[1]}円 × ${current + 1}パック`).first()).toBeVisible();
+        await expect(card.getByText(`${expected}円`, { exact: true }).first()).toBeVisible();
     });
 
     test('FR-MENU-21 チャットで依頼すると、組み直して返答が出る', async ({ page }) => {
@@ -450,6 +512,26 @@ test.describe.serial('SC-09 献立作成', () => {
         expect(await page.getByRole('region', { name: /の献立$/ }).count()).toBe(daysBefore);
     });
 
+    test('FR-MENU-04 日ごとのカードの「詳細設定」で見出しを直すと、カードに出る', async ({ page }) => {
+        await openWeek(page, '再来週');
+        const card = page.getByRole('region', { name: /の献立$/ }).first();
+        await card.getByRole('button', { name: /の詳細設定$/ }).click();
+        const dialog = page.getByRole('dialog', { name: /の詳細設定$/ });
+        const label = dialog.getByLabel('見出し');
+        const before = await label.inputValue();
+        // 何も直していないうちは保存できない
+        await expect(dialog.getByRole('button', { name: '保存する' })).toBeDisabled();
+        await label.fill('E2E の見出し');
+        await dialog.getByRole('button', { name: '保存する' }).click();
+        await expect(dialog).toBeHidden();
+        await expect(card.getByText('E2E の見出し')).toBeVisible();
+        // 元に戻す（ほかのテストに残さない）
+        await card.getByRole('button', { name: /の詳細設定$/ }).click();
+        await page.getByRole('dialog', { name: /の詳細設定$/ }).getByLabel('見出し').fill(before);
+        await page.getByRole('dialog', { name: /の詳細設定$/ }).getByRole('button', { name: '保存する' }).click();
+        await expect(page.getByRole('dialog', { name: /の詳細設定$/ })).toBeHidden();
+    });
+
     test('D-91 PC では AIチャットを閉じて細い帯にでき、開くと入力中の文字が残っている', async ({ page }, testInfo) => {
         test.skip(testInfo.project.name === 'mobile', 'スマホはタブで切り替えるため、開閉のボタンはない');
         await page.setViewportSize({ width: 1600, height: 900 });
@@ -464,6 +546,21 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(page.getByRole('heading', { name: 'AIチャット' })).toBeVisible();
         await expect(input).toHaveValue('金曜をもう少し豪華に');
         await input.fill('');
+    });
+
+    test('D-91 PC では使える商品を閉じて細い帯にでき、開くと元に戻る', async ({ page }, testInfo) => {
+        test.skip(testInfo.project.name === 'mobile', 'スマホはタブで切り替えるため、開閉のボタンはない');
+        await page.setViewportSize({ width: 1600, height: 900 });
+        await openWeek(page, '再来週');
+        const panel = page.getByRole('region', { name: '使える商品' });
+        await expect(panel).toBeVisible();
+        await page.getByRole('button', { name: '使える商品を閉じる' }).click();
+        await expect(panel).toBeHidden();
+        await expect(page.getByRole('separator', { name: '使える商品と献立の境目' })).toBeHidden();
+        await page.screenshot({ path: testInfo.outputPath('products-collapsed.png') });
+        await page.getByRole('button', { name: '使える商品を開く' }).click();
+        await expect(panel).toBeVisible();
+        await expect(page.getByRole('separator', { name: '使える商品と献立の境目' })).toBeVisible();
     });
 
     test('FR-MENU-24 PC では使える商品・献立・チャットが左から並び、商品をドラッグして足す・別の日へ動かす・一覧へ戻して外すができる', async ({ page }, testInfo) => {
@@ -487,7 +584,7 @@ test.describe.serial('SC-09 献立作成', () => {
         expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(panelBox!.y);
         expect(barBox!.x).toBeLessThanOrEqual(panelBox!.x + 1);
         expect(barBox!.x + barBox!.width).toBeGreaterThanOrEqual(chatBox!.x + chatBox!.width - 1);
-        await expect(commandBar.getByRole('button', { name: /^確定/ })).toBeVisible();
+        await expect(commandBar.getByRole('button', { name: '確定して保存', exact: true })).toBeVisible();
 
         // まだ入っていない日が2日以上ある商品を探し、その1日目へドラッグする（データの状態に左右されないように、飛ばさずに探す）
         const handleOf = (day: Locator, productName: string) => day.getByLabel(`${productName}をつかんで、ほかの日か使える商品へ動かす`, { exact: true });
@@ -581,7 +678,7 @@ test.describe.serial('SC-09 献立作成', () => {
             await page.getByRole('tab', { name: '使える商品' }).click();
         }
         // コマンドバー（週の実績・予算と確定）は、どのタブでも見える
-        await expect(page.getByRole('region', { name: '献立の操作' }).getByRole('button', { name: /^確定/ })).toBeVisible();
+        await expect(page.getByRole('region', { name: '献立の操作' }).getByRole('button', { name: '確定して保存', exact: true })).toBeVisible();
         const panel = page.getByRole('region', { name: '使える商品' });
         const plusButtons = panel.getByRole('button', { name: /を日を選んで足す$/ });
         await expect(plusButtons.first()).toBeVisible();
@@ -616,19 +713,20 @@ test.describe.serial('SC-09 献立作成', () => {
 
     test('FR-MENU-32・SR-04 確定のダイアログで 🟡 の商品にチェックを付けると確定できる', async ({ page }, testInfo) => {
         await openWeek(page, '再来週');
-        await page.getByRole('button', { name: /^確定/ }).click();
+        await page.getByRole('button', { name: '確定して保存', exact: true }).click();
         const dialog = page.getByRole('dialog');
-        await expect(dialog.getByText('献立を確定する')).toBeVisible();
-        const confirmButton = dialog.getByRole('button', { name: '確定する' });
+        await expect(dialog.getByText('保存の前に確かめること')).toBeVisible();
+        const confirmButton = dialog.getByRole('button', { name: '保存して確定する' });
         const checkboxes = dialog.getByRole('checkbox');
-        await expect(dialog.getByText(/確定できます|要確認の商品|確定できません/).first()).toBeVisible();
+        await expect(dialog.getByText(/保存できます|要確認の商品|保存できません/).first()).toBeVisible();
         const count = await checkboxes.count();
         const unchecked = dialog.getByRole('checkbox', { checked: false, disabled: false });
         if ((await unchecked.count()) > 0) {
             await expect(confirmButton).toBeDisabled();
             await expect(dialog.getByText('届いたらパッケージで', { exact: false }).first()).toBeVisible();
         }
-        await expect(dialog.getByText('メーカーへの確認が必要', { exact: false })).toBeVisible();
+        // 「メーカーへの確認が必要」は出さない（D-93。SR-06 は取り下げ）
+        await expect(dialog.getByText('メーカーへの確認が必要', { exact: false })).toHaveCount(0);
         await captureScreen(page, testInfo, 'sc-09-confirm-dialog');
         for (let i = 0; i < count; i++) {
             const checkbox = checkboxes.nth(i);
@@ -637,7 +735,7 @@ test.describe.serial('SC-09 献立作成', () => {
             }
         }
         await confirmButton.click();
-        await expect(page.getByText('献立を確定しました')).toBeVisible();
+        await expect(page.getByText('献立を保存しました（確定済み）')).toBeVisible();
         await expect(page.getByText(/^確定済み（\d/)).toBeVisible();
     });
 });
@@ -686,10 +784,10 @@ test.describe('SC-09 注文リスト', () => {
             await first.click();
             await expect(first).not.toBeChecked();
         }
-        await expect(dialog.getByText(/^注文した 0 \/ \d+品$/)).toBeVisible();
+        await expect(dialog.getByText(/^注文済み 0 \/ \d+品$/)).toBeVisible();
         await first.click();
         await expect(first).toBeChecked();
-        await expect(dialog.getByText(/^(注文した 1 \/ \d+品|すべて注文しました)/)).toBeVisible();
+        await expect(dialog.getByText(/^(注文済み 1 \/ \d+品|すべて注文しました)/)).toBeVisible();
 
         await page.reload();
         await page.getByRole('button', { name: /^注文リスト（1\// }).click();

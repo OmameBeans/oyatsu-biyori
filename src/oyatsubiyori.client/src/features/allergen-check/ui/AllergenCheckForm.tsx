@@ -17,7 +17,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { AllergenJudgementLine, BlockedInMenuNotice, KeywordHitNotice, manufacturerCheckText, NonPackageSourceNotice } from '../../../entities/allergen-judgement';
+import { AllergenJudgementLine, BlockedInMenuNotice, KeywordHitNotice, NonPackageSourceNotice } from '../../../entities/allergen-judgement';
 import { useKeywordHits, useRecordCheck, useStartExtraction } from '../../../entities/product';
 import type { AllergenExtraction, CheckRecorded, CheckSource, KeywordRange, ProductDetail } from '../../../entities/product';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
@@ -140,7 +140,6 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
     const hitAllergenIds = new Set(hits.map((h) => h.allergenId));
     const isPackage = source === 'Package';
     const canRecord = isPackage ? text.trim().length > 0 && undecided.length === 0 : true;
-    const manufacturer = manufacturerCheckText(product.checkTargets.filter((t) => t.isAvoided && t.labelNotGuaranteed).map((t) => t.name));
 
     const handleRecord = () =>
         record.mutate(
@@ -167,7 +166,7 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                         <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
                             記録しました
                         </Typography>
-                        <AllergenJudgementLine judgement={result.judgement} isInMenu={result.usages.length > 0} showManufacturerCheck />
+                        <AllergenJudgementLine judgement={result.judgement} isInMenu={result.usages.length > 0} />
                     </CardContent>
                 </Card>
                 {result.usages.length > 0 ? (
@@ -273,11 +272,6 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                         AI が「含む」と読んだ品目だけを選んであります。ほかの品目は、パッケージを見て決めてください。
                     </Typography>
-                    {manufacturer && (
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                            {manufacturer}
-                        </Typography>
-                    )}
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 1 }}>
                         {product.checkTargets.map((target) => {
                             const decision = decisions[target.id] ?? 'undecided';

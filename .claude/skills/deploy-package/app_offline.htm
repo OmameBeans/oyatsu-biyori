@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<!-- 入れ替えが終わったら自動で開き直す（60秒ごと） -->
+<meta http-equiv="refresh" content="60">
+<title>メンテナンス中 | おやつ日和</title>
+<!--
+  配置のあいだだけ、アプリのフォルダの直下に置く（ASP.NET Core Module がアプリを止め、すべての要求にこのページを 503 で返す）。
+  アプリが止まっているので、画像・CSS・JS は外から読めない。すべてこのファイルの中に書く。
+  入れ替えが終わったら、このファイルを消すとアプリが起動する。
+-->
+<style>
+  :root {
+    --bg: #ffffff;
+    --paper: #ffffff;
+    --text: #1f1f1f;
+    --sub: #5f6368;
+    --line: #e0e0e0;
+    --primary: #b5541c;
+    --primary-text: #ffffff;
+    --primary-light: #fbe3d2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212;
+      --paper: #1e1e1e;
+      --text: #ececec;
+      --sub: #b0b0b0;
+      --line: #3a3a3a;
+      --primary: #c3722b;
+      --primary-text: #1f0c03;
+      --primary-light: #4a2b1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+    line-height: 1.7;
+  }
+  .card {
+    width: 100%;
+    max-width: 480px;
+    padding: 32px 24px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .brand { margin: 0 0 4px; font-size: 14px; color: var(--sub); }
+  h1 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
+  p { margin: 0 0 8px; font-size: 15px; }
+  .note { color: var(--sub); font-size: 13px; }
+  button {
+    margin-top: 20px;
+    padding: 8px 22px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="icon" aria-hidden="true">
+    <!-- Material Icons「build」 -->
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+  </div>
+  <p class="brand">おやつ日和</p>
+  <h1>ただいまメンテナンス中です</h1>
+  <p>アプリを新しくしています。数分で終わります。</p>
+  <p class="note">終わると自動で開き直します。入力中の内容があった場合は、お手数ですがもう一度入れてください。</p>
+  <button type="button" onclick="location.reload()">もう一度読み込む</button>
+</main>
+</body>
+</html>

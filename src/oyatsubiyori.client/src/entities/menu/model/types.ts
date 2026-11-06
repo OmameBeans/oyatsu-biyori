@@ -133,6 +133,8 @@ export interface MenuItem {
     /** 確認の種類（サーバーが決める。D-90） */
     issueKind: MenuItemIssue;
     judgementFingerprint: string | null;
+    /** 1パックの入数（パック数の計算に使う値。未入力なら null） */
+    piecesPerPack: number | null;
 }
 
 /** 日ごとの献立 */

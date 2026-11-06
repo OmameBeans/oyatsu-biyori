@@ -10,7 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine, manufacturerCheckText } from '../../../entities/allergen-judgement';
+import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine } from '../../../entities/allergen-judgement';
 import { useConfirmMenu, useMenuConfirmation } from '../../../entities/menu';
 import type { MenuDetail } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -25,7 +25,7 @@ interface ConfirmMenuDialogProps {
 
 /**
  * 確定のダイアログ（T4-11。FR-MENU-32・SR-04）。止めるエラーがあれば一覧を示し「確定する」を押せない。
- * 🟡 の商品は1件ずつ、理由と次にすることを含む1文にチェックを付ける。末尾に「メーカーへの確認が必要」の1行。
+ * 🟡 の商品は1件ずつ、理由と次にすることを含む1文にチェックを付ける。
  * 判定は開くたびにサーバーで求め直し、確定のときにももう一度確かめる。
  */
 export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmMenuDialogProps) => {
@@ -37,19 +37,19 @@ export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmM
     const pending = confirmation?.acknowledgements.filter((a) => !a.isAcknowledged) ?? [];
     const allChecked = pending.every((a) => checked.includes(checkKey(a)));
     const canConfirm = confirmation !== undefined && confirmation.blockingIssues.length === 0 && allChecked;
-    const manufacturer = confirmation ? manufacturerCheckText(confirmation.manufacturerCheckAllergens) : null;
 
     return (
         <Dialog open={isOpen} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>献立を確定する</DialogTitle>
+            <DialogTitle>保存の前に確かめること</DialogTitle>
             <DialogContent dividers>
                 {isLoading && <CircularProgress aria-label="読み込み中" />}
                 {error && <Alert severity="error">{errorMessageOf(error)}</Alert>}
                 {confirmation && (
                     <Stack spacing={2}>
+                        <Typography variant="body2">保存すると献立が「確定済み」になり、注文リストを使えるようになります。</Typography>
                         {confirmation.blockingIssues.length > 0 && (
                             <Alert severity="error">
-                                <Typography sx={{ fontWeight: 700 }}>次の問題があるため、確定できません</Typography>
+                                <Typography sx={{ fontWeight: 700 }}>次の問題があるため、保存できません</Typography>
                                 {confirmation.blockingIssues.map((issue, index) => (
                                     <Stack key={`${issue.date}-${issue.productName}-${index}`} sx={{ mt: 0.5 }}>
                                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -93,11 +93,10 @@ export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmM
                                 ))}
                             </Alert>
                         )}
-                        {confirmation.blockingIssues.length === 0 && confirmation.acknowledgements.length === 0 && <Typography>確定できます。</Typography>}
+                        {confirmation.blockingIssues.length === 0 && confirmation.acknowledgements.length === 0 && <Typography>問題はありません。保存できます。</Typography>}
                         <Typography variant="body2" color="text.secondary">
                             発注のときに、コープのカートのアレルゲンの絞り込みでも、もう一度確かめると安心です。
                         </Typography>
-                        {manufacturer && <Typography variant="body2">{manufacturer}</Typography>}
                         {confirm.isError && <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>{errorMessageOf(confirm.error)}</Alert>}
                     </Stack>
                 )}
@@ -123,7 +122,7 @@ export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmM
                         )
                     }
                 >
-                    確定する
+                    保存して確定する
                 </Button>
             </DialogActions>
         </Dialog>

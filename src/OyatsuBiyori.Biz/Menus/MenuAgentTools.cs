@@ -53,6 +53,25 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
             .ToList();
     }
 
+    /// <summary>
+    /// 条件の指紋（避ける品目と、候補とその要確認の印）。これが変わったら、前のセッションは古い候補を覚えているので続けない（D-94）
+    /// </summary>
+    public string SessionFingerprint()
+    {
+        var text = new StringBuilder();
+        foreach (var allergen in _context.AvoidedAllergens.Select(a => a.Id).Order(StringComparer.Ordinal))
+        {
+            text.Append("a:").Append(allergen).Append('\n');
+        }
+
+        foreach (var candidate in Candidates().OrderBy(c => c.Id, StringComparer.Ordinal))
+        {
+            text.Append("c:").Append(candidate.Id).Append(candidate.NeedsCheck ? ":check" : ":ok").Append('\n');
+        }
+
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));
+    }
+
     /// <inheritdoc />
     public string SearchProducts(string? keyword, SnackType? snackType)
     {

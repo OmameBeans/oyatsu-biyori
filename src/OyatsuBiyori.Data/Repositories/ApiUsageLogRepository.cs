@@ -22,4 +22,9 @@ public sealed class ApiUsageLogRepository(OyatsuBiyoriDbContext context) : IApiU
     {
         return _context.ApiUsageLogs.CountAsync(l => l.CalledAt >= sinceUtc);
     }
+
+    public async Task<IReadOnlyList<ApiUsageLog>> GetSinceAsync(DateTime sinceUtc)
+    {
+        return await _context.ApiUsageLogs.AsNoTracking().Where(l => l.CalledAt >= sinceUtc).ToListAsync();
+    }
 }

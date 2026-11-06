@@ -29,10 +29,12 @@ interface ResizableColumnsProps {
      * 切り替えても要素の並びは変えない
      */
     isEnabled?: boolean;
-    /** true のあいだは右の列を閉じて細い帯（collapsedRightWidth）にし、右の境目を隠す。選んだ幅は変えない（開いたら元の幅に戻る） */
+    /** true のあいだは左の列を閉じて細い帯（collapsedWidth）にし、左の境目を隠す。選んだ幅は変えない（開いたら元の幅に戻る） */
+    isLeftCollapsed?: boolean;
+    /** true のあいだは右の列を閉じて細い帯（collapsedWidth）にし、右の境目を隠す。選んだ幅は変えない（開いたら元の幅に戻る） */
     isRightCollapsed?: boolean;
-    /** 右の列を閉じたときの幅（px） */
-    collapsedRightWidth?: number;
+    /** 列を閉じたときの幅（px） */
+    collapsedWidth?: number;
 }
 
 const SPLITTER_WIDTH = 12;
@@ -54,8 +56,9 @@ export const ResizableColumns = ({
     splitterLabels,
     storageKey,
     isEnabled = true,
+    isLeftCollapsed = false,
     isRightCollapsed = false,
-    collapsedRightWidth = 56,
+    collapsedWidth = 56,
 }: ResizableColumnsProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     // 職員が選んだ幅（保存する値）。画面が狭いときは表示だけ縮め、この値は変えない（広げたら元の幅に戻るように）
@@ -132,6 +135,7 @@ export const ResizableColumns = ({
         }
     };
 
+    const isLeftOpen = !isLeftCollapsed;
     const isRightOpen = !isRightCollapsed;
     const splitter = (side: 'left' | 'right', label: string) => (
         <Box
@@ -149,7 +153,7 @@ export const ResizableColumns = ({
             onKeyDown={handleKeyDown(side)}
             onDoubleClick={() => resetSide(side)}
             sx={{
-                display: isEnabled && (side === 'left' || isRightOpen) ? 'flex' : 'none',
+                display: isEnabled && (side === 'left' ? isLeftOpen : isRightOpen) ? 'flex' : 'none',
                 cursor: 'col-resize',
                 touchAction: 'none',
                 justifyContent: 'center',
@@ -167,17 +171,19 @@ export const ResizableColumns = ({
             ref={containerRef}
             sx={{
                 display: 'grid',
+                // 閉じた側の境目は隠す（display: none の要素は列を使わないので、境目の列も外し、その分を閉じた列の余白にする）
                 gridTemplateColumns: !isEnabled
                     ? '1fr'
-                    : isRightOpen
-                      ? `${shown.left}px ${SPLITTER_WIDTH}px minmax(${minCenterWidth}px, 1fr) ${SPLITTER_WIDTH}px ${shown.right}px`
-                      : // 右の境目は隠す（display: none の要素は列を使わないので、境目の列も外す）
-                        `${shown.left}px ${SPLITTER_WIDTH}px minmax(${minCenterWidth}px, 1fr) ${SPLITTER_WIDTH + collapsedRightWidth}px`,
+                    : [
+                          isLeftOpen ? `${shown.left}px ${SPLITTER_WIDTH}px` : `${collapsedWidth + SPLITTER_WIDTH}px`,
+                          `minmax(${minCenterWidth}px, 1fr)`,
+                          isRightOpen ? `${SPLITTER_WIDTH}px ${shown.right}px` : `${SPLITTER_WIDTH + collapsedWidth}px`,
+                      ].join(' '),
                 height: '100%',
                 minHeight: 0,
             }}
         >
-            <Box sx={{ minWidth: 0, minHeight: 0, height: '100%' }}>{left}</Box>
+            <Box sx={{ minWidth: 0, minHeight: 0, height: '100%', pr: isEnabled && !isLeftOpen ? `${SPLITTER_WIDTH}px` : undefined }}>{left}</Box>
             {splitter('left', splitterLabels[0])}
             <Box sx={{ minWidth: 0, minHeight: 0, height: '100%', overflow: isEnabled ? 'auto' : undefined }}>{center}</Box>
             {splitter('right', splitterLabels[1])}

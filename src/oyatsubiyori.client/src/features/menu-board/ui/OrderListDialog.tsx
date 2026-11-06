@@ -73,13 +73,13 @@ export const OrderListDialog = ({ menu, isOpen, onClose }: OrderListDialogProps)
                     {lines.length > 0 && (
                         <Stack spacing={0.5}>
                             <Typography sx={{ fontWeight: 700, color: isAllOrdered ? 'success.main' : 'text.primary' }}>
-                                {isAllOrdered ? `すべて注文しました（${lines.length}品）` : `注文した ${orderedCount} / ${lines.length}品`}
+                                {isAllOrdered ? `すべて注文しました（${lines.length}品）` : `注文済み ${orderedCount} / ${lines.length}品`}
                             </Typography>
                             <LinearProgress
                                 variant="determinate"
                                 value={(orderedCount / lines.length) * 100}
                                 color={isAllOrdered ? 'success' : 'primary'}
-                                aria-label="注文した割合"
+                                aria-label="注文済みの割合"
                             />
                         </Stack>
                     )}
@@ -103,7 +103,9 @@ export const OrderListDialog = ({ menu, isOpen, onClose }: OrderListDialogProps)
                             <Table size="small" aria-label="注文リスト">
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell padding="checkbox">注文した</TableCell>
+                                        <TableCell padding="checkbox" sx={{ whiteSpace: 'nowrap', px: 1 }}>
+                                            注文済み
+                                        </TableCell>
                                         <TableCell>注文番号</TableCell>
                                         <TableCell>商品名</TableCell>
                                         <TableCell align="right">数量</TableCell>

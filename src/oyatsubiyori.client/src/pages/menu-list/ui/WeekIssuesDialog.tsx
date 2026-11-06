@@ -193,7 +193,7 @@ const IssueItem = ({ entry, children }: IssueItemProps) => (
             {formatDateLabel(entry.date)} {entry.item.productName}
         </Typography>
         {entry.item.judgement ? (
-            <AllergenJudgementLine judgement={entry.item.judgement} isInMenu showManufacturerCheck />
+            <AllergenJudgementLine judgement={entry.item.judgement} isInMenu />
         ) : (
             <Typography variant="body2">{ISSUE_GUIDE.MISSING_PRODUCT}</Typography>
         )}
