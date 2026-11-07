@@ -194,6 +194,8 @@ public class MenuChatTests
     /// <summary>決まった動き（道具の呼び方）のあと、決まった返答の文章を返す偽のエージェント</summary>
     private sealed class ScriptedAgent(Action<IMenuAgentTools> script, string replyText) : IMenuPlannerAgent
     {
+        public string SessionVersion => string.Empty;
+
         public Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken)
         {
             script(tools);

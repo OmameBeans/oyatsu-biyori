@@ -15,6 +15,9 @@ namespace OyatsuBiyori.Claude.Services;
 /// </summary>
 public sealed class MenuPlannerAgent(ClaudeRequestRunner runner, ILogger<MenuPlannerAgent> logger) : IMenuPlannerAgent
 {
+    /// <summary>セッションを続けない（毎回、条件と履歴を最初のメッセージで渡す）ので空</summary>
+    public string SessionVersion => string.Empty;
+
     /// <summary>ループの上限</summary>
     public const int MaxIterations = 10;
 

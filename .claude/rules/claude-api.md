@@ -33,6 +33,7 @@ C# の書き方は [csharp.md](csharp.md) に従う。ここでは Claude を呼
 - 予算に合わせる入れ替え案は、アプリが計算した候補だけを渡し、Claude には「どれが要望に合うか」の選択と説明だけをさせる（FR-MENU-30）
 - 献立づくり（献立案の作成・チャットでの組み直し）はエージェントにする（D-82）。**Claude Managed Agents** で動かす（D-94。`ManagedMenuPlannerAgent`）。Biz の計算をカスタムツールとして使わせ、`submit_menu` が Biz の検証を通したら受け付ける。道具の判断ロジックは Biz、道具の定義・振り分け・最初のメッセージは `MenuAgentToolDispatcher` に置き、Messages API 版（`MenuPlannerAgent`。手書きのループ10回まで）と共有する（NFR-MNT-05）。どちらを使うかは設定 `Claude:MenuPlannerEngine` で決める
   - エージェントと環境は `agents/oyatsu-menu-planner/` のファイルから `ant apply` で作る。コードで `agents.create()` を呼ばない。道具の入力の型・プロンプトを変えたら、`agent.md` も同じに直して `ant apply` し直す（`agent.md` のシステムプロンプトは `Prompts/Common.md`・`MenuPlanner.md` をもとにしている）
+  - アプリが使う版は `appsettings.json` の `Claude:ManagedAgents:MenuPlannerAgentVersion` で固定している。`ant apply` で版が上がったら（`claude-lock.json` の `version`）、**この値も同じ版に直して一緒にコミットする**（直さないと、古い版のプロンプト・道具のまま動く）。版が変わると、前の版で始めたセッションは続けない（`IMenuPlannerAgent.SessionVersion` を指紋に入れている）
   - セッションの流れ（SSE）は切れることがある。取りこぼしはイベント一覧（`events.list`）で拾い、イベント ID で二重を除く。セッションが道具の結果を待っている（`requires_action`）ままにしない
   - 流れのイベントは、つなぎ直すと順番が入れ替わることがある。職員に残す返答は流れから組み立てず、終わったときにイベント一覧から作り直す（最後の道具の呼び出し・依頼より後ろの文章だけ）
   - 避ける品目・候補が変わったら前のセッションを続けない（`MenuAgentTools.SessionFingerprint`）。使わなくなったセッションは `IMenuAgentSessionCleaner` で消す

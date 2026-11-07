@@ -36,6 +36,10 @@ public sealed class ManagedMenuPlannerAgent(
     private readonly ClaudeOptions _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     private readonly ILogger<ManagedMenuPlannerAgent> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
+    /// <inheritdoc />
+    public string SessionVersion =>
+        $"{_options.ManagedAgents.MenuPlannerAgentId}:{_options.ManagedAgents.MenuPlannerAgentVersion?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "latest"}";
+
     public async Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -172,6 +176,14 @@ public sealed class ManagedMenuPlannerAgent(
     {
         if (session.ArchivedAt is not null || session.Status.Raw() != "idle")
         {
+            return false;
+        }
+
+        // セッションは作ったときの版のプロンプト・道具のまま動く。設定の版と違えば続けない
+        // （条件の指紋にも版を入れているが、指紋に版を入れる前に作ったセッションもここで止める）
+        if (_options.ManagedAgents.MenuPlannerAgentVersion is int pinned && session.Agent.Version != pinned)
+        {
+            _logger.LogInformation("前のセッションはエージェントの版が違うので続けません: {SessionVersion} / {Pinned}", session.Agent.Version, pinned);
             return false;
         }
 

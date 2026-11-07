@@ -128,6 +128,13 @@ public sealed record AllergenExtraction(
 /// </summary>
 public interface IMenuPlannerAgent
 {
+    /// <summary>
+    /// 続けるセッションを作ったときのエージェントの版（Managed Agents 版は「エージェントの ID:版」）。
+    /// セッションは作ったときの版のプロンプト・道具のまま動くので、これが変わったら前のセッションを続けない
+    /// （版を上げたのに、古いプロンプトで答え続けないため）。セッションを続けない実装は空を返す（実装ごとに必ず決める）
+    /// </summary>
+    string SessionVersion { get; }
+
     /// <summary>献立案を作る（チャットでの組み直し・質問への返答も同じ）</summary>
     /// <param name="request">渡す条件</param>
     /// <param name="tools">道具（判断のロジックは Biz）</param>

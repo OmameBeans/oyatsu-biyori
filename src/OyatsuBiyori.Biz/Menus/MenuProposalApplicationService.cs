@@ -208,8 +208,9 @@ public sealed class MenuProposalApplicationService(
         progress.Report(mode == MenuAgentMode.Create ? "要望を読み取って、献立を考えています" : "ご依頼を読んでいます");
         var weekRequest = mode == MenuAgentMode.Chat ? MenuAgentTools.BuildWeekRequestText(menu) : null;
         // チャットは前のセッションを続ける（作成は新しく始める。D-94）。避ける品目・確認の記録・掲載品が変わっていたら、
-        // 前のセッションは古い候補を覚えているので続けない。続けられなければ、エージェントが新しく始めて履歴を渡す
-        var fingerprint = tools.SessionFingerprint();
+        // 前のセッションは古い候補を覚えているので続けない。エージェントの版が変わっていても、前のセッションは古いプロンプトのままなので続けない。
+        // 続けられなければ、エージェントが新しく始めて履歴を渡す
+        var fingerprint = tools.SessionFingerprint(_agent.SessionVersion);
         var previousSession = menu.AgentSessionId;
         var sessionId = mode == MenuAgentMode.Chat && menu.AgentSessionFingerprint == fingerprint ? previousSession : null;
         var request = new MenuAgentRequest(mode, tools.BuildConditionsText(setting, recent), text, history, weekRequest, sessionId);

@@ -54,11 +54,14 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
     }
 
     /// <summary>
-    /// 条件の指紋（避ける品目と、候補とその要確認の印）。これが変わったら、前のセッションは古い候補を覚えているので続けない（D-94）
+    /// 条件の指紋（エージェントの版と、避ける品目と、候補とその要確認の印）。これが変わったら、前のセッションは
+    /// 古いプロンプト・古い候補を覚えているので続けない（D-94）
     /// </summary>
-    public string SessionFingerprint()
+    /// <param name="agentVersion">エージェントの版（IMenuPlannerAgent.SessionVersion）</param>
+    public string SessionFingerprint(string agentVersion)
     {
         var text = new StringBuilder();
+        text.Append("v:").Append(agentVersion).Append('\n');
         foreach (var allergen in _context.AvoidedAllergens.Select(a => a.Id).Order(StringComparer.Ordinal))
         {
             text.Append("a:").Append(allergen).Append('\n');

@@ -104,6 +104,22 @@ public class MenuAgentSessionTests
     }
 
     [Fact]
+    public async Task D_94_エージェントの版が変わったら_前のセッション_古いプロンプトのまま_は続けずに消す()
+    {
+        var (data, menu, senbei) = DraftMenu();
+        await CreateProposalAsync(data, menu, senbei, "sesn_版1");
+        var agent = new SessionAgent(_ => { }, "火曜のせんべいは40人分にできます。", "sesn_版4", version: "agent_テスト:4");
+        var cleaner = new RecordingCleaner();
+
+        var result = await Create(data, agent, cleaner).RunAsync(menu.Id, MenuAgentMode.Chat, "特定のおやつを40人分にできますか？", new NullProgress(), CancellationToken.None);
+
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        Assert.Null(agent.ReceivedSessionId);
+        Assert.Equal("sesn_版4", menu.AgentSessionId);
+        Assert.Equal(["sesn_版1"], cleaner.Forgotten);
+    }
+
+    [Fact]
     public async Task D_94_失敗したときはセッションを忘れ_次は新しく始める()
     {
         // 案は出したが、そのあとセッションが壊れた（期限切れなど）。壊れたセッションはエージェントが消す
@@ -204,9 +220,11 @@ public class MenuAgentSessionTests
         false);
 
     /// <summary>受け取ったセッションを覚え、決まったセッションを返す偽のエージェント</summary>
-    private sealed class SessionAgent(Action<IMenuAgentTools> script, string replyText, string? returnSessionId, bool fail = false) : IMenuPlannerAgent
+    private sealed class SessionAgent(Action<IMenuAgentTools> script, string replyText, string? returnSessionId, bool fail = false, string version = "agent_テスト:1") : IMenuPlannerAgent
     {
         public string? ReceivedSessionId { get; private set; }
+
+        public string SessionVersion => version;
 
         public Task<Result<MenuAgentRunResult>> RunAsync(MenuAgentRequest request, IMenuAgentTools tools, IJobProgress progress, CancellationToken cancellationToken)
         {

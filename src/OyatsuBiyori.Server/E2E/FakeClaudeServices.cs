@@ -179,6 +179,9 @@ public sealed class FakeBudgetFitExplainer : IBudgetFitExplainer
 /// </summary>
 public sealed class FakeMenuPlannerAgent : IMenuPlannerAgent
 {
+    /// <summary>偽のエージェントの版（変わらない）</summary>
+    public string SessionVersion => "e2e";
+
     /// <summary>E2E の偽の質問への返答（Markdown）</summary>
     public const string AnswerText = "今週の献立について、お答えします（E2E の偽の返答）。\n\n- **しょっぱいもの・あまいもの**と、デザート・飲料を組み合わせています\n- 金額は、画面の週の実績で確かめてください\n\n献立は変えていません。";
 

@@ -96,7 +96,10 @@ public sealed class ManagedAgentsOptions
     /// <summary>献立づくりのエージェントの ID（agent_...。claude-lock.json の agents/oyatsu-menu-planner/agent.md）</summary>
     public string MenuPlannerAgentId { get; set; } = string.Empty;
 
-    /// <summary>使うエージェントの版（null なら最新。プロンプトを変えたあと、前の版に戻すときに使う）</summary>
+    /// <summary>
+    /// 使うエージェントの版（claude-lock.json の version とそろえる。ant apply で版が上がったら直す）。
+    /// 版が違う前のセッションは続けない。null なら最新を使うが、そのときは版が上がっても前のセッションを続けてしまうので、固定して使う
+    /// </summary>
     public int? MenuPlannerAgentVersion { get; set; }
 
     /// <summary>環境の ID（env_...。claude-lock.json の agents/oyatsu-menu-planner/environment.yaml）</summary>
