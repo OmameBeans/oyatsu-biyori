@@ -12,7 +12,7 @@ export const COLOR_THEME = {
 export type ColorTheme = (typeof COLOR_THEME)[keyof typeof COLOR_THEME];
 
 /** 既定の色のテーマ（保存が使えないとき・保存した値が読めないときもこれ） */
-export const DEFAULT_COLOR_THEME: ColorTheme = COLOR_THEME.ORANGE;
+export const DEFAULT_COLOR_THEME: ColorTheme = COLOR_THEME.BLUE;
 
 /** 色のテーマの値として正しいか（ブラウザに保存した値を確かめる） */
 export const isColorTheme = (value: unknown): value is ColorTheme =>

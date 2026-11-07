@@ -12,7 +12,8 @@ export const E2E_USER = {
  * 保存先は e2e/screenshots/<画面>-<pc|mobile>.png（.gitignore）。
  */
 export const captureScreen = async (page: Page, testInfo: TestInfo, name: string) => {
-    await page.screenshot({ path: `./e2e/screenshots/${name}-${testInfo.project.name}.png`, fullPage: true });
+    // ダイアログのフェードの途中で撮ると後ろの画面が透けるので、動きを終わらせてから撮る
+    await page.screenshot({ path: `./e2e/screenshots/${name}-${testInfo.project.name}.png`, fullPage: true, animations: 'disabled' });
 };
 
 /**
@@ -86,6 +87,34 @@ export const openFlyerItemDetail = async (page: Page, name: string) => {
     await expect(detail).toBeVisible();
     return detail;
 };
+
+/** 取り込みの分類の名前（09 の 3.1）。一覧はこの順（再入力 → 要確認 → 使える → 使えない → 確定済み）に並ぶ */
+export const FLYER_CATEGORIES = ['再入力', '要確認', '使える', '使えない', '確定済み'] as const;
+export type FlyerCategory = (typeof FLYER_CATEGORIES)[number];
+
+/** SC-09 手順1 の読み取った商品の表 */
+export const flyerGrid = (page: Page): Locator => page.getByRole('grid', { name: '読み取った商品' });
+
+/** 読み取った商品の表の、商品の1行（商品名で探す。詳細の行は除く） */
+export const flyerRow = (page: Page, name: string): Locator =>
+    flyerGrid(page).getByRole('row').filter({ has: page.getByRole('button', { name: `「${name}」の詳細を`, exact: false }) });
+
+/** 行の取り込みの分類のチップ（読み上げは「取り込みの分類：使える」。アレルゲンの表示とは別のもの） */
+export const flyerCategoryChip = (row: Locator): Locator => row.getByLabel(/^取り込みの分類：/);
+
+/** 表に並んでいる行の、取り込みの分類（上から順） */
+export const flyerCategoriesInOrder = async (page: Page): Promise<string[]> => (await flyerCategoryChip(flyerGrid(page)).allInnerTexts()).map((text) => text.trim());
+
+/** 表の上の、取り込みの分類のタブ（「再入力 3」のように件数つき） */
+export const flyerTab = (page: Page, label: 'すべて' | FlyerCategory): Locator =>
+    page.getByRole('tablist', { name: '取り込みの分類で絞り込む' }).getByRole('tab', { name: new RegExp(`^${label} \\d+$`) });
+
+/** タブの件数 */
+export const flyerTabCount = async (page: Page, label: 'すべて' | FlyerCategory): Promise<number> =>
+    Number((await flyerTab(page, label).innerText()).match(/(\d+)\s*$/)![1]);
+
+/** 一覧の下の「外した掲載品」のカード */
+export const removedListings = (page: Page): Locator => page.getByRole('region', { name: /^外した掲載品（\d+件）$/ });
 
 /**
  * 商品一覧の1件（PC は表の行、スマホはカード）。中の商品名のリンクから商品詳細を開ける。

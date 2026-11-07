@@ -14,14 +14,11 @@ public sealed class ClaudeOptions
     /// <summary>既定のモデル（用途ごとの指定がないとき）</summary>
     public string DefaultModel { get; set; } = "claude-sonnet-5-5";
 
-    /// <summary>用途ごとのモデル（例：ProductMatch は claude-haiku-5-5）</summary>
+    /// <summary>用途ごとのモデル（指定がなければ DefaultModel）</summary>
     public Dictionary<ClaudePurpose, string> Models { get; set; } = [];
 
     /// <summary>1回の呼び出しのタイムアウト（秒。画像の読み取りと献立）</summary>
     public int TimeoutSeconds { get; set; } = 90;
-
-    /// <summary>照合の判定の1回の呼び出しのタイムアウト（秒）</summary>
-    public int ProductMatchTimeoutSeconds { get; set; } = 30;
 
     /// <summary>用途ごとのタイムアウト（秒。指定がなければ TimeoutSeconds。画像の読み取りは長めにする）</summary>
     public Dictionary<ClaudePurpose, int> TimeoutSecondsByPurpose { get; set; } = [];
@@ -45,11 +42,11 @@ public sealed class ClaudeOptions
     public IReadOnlyList<ApiModelPrice> PriceList() =>
         Prices.Select(p => new ApiModelPrice(p.Key, p.Value.Input, p.Value.Output, p.Value.CacheWrite, p.Value.CacheRead)).ToList();
 
-    /// <summary>1回のチラシの取り込みでの照合の判定の呼び出しの上限</summary>
-    public int ProductMatchCallLimitPerImport { get; set; } = 30;
-
     /// <summary>1回の応答の最大トークン数</summary>
     public int MaxTokens { get; set; } = 16000;
+
+    /// <summary>用途ごとの1回の応答の最大トークン数（指定がなければ MaxTokens。チラシの読み取りは商品が多く、考える分も数えるので大きくする）</summary>
+    public Dictionary<ClaudePurpose, int> MaxTokensByPurpose { get; set; } = [];
 
     /// <summary>献立づくりのエージェントの動かし方（D-94。Managed Agents がうまく動かないときに、Messages API の手書きのループへ戻せるようにする）</summary>
     public MenuPlannerEngine MenuPlannerEngine { get; set; } = MenuPlannerEngine.MessagesApi;
@@ -71,8 +68,12 @@ public sealed class ClaudeOptions
             return TimeSpan.FromSeconds(seconds);
         }
 
-        return TimeSpan.FromSeconds(purpose == ClaudePurpose.ProductMatch ? ProductMatchTimeoutSeconds : TimeoutSeconds);
+        return TimeSpan.FromSeconds(TimeoutSeconds);
     }
+
+    /// <summary>用途の1回の応答の最大トークン数</summary>
+    public int MaxTokensFor(ClaudePurpose purpose) =>
+        MaxTokensByPurpose.TryGetValue(purpose, out var maxTokens) && maxTokens > 0 ? maxTokens : MaxTokens;
 
     /// <summary>用途の考える深さ（設定がなければ null＝モデルの既定）</summary>
     public string? EffortFor(ClaudePurpose purpose) =>

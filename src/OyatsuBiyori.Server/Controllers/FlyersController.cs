@@ -7,7 +7,8 @@ using OyatsuBiyori.Biz.Interfaces;
 namespace OyatsuBiyori.Server.Controllers;
 
 /// <summary>
-/// チラシの取り込み（SC-09 手順1。T3-04〜T3-10）。画像は Claude に送るだけで保存しない。
+/// チラシの取り込み（SC-09 手順1。D-100、09-flyer-import.md）。画像は Claude に送るだけで保存しない。
+/// 分類・まとめの対象はサーバー（Biz）が決めて返し、確定の API でも求め直す（画面の値を信用しない。09 の 3.1・5.2）。
 /// </summary>
 [Route("api/[controller]/[action]")]
 [ApiController]
@@ -51,38 +52,80 @@ public sealed class FlyersController(FlyerImportApplicationService flyerService)
         return new JsonResult(await _flyerService.StartReadingAsync(menuId, images));
     }
 
-    /// <summary>取り込みの状態（読み取りの処理と、確定前の結果）</summary>
+    /// <summary>
+    /// 取り込みの状態（読み取りの処理と、確定前の結果）。分類・理由・一致した商品・タブの件数・まとめの対象は、呼ぶたびにサーバーが求め直す（09 の 3.1・6）。
+    /// editingItemIds は、画面で行を開いて直している途中の商品（まとめから外す。09 の 5.2）
+    /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Latest([FromQuery] string? menuId) => new JsonResult(await _flyerService.GetLatestAsync(menuId));
+    public async Task<IActionResult> Latest([FromQuery] string? menuId, [FromQuery] List<string>? editingItemIds)
+        => new JsonResult(await _flyerService.GetLatestAsync(menuId, editingItemIds));
 
-    /// <summary>1商品を確定する（選び直しも）</summary>
+    /// <summary>行を直す（フォームの行のすべての値を送る。今の値と違う項目だけが直した項目になる）。分類し直した行を返す（09 の 5.3）</summary>
     [HttpPost]
-    public async Task<IActionResult> Confirm([FromBody] ConfirmRequest request)
-        => new JsonResult(await _flyerService.ConfirmItemAsync(new FlyerConfirmInput(
+    public async Task<IActionResult> UpdateItem([FromBody] UpdateItemRequest request)
+        => new JsonResult(await _flyerService.UpdateItemAsync(new FlyerItemEditInput(
             request.MenuId,
             request.ItemId,
-            request.Choice,
-            request.ProductId,
             request.Name,
             request.Maker,
             request.Volume,
-            request.PiecesPerPack,
-            request.PiecesEdited,
-            request.SnackType,
-            request.SnackTypeEdited,
             request.PriceIncludingTax,
             request.PriceExcludingTax,
             request.OrderNo,
+            request.PiecesPerPack,
+            request.SnackType,
             request.TargetAgeLabel,
-            request.CharacterTags ?? [],
-            request.FlavorTags ?? [],
-            request.LabelAllergenIds ?? [],
-            request.ResolvedTerms ?? [],
-            request.TreatAsFlyerError)));
+            request.CharacterTags,
+            request.FlavorTags,
+            request.LabelAllergenIds)));
 
-    /// <summary>「同じ商品」（完全一致）をまとめて確定する</summary>
+    /// <summary>品目の分からない語に品目を選ぶ（空なら「対応する品目なし」。選び直しもこれ。FR-IMPORT-33）</summary>
     [HttpPost]
-    public async Task<IActionResult> ConfirmSame([FromBody] MenuRequest request) => new JsonResult(await _flyerService.ConfirmAllSameAsync(request.MenuId));
+    public async Task<IActionResult> ResolveTerm([FromBody] ResolveTermRequest request)
+        => new JsonResult(await _flyerService.ResolveTermAsync(request.MenuId, request.ItemId, request.Term, request.AllergenIds));
+
+    /// <summary>「使えない（入数が分からない）」の商品に入数を入れて分類し直す（まとめには入らない。FR-IMPORT-11）</summary>
+    [HttpPost]
+    public async Task<IActionResult> EnterPieces([FromBody] EnterPiecesRequest request)
+        => new JsonResult(await _flyerService.EnterPiecesAsync(request.MenuId, request.ItemId, request.PiecesPerPack));
+
+    /// <summary>再入力の理由に「このままでよい」を押す（取り込みのメモリにだけ持つ。09 の 5.3）</summary>
+    [HttpPost]
+    public async Task<IActionResult> AcceptReason([FromBody] AcceptReasonRequest request)
+        => new JsonResult(await _flyerService.AcceptReasonAsync(request.MenuId, request.ItemId, request.ReasonKey));
+
+    /// <summary>外した掲載品に移す。確定済みの商品なら、確定を取り消してから外す（FR-IMPORT-21）</summary>
+    [HttpPost]
+    public async Task<IActionResult> Remove([FromBody] ItemRequest request)
+        => new JsonResult(await _flyerService.RemoveItemAsync(request.MenuId, request.ItemId));
+
+    /// <summary>外した掲載品を一覧に戻す（分類し直した行を返す。FR-IMPORT-21）</summary>
+    [HttpPost]
+    public async Task<IActionResult> Restore([FromBody] ItemRequest request)
+        => new JsonResult(await _flyerService.RestoreItemAsync(request.MenuId, request.ItemId));
+
+    /// <summary>1件を確定する（使える：一致した商品に確定、要確認：新しい商品として登録。使えない・再入力はエラー。09 の 5.1）</summary>
+    [HttpPost]
+    public async Task<IActionResult> Confirm([FromBody] ItemRequest request)
+        => new JsonResult(await _flyerService.ConfirmItemAsync(request.MenuId, request.ItemId));
+
+    /// <summary>
+    /// 「使える商品をまとめて確定」（条件はサーバーで確かめ直す。09 の 5.2）。
+    /// itemIds は確かめのダイアログに並べた商品（省くと、まとめの対象のすべて）
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> ConfirmUsable([FromBody] BulkRequest request)
+        => new JsonResult(await _flyerService.ConfirmAllUsableAsync(request.MenuId, request.ItemIds, request.EditingItemIds));
+
+    /// <summary>「新しい商品をまとめて登録」（ダイアログで印を付けた商品。条件はサーバーで確かめ直す。09 の 5.2・D-98）</summary>
+    [HttpPost]
+    public async Task<IActionResult> ConfirmNew([FromBody] BulkRequest request)
+        => new JsonResult(await _flyerService.ConfirmAllNewAsync(request.MenuId, request.ItemIds, request.EditingItemIds));
+
+    /// <summary>「表記なし」と読んだ商品を、チラシで見比べたことを残す（取り込みのメモリにだけ持つ。D-97）</summary>
+    [HttpPost]
+    public async Task<IActionResult> MarkLabelAbsentCompared([FromBody] LabelAbsentComparedRequest request)
+        => new JsonResult(await _flyerService.MarkLabelAbsentComparedAsync(request.MenuId, request.ItemIds));
 
     /// <summary>手入力の商品を足す</summary>
     [HttpPost]
@@ -108,16 +151,38 @@ public sealed class FlyersController(FlyerImportApplicationService flyerService)
         public string? MenuId { get; set; }
     }
 
-    /// <summary>確定の入力</summary>
-    public sealed class ConfirmRequest
+    /// <summary>1商品の指定</summary>
+    public sealed class ItemRequest
     {
         public string? MenuId { get; set; }
 
         public string? ItemId { get; set; }
+    }
 
-        public FlyerItemChoice Choice { get; set; }
+    /// <summary>見比べた「表記なし」の商品</summary>
+    public sealed class LabelAbsentComparedRequest
+    {
+        public string? MenuId { get; set; }
 
-        public string? ProductId { get; set; }
+        public List<string>? ItemIds { get; set; }
+    }
+
+    /// <summary>まとめての確定・登録（EditingItemIds は画面で行を開いて直している途中の商品。まとめから外す）</summary>
+    public sealed class BulkRequest
+    {
+        public string? MenuId { get; set; }
+
+        public List<string>? ItemIds { get; set; }
+
+        public List<string>? EditingItemIds { get; set; }
+    }
+
+    /// <summary>行を直す入力（フォームの行のすべての値。文字は空なら値なし。タグ・品目は null なら変えない）</summary>
+    public sealed class UpdateItemRequest
+    {
+        public string? MenuId { get; set; }
+
+        public string? ItemId { get; set; }
 
         public string? Name { get; set; }
 
@@ -125,19 +190,15 @@ public sealed class FlyersController(FlyerImportApplicationService flyerService)
 
         public string? Volume { get; set; }
 
-        public int? PiecesPerPack { get; set; }
-
-        public bool PiecesEdited { get; set; }
-
-        public SnackType? SnackType { get; set; }
-
-        public bool SnackTypeEdited { get; set; }
-
         public int? PriceIncludingTax { get; set; }
 
         public int? PriceExcludingTax { get; set; }
 
         public string? OrderNo { get; set; }
+
+        public int? PiecesPerPack { get; set; }
+
+        public SnackType? SnackType { get; set; }
 
         public string? TargetAgeLabel { get; set; }
 
@@ -146,10 +207,38 @@ public sealed class FlyersController(FlyerImportApplicationService flyerService)
         public List<string>? FlavorTags { get; set; }
 
         public List<string>? LabelAllergenIds { get; set; }
+    }
 
-        public List<string>? ResolvedTerms { get; set; }
+    /// <summary>品目の分からない語に選んだ品目（空なら「対応する品目なし」）</summary>
+    public sealed class ResolveTermRequest
+    {
+        public string? MenuId { get; set; }
 
-        public bool TreatAsFlyerError { get; set; }
+        public string? ItemId { get; set; }
+
+        public string? Term { get; set; }
+
+        public List<string>? AllergenIds { get; set; }
+    }
+
+    /// <summary>入数を入れる</summary>
+    public sealed class EnterPiecesRequest
+    {
+        public string? MenuId { get; set; }
+
+        public string? ItemId { get; set; }
+
+        public int? PiecesPerPack { get; set; }
+    }
+
+    /// <summary>「このままでよい」を押した理由</summary>
+    public sealed class AcceptReasonRequest
+    {
+        public string? MenuId { get; set; }
+
+        public string? ItemId { get; set; }
+
+        public string? ReasonKey { get; set; }
     }
 
     /// <summary>手入力の商品</summary>

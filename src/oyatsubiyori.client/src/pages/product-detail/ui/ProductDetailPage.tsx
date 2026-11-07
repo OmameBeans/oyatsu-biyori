@@ -38,6 +38,9 @@ const STATUS_LABEL: Record<CheckHistory['status'], string> = {
 
 const toNumber = (value: string): number | null => (value.trim() === '' ? null : Number(value));
 
+/** PC（md 以上）で、グリッドの行の高さいっぱいに伸ばすカード（中身は CardContent の中でスクロールする） */
+const FILL_CARD_SX = { display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } } as const;
+
 /**
  * SC-07 商品詳細・編集（T6-02）。上部に今のアレルゲンの表示と理由・次にすること、基本情報の編集、確認の履歴、
  * 今日以降にこの商品を使う献立（🔴 なら目立たせる）、アレルゲン確認（SC-08）への入口。
@@ -57,7 +60,8 @@ export const ProductDetailPage = () => {
             }
             header={<AllergenJudgementLine judgement={product.judgement} isInMenu={product.usages.length > 0} />}
         >
-            <Stack spacing={2}>
+            {/* PC（md 以上）では、2枚のカードを画面の残りの高さいっぱいに伸ばし、あふれた分はカードの中だけをスクロールする */}
+            <Stack spacing={2} sx={{ height: { md: '100%' } }}>
                 {product.isAvoidedEmpty && <NoAvoidedAllergenNotice />}
                 {product.usages.length > 0 && (
                     <Alert severity={isBlocked ? 'error' : 'info'} variant={isBlocked ? 'filled' : 'standard'}>
@@ -73,10 +77,19 @@ export const ProductDetailPage = () => {
                         ))}
                     </Alert>
                 )}
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' }, gap: 2 }}>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' },
+                        gridTemplateRows: { md: 'minmax(0, 1fr)' },
+                        flex: { md: 1 },
+                        minHeight: { md: 0 },
+                        gap: 2,
+                    }}
+                >
                     <ProductEditForm key={product.id + product.name + product.memo} product={product} />
-                    <Card>
-                        <CardContent>
+                    <Card sx={FILL_CARD_SX}>
+                        <CardContent sx={{ flex: 1, minHeight: 0, overflow: { md: 'auto' } }}>
                             <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
                                 アレルゲン確認の履歴
                             </Typography>
@@ -161,8 +174,8 @@ const ProductEditForm = ({ product }: ProductEditFormProps) => {
         );
 
     return (
-        <Card>
-            <CardContent>
+        <Card sx={FILL_CARD_SX}>
+            <CardContent sx={{ flex: 1, minHeight: 0, overflow: { md: 'auto' } }}>
                 <Typography variant="h3" component="h2" sx={{ mb: 1.5 }}>
                     基本情報
                 </Typography>
@@ -233,17 +246,20 @@ const ProductEditForm = ({ product }: ProductEditFormProps) => {
                     helperText="子どもの名前は書かないでください（献立の提案のため AI に送ります）"
                 />
                 <FormControlLabel control={<Switch checked={isDisabled} onChange={(event) => setIsDisabled(event.target.checked)} />} label="使わない（献立の候補から外す）" sx={{ mt: 1 }} />
+            </CardContent>
+            {/* 保存はスクロールの外（カードの右下）に置き、中身をスクロールしても押せるようにする */}
+            <Box sx={{ flexShrink: 0, px: 2, pb: 2, pt: 1 }}>
                 {update.isError && (
-                    <Alert severity="error" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
+                    <Alert severity="error" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
                         {errorMessageOf(update.error)}
                     </Alert>
                 )}
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button variant="contained" onClick={handleSave} disabled={update.isPending || !name.trim()}>
                         保存する
                     </Button>
                 </Box>
-            </CardContent>
+            </Box>
         </Card>
     );
 };

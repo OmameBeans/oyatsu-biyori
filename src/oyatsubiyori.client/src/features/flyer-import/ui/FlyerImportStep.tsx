@@ -16,7 +16,6 @@ import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
 import {
     useAddManualFlyerItem,
-    useConfirmSameFlyerItems,
     useDiscardFlyerImport,
     useFlyerImport,
     useRefreshFlyerImport,
@@ -28,8 +27,12 @@ import type { PreparedImage } from '../../../shared/lib';
 import { JOB_STATE, SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
 import { ClaudeText, JobProgress } from '../../../shared/ui';
+import type { FlyerBulkExclusionCount, FlyerSession } from '../../../entities/flyer';
+import { FlyerBulkNewDialog } from './FlyerBulkNewDialog';
+import { FlyerBulkUsableDialog } from './FlyerBulkUsableDialog';
 import { FlyerImagePicker } from './FlyerImagePicker';
 import { FlyerItemGrid } from './FlyerItemGrid';
+import { FlyerRemovedCard } from './FlyerRemovedCard';
 
 interface FlyerImportStepProps {
     menuId: string;
@@ -51,7 +54,6 @@ interface FlyerImportStepProps {
 export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputChange, pickerInset }: FlyerImportStepProps) => {
     const { data: flyerImport, dataUpdatedAt: flyerImportUpdatedAt, errorUpdatedAt: flyerImportErrorAt } = useFlyerImport(menuId);
     const startReading = useStartFlyerReading(menuId);
-    const confirmSame = useConfirmSameFlyerItems(menuId);
     const discard = useDiscardFlyerImport(menuId);
     const refresh = useRefreshFlyerImport(menuId);
     const { enqueueSnackbar } = useSnackbar();
@@ -59,6 +61,10 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
     const [startedJobId, setStartedJobId] = useState<string | null>(null);
     const [manualName, setManualName] = useState<string | null>(null);
     const [isPreparingImages, setIsPreparingImages] = useState(false);
+    const [isBulkNewOpen, setIsBulkNewOpen] = useState(false);
+    const [isBulkUsableOpen, setIsBulkUsableOpen] = useState(false);
+    // 表で開いている（確定のフォームで直している途中の）行。まとめて確定・登録から外す（直した内容を捨てて、読み取ったままで確定しないように）
+    const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
     const runningJob = flyerImport.job && !isJobFinished(flyerImport.job) ? flyerImport.job.id : null;
     const jobId = startedJobId ?? runningJob;
@@ -117,6 +123,16 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
     const showPicker = !isReading && !session;
 
     const showResult = !!session && !isReading;
+    // まとめての確定・登録に並べる商品（サーバーが決めた bulkUsable・bulkNew。09 の 5.2）。
+    // 表で開いて直している途中の行は入れない（確定の API にも editingItemIds として伝え、サーバーでも外す）
+    const editingItemIds = expandedItemId ? [expandedItemId] : [];
+    const bulkItemsOf = (ids: string[]) => session?.items.filter((item) => ids.includes(item.id) && item.id !== expandedItemId) ?? [];
+    const bulkUsableItems = bulkItemsOf(session?.bulkUsable.itemIds ?? []);
+    const bulkNewItems = bulkItemsOf(session?.bulkNew.itemIds ?? []);
+    // 開いている行が、まとめての対象から外れているか（外れていることを文言で示す）
+    const expandedItem = session?.items.find((item) => item.id === expandedItemId);
+    const isExpandedExcluded =
+        !!expandedItem && !!session && (session.bulkUsable.itemIds.includes(expandedItem.id) || session.bulkNew.itemIds.includes(expandedItem.id));
 
     return (
         <Stack
@@ -132,7 +148,8 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                           pr: { md: `${pickerInset?.right ?? 0}px` },
                       }
                     : showResult
-                      ? { height: { md: '100%' } }
+                      ? // 表の上の案内が多いと表の枠が入りきらないので、そのときは手順1の枠の中をスクロールする
+                        { height: { md: '100%' }, overflowY: { md: 'auto' } }
                       : undefined
             }
         >
@@ -211,40 +228,36 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
             {session && showResult && (
                 <>
                     <Card sx={{ flexShrink: 0 }}>
-                        <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, alignItems: { md: 'center' } }}>
-                            <Box sx={{ flex: 1 }}>
+                        <CardContent sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, flexWrap: { md: 'wrap' }, gap: 1.5, alignItems: { md: 'center' } }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography variant="h3" component="h2">
                                     読み取った商品 {session.items.length}件
                                 </Typography>
-                                <Typography variant="body2" sx={{ color: session.unconfirmedCount > 0 ? 'warning.dark' : 'success.main', fontWeight: 600 }}>
-                                    {session.unconfirmedCount > 0 ? `確定していない ${session.unconfirmedCount}件は、今週の商品に入りません` : 'すべて確定しました'}
+                                <Typography variant="body2" sx={{ color: session.notListed.total > 0 ? 'warning.dark' : 'success.main', fontWeight: 600 }}>
+                                    {notListedText(session)}
                                 </Typography>
                             </Box>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                <Button
-                                    variant="outlined"
-                                    disabled={confirmSame.isPending || !session.items.some((i) => i.canBulkConfirm && !i.confirmation)}
-                                    onClick={() =>
-                                        confirmSame.mutate(undefined, {
-                                            onSuccess: (count) => enqueueSnackbar(`「同じ商品」の ${count}件を確定しました`, { variant: 'success' }),
-                                            onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
-                                        })
-                                    }
-                                >
-                                    「同じ商品」をまとめて確定
+                                <Button variant="outlined" disabled={bulkUsableItems.length === 0} onClick={() => setIsBulkUsableOpen(true)}>
+                                    使える商品をまとめて確定（{bulkUsableItems.length}件）
+                                </Button>
+                                <Button variant="outlined" disabled={bulkNewItems.length === 0} onClick={() => setIsBulkNewOpen(true)}>
+                                    新しい商品をまとめて登録（{bulkNewItems.length}件）
                                 </Button>
                                 <Button variant="contained" onClick={onNext} disabled={listedCount === 0}>
                                     今週の商品へ
                                 </Button>
                             </Stack>
+                            <BulkExclusionSummary session={session} expandedItemName={isExpandedExcluded && expandedItem ? expandedItem.read.name : null} />
                         </CardContent>
                     </Card>
                     {session.reviewFailed && (
                         <Alert severity="info" sx={{ flexShrink: 0 }}>
-                            読み取りの検証ができませんでした。読み取った内容を、チラシと見比べて確かめてください。
+                            読み取りの検証ができませんでした。読み取った内容を、チラシと見比べて確かめてください。この取り込みの商品は、まとめての確定・登録に入りません（1件ずつ確定してください）。
                         </Alert>
                     )}
-                    <FlyerItemGrid key={session.id} menuId={menuId} items={session.items} />
+                    <FlyerItemGrid key={session.id} menuId={menuId} session={session} onExpandedIdChange={setExpandedItemId} />
+                    {session.removedItems.length > 0 && <FlyerRemovedCard menuId={menuId} items={session.removedItems} />}
                     {session.missedProducts.length > 0 && (
                         <Card sx={{ flexShrink: 0 }}>
                             <CardContent>
@@ -275,6 +288,10 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                 </>
             )}
 
+            {isBulkUsableOpen && (
+                <FlyerBulkUsableDialog menuId={menuId} items={bulkUsableItems} editingItemIds={editingItemIds} isOpen onClose={() => setIsBulkUsableOpen(false)} />
+            )}
+            {isBulkNewOpen && <FlyerBulkNewDialog menuId={menuId} items={bulkNewItems} editingItemIds={editingItemIds} isOpen onClose={() => setIsBulkNewOpen(false)} />}
             {manualName !== null && <ManualItemDialog menuId={menuId} initialName={manualName} onClose={() => setManualName(null)} />}
         </Stack>
     );
@@ -286,11 +303,12 @@ interface ManualItemDialogProps {
     onClose: () => void;
 }
 
-/** 手入力の商品（チラシと同じ扱いで、同じ商品かどうかを調べてから一覧に並ぶ。U-36） */
+/** 手入力の商品（チラシと同じ扱いで、サーバーが分類してから一覧に並ぶ。まとめての確定・登録には入らない。U-36・09 の 5.2） */
 const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProps) => {
     const addManual = useAddManualFlyerItem(menuId);
     const { enqueueSnackbar } = useSnackbar();
     const [name, setName] = useState(initialName);
+    const [maker, setMaker] = useState('');
     const [volume, setVolume] = useState('');
     const [price, setPrice] = useState('');
     const [pieces, setPieces] = useState('');
@@ -305,6 +323,12 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
             <DialogContent dividers>
                 <Stack spacing={2}>
                     <TextField label="商品名" value={name} onChange={(event) => setName(event.target.value)} required />
+                    <TextField
+                        label="メーカー"
+                        value={maker}
+                        onChange={(event) => setMaker(event.target.value)}
+                        helperText="チラシに書かれているメーカーを入れてください。空のままだと「再入力」になります"
+                    />
                     <TextField label="内容量" value={volume} onChange={(event) => setVolume(event.target.value)} />
                     <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} />
                     <TextField label="入数（1つで何人分か）" type="number" value={pieces} onChange={(event) => setPieces(event.target.value)} />
@@ -334,7 +358,7 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
                         addManual.mutate(
                             {
                                 name,
-                                maker: null,
+                                maker: maker.trim() || null,
                                 volume: volume || null,
                                 priceIncludingTax: toNumber(price),
                                 priceExcludingTax: null,
@@ -345,7 +369,7 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
                             },
                             {
                                 onSuccess: () => {
-                                    enqueueSnackbar('一覧に足しました。確かめて確定してください', { variant: 'success' });
+                                    enqueueSnackbar('一覧に足しました。手で入力した商品はまとめての確定に入らないので、行を開いて1件ずつ確定してください', { variant: 'success' });
                                     onClose();
                                 },
                             },
@@ -359,3 +383,53 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
     );
 };
 
+
+/** 「今週の商品に入らない N件（使えない a件・再入力 b件・まだ確定していない c件）」（FR-FLYER-06b・09 の 5.1。件数はサーバーの値） */
+const notListedText = (session: FlyerSession) => {
+    const notListed = session.notListed;
+    if (notListed.total === 0) {
+        return session.counts.confirmed > 0 ? '確定した商品は、すべて今週の商品に入ります' : '今週の商品に入る商品はまだありません';
+    }
+    return `今週の商品に入らない ${notListed.total}件（使えない ${notListed.unusable}件・再入力 ${notListed.needsInput}件・まだ確定していない ${notListed.unconfirmed}件）`;
+};
+
+interface BulkExclusionSummaryProps {
+    session: FlyerSession;
+    /** 開いて直している途中で、まとめから外れた行の商品名 */
+    expandedItemName: string | null;
+}
+
+/** まとめての確定・登録に入らない商品の件数と理由（09 の 5.2。理由ごとの件数はサーバーの値。1件が複数の理由に数えられる） */
+const BulkExclusionSummary = ({ session, expandedItemName }: BulkExclusionSummaryProps) => {
+    const merged = [...session.bulkUsable.exclusions, ...session.bulkNew.exclusions].reduce<FlyerBulkExclusionCount[]>((acc, exclusion) => {
+        const found = acc.find((x) => x.exclusion === exclusion.exclusion);
+        return found ? acc.map((x) => (x === found ? { ...x, count: x.count + exclusion.count } : x)) : [...acc, exclusion];
+    }, []);
+    const excludedCount = session.bulkUsable.excludedCount + session.bulkNew.excludedCount;
+    if (excludedCount === 0 && !expandedItemName) {
+        return null;
+    }
+    return (
+        <Box component="section" aria-label="まとめに入らない商品" sx={{ width: '100%' }}>
+            {excludedCount > 0 && (
+                <>
+                    <Typography variant="body2" color="text.secondary">
+                        まとめての確定・登録に入らない {excludedCount}件（行を開いて1件ずつ確定してください）：
+                    </Typography>
+                    <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+                        {merged.map((exclusion) => (
+                            <Typography key={exclusion.exclusion} component="li" variant="body2" color="text.secondary">
+                                {exclusion.message} {exclusion.count}件
+                            </Typography>
+                        ))}
+                    </Box>
+                </>
+            )}
+            {expandedItemName && (
+                <Typography variant="body2" color="text.secondary">
+                    開いている「{expandedItemName}」は、直している途中のため、まとめての確定・登録に入りません。行のボタンで確定してください
+                </Typography>
+            )}
+        </Box>
+    );
+};

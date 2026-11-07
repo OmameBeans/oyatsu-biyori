@@ -212,15 +212,14 @@ internal sealed class FixedFlyerReader(params FlyerReadProduct[] items) : IFlyer
 /// <summary>決まった検証の結果を返す</summary>
 internal sealed class FixedFlyerReviewer(FlyerReview? review = null) : IFlyerReviewer
 {
-    public Task<Result<FlyerReview>> ReviewAsync(IReadOnlyList<ClaudeImage> images, FlyerReading reading, CancellationToken cancellationToken) =>
-        Task.FromResult(review is null ? Result<FlyerReview>.Error("検証できません") : Result<FlyerReview>.Ok(review));
-}
+    /// <summary>検証に渡された読み取り結果</summary>
+    public FlyerReading? Received { get; private set; }
 
-/// <summary>決まった照合の判定を返す</summary>
-internal sealed class FixedJudge(ProductMatchVerdict verdict) : IProductMatchJudge
-{
-    public Task<Result<ProductMatchJudgement>> JudgeAsync(ProductMatchInput item, IReadOnlyList<Product> candidates, CancellationToken cancellationToken) =>
-        Task.FromResult(Result<ProductMatchJudgement>.Ok(new ProductMatchJudgement(verdict, verdict == ProductMatchVerdict.Different ? null : candidates[0].Id, "テストの判定")));
+    public Task<Result<FlyerReview>> ReviewAsync(IReadOnlyList<ClaudeImage> images, FlyerReading reading, CancellationToken cancellationToken)
+    {
+        Received = reading;
+        return Task.FromResult(review is null ? Result<FlyerReview>.Error("検証できません") : Result<FlyerReview>.Ok(review));
+    }
 }
 
 /// <summary>進捗を捨てる</summary>

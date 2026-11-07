@@ -1,0 +1,223 @@
+{
+  "_note": "架空のチラシの元データ（TD-01・HK-DEMO-01〜02）。冷蔵デザートのページ。説明文が番号・価格の上にあり、アレルゲンは「［卵・乳］」と角括弧で書く。商品・メーカー・生協の名前、価格、内容量、説明文はすべて架空。python tools/build-samples/build.py で HTML・画像・PDF・正解データを作る",
+  "id": "flyer-03",
+  "descPosition": "above",
+  "labelBrackets": [
+    "［",
+    "］"
+  ],
+  "publisher": "ひだまり生協",
+  "issue": "12月 第1回",
+  "section": "冷蔵デザート",
+  "subsection": "ゼリー・プリン・ムース",
+  "items": [
+    {
+      "code": "8133",
+      "origin": "製造岐阜。",
+      "next": "12月1回",
+      "maker": "みるく堂",
+      "shelf": "21日",
+      "chilled": true,
+      "name": "CO・OP ふんわり ミルクムース",
+      "volume": "65g×4",
+      "priceExcludingTax": 348,
+      "unitPrice": "1個",
+      "description": "ミルクをたっぷり使って、ふんわり泡立てたムース。1個（65g）92㎉、塩0.07g。",
+      "allergenLabel": [
+        "乳"
+      ],
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#2c6fb5",
+        "icon": "🥛",
+        "label": "ミルクムース"
+      },
+      "notice": "※洋酒使用。",
+      "_trap": "「※洋酒使用。」の注意書きが説明文の頭にある（アレルゲンではないが、子どもに出すかは職員が判断する）"
+    },
+    {
+      "code": "433",
+      "origin": "製造岩手。",
+      "next": "毎週",
+      "maker": "あおば酪農",
+      "shelf": "14日",
+      "chilled": true,
+      "banner": "冷蔵デザート部門 1位",
+      "badge": "人気ベスト1",
+      "name": "とろける たまごプリン",
+      "volume": "75g×3",
+      "priceExcludingTax": 158,
+      "unitPrice": "1個",
+      "description": "やさしい甘さの、ぷるんとかためのプリン。1個78㎉、塩0.08g。",
+      "allergenLabel": [
+        "卵",
+        "乳"
+      ],
+      "piecesPerPackCandidates": [
+        3
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#e8b34a",
+        "icon": "🍮",
+        "label": "たまごプリン"
+      },
+      "_trap": "「人気ベスト1」「冷蔵デザート部門 1位」は商品名に含めない"
+    },
+    {
+      "code": "8132",
+      "origin": "製造愛媛。",
+      "next": "12月2回",
+      "maker": "みかんの里食品",
+      "shelf": "30日",
+      "chilled": true,
+      "name": "ごろっと みかん寒天",
+      "volume": "4個入",
+      "priceExcludingTax": 298,
+      "unitPrice": "1個",
+      "description": "みかんの果肉を、寒天でさっぱりと固めました。1個（90g）61㎉。",
+      "allergenLabel": null,
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#f39c12",
+        "icon": "🍊",
+        "label": "みかん寒天"
+      },
+      "_trap": "デモデータの「ぷるぷる みかんゼリー」とは別商品"
+    },
+    {
+      "code": "432",
+      "origin": "製造長野。",
+      "next": "毎週",
+      "maker": "うさぎ乳業",
+      "shelf": "40日",
+      "chilled": true,
+      "name": "うさぎのミミ ぶどうゼリー",
+      "volume": "6個入",
+      "priceExcludingTax": 258,
+      "unitPrice": "1個",
+      "description": "ぶどうの粒を感じる、甘ずっぱいゼリー。果汁30%。1個（70g）54㎉。",
+      "allergenLabel": null,
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#7d5ba6",
+        "icon": "🐰",
+        "label": "ぶどうゼリー"
+      },
+      "_trap": "照合：431「うさぎのミミ いちごゼリー」と同じメーカーの味違い。D-100 では名前が違うので別の商品（一致せず「要確認」。アレルゲン確認を引き継がない）"
+    },
+    {
+      "code": "434",
+      "origin": "製造岩手。",
+      "next": "12月2回",
+      "maker": "あおば酪農",
+      "shelf": "12日",
+      "chilled": true,
+      "name": "こんがり 焼きプリン",
+      "volume": "80g×4",
+      "priceExcludingTax": 298,
+      "unitPrice": "1個",
+      "description": "表面をこんがり焼いた、香ばしいプリン。1個（80g）98㎉、塩0.1g。",
+      "allergenLabel": [
+        "卵",
+        "乳"
+      ],
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#a8662f",
+        "icon": "🍮",
+        "label": "焼きプリン"
+      },
+      "_trap": "照合：433「とろける たまごプリン」とは別商品（同じメーカーのプリン。D-100 では名前が違えば、メーカーが同じでも一致しない）"
+    },
+    {
+      "code": "8134",
+      "origin": "製造岐阜。",
+      "next": "12月2回",
+      "maker": "みるく堂",
+      "shelf": "30日",
+      "chilled": true,
+      "name": "ベリーのレアチーズカップ",
+      "volume": "70g×3個",
+      "priceExcludingTax": 378,
+      "unitPrice": "1個",
+      "description": "クリームチーズのムースに、ベリーソースを重ねました。1個（70g）131㎉、塩0.11g。ゲル化剤（増粘多糖類）使用。",
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "piecesPerPackCandidates": [
+        3
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#8e2c48",
+        "icon": "🫐",
+        "label": "レアチーズ"
+      },
+      "_trap": "「ゲル化剤（増粘多糖類）使用」は添加物の表示で、アレルゲンの表記ではない"
+    },
+    {
+      "code": "431",
+      "origin": "製造長野。",
+      "next": "毎週",
+      "maker": "うさぎ乳業",
+      "shelf": "40日",
+      "chilled": true,
+      "name": "うさぎのミミ いちごゼリー",
+      "volume": "6個入",
+      "priceExcludingTax": 258,
+      "unitPrice": "1個",
+      "description": "いちごの果肉が入った、つるんとしたゼリー。果汁10%。1個（70g）49㎉。",
+      "allergenLabel": null,
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#ef7f9a",
+        "icon": "🐰",
+        "label": "いちごゼリー"
+      },
+      "_trap": "照合：デモデータの「うさぎのミミ いちごゼリー」と同じ商品。次回予定の代わりに「毎週」"
+    },
+    {
+      "code": "8131",
+      "origin": "製造北海道。",
+      "next": "12月3回",
+      "maker": "うさぎ乳業",
+      "shelf": "18日",
+      "chilled": true,
+      "name": "しろくまの ヨーグルトゼリー",
+      "volume": "6個入",
+      "priceExcludingTax": 298,
+      "unitPrice": "1個",
+      "description": "ヨーグルトの酸味をいかした、さっぱりしたゼリー。1個（65g）58㎉、塩0.05g。",
+      "allergenLabel": [
+        "乳"
+      ],
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "package": {
+        "color": "#7fb3d5",
+        "icon": "🐻‍❄️",
+        "label": "ヨーグルトゼリー"
+      },
+      "_trap": "照合：デモデータの「しろくまの ヨーグルトゼリー」と同じ商品。表記は角括弧の「［乳］」"
+    }
+  ]
+}

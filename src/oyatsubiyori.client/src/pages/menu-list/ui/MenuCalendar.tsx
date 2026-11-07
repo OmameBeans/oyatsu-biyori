@@ -7,7 +7,6 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { AllergenCategoryIcon, CATEGORY_LABEL } from '../../../entities/allergen-judgement';
@@ -175,26 +174,26 @@ interface WeekSummaryProps {
     onShowIssues: (menuId: string) => void;
 }
 
-/** 週の状態・実績と予算・商品の問題。献立のある週は週の日付から開く。未作成の週は「献立を作る」。献立一覧に行がない週（過去の未作成の週など）は日付だけ */
+/** 週の状態・実績と予算・商品の問題。献立のある週は「献立を開く」、未作成の週は「献立を作る」。献立一覧に行がない週（過去の未作成の週など）は日付だけ */
 const WeekSummary = ({ weekStart, row, isPending, onCreate, onShowIssues }: WeekSummaryProps) => (
     <Stack spacing={0.75} sx={{ alignItems: 'flex-start' }}>
-        <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', alignSelf: 'stretch' }}>
             {row?.relativeLabel && <Chip size="small" label={row.relativeLabel} color={row.relativeLabel === '今週' ? 'primary' : 'default'} sx={TAG_SX} />}
-            {/* 献立のある週は、週の日付から献立（SC-09）を開ける。未作成の週は押しても作らない（作るのは「献立を作る」だけ） */}
-            {row?.menuId ? (
-                <Link
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {dayjs(weekStart).format('M/D')}〜
+            </Typography>
+            {/* 献立のある週は、日付の横の「献立を開く」で献立（SC-09）を開く。未作成の週は下の「献立を作る」 */}
+            {row?.menuId && (
+                <Button
                     component={RouterLink}
                     to={menuPath(row.menuId)}
-                    variant="body2"
-                    aria-label={`${formatWeekLabel(weekStart)}の献立`}
-                    sx={{ fontWeight: 700 }}
+                    size="small"
+                    variant="outlined"
+                    aria-label={`${formatWeekLabel(weekStart)}の献立を開く`}
+                    sx={{ minHeight: 32, py: 0, px: 1, fontWeight: 700, whiteSpace: 'nowrap' }}
                 >
-                    {dayjs(weekStart).format('M/D')}〜
-                </Link>
-            ) : (
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {dayjs(weekStart).format('M/D')}〜
-                </Typography>
+                    献立を開く
+                </Button>
             )}
         </Stack>
         {row && <WeekStatus row={row} />}

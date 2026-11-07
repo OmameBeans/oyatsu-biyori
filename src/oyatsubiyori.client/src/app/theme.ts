@@ -22,7 +22,7 @@ interface PrimaryColors {
  */
 const COLOR_THEME_DEFINITIONS: Record<ColorTheme, { label: string; primary: Record<ResolvedColorMode, PrimaryColors> }> = {
     [COLOR_THEME.ORANGE]: {
-        label: 'オレンジ（いつもの色）',
+        label: 'オレンジ',
         primary: {
             light: { main: '#b5541c', dark: '#873a22', light: '#fbe3d2', contrastText: '#ffffff' },
             // ダークの main は error（#ff7b72）・warning（#e3b341）と見分けるため、ΔE2000 で error と 22.2・warning と 21.9 離した濃いオレンジ。
@@ -32,7 +32,7 @@ const COLOR_THEME_DEFINITIONS: Record<ColorTheme, { label: string; primary: Reco
         },
     },
     [COLOR_THEME.BLUE]: {
-        label: 'あお',
+        label: 'あお（いつもの色）',
         primary: {
             light: { main: '#2f6db5', dark: '#1d4f8a', light: '#dfeaf7', contrastText: '#ffffff' },
             dark: { main: '#8ab4f0', dark: '#cfe0fa', light: '#1e3150', contrastText: '#0b1d33' },
@@ -271,7 +271,7 @@ export const createAppTheme = ({ colorTheme, mode }: AppThemeSelection) =>
 
 /**
  * ブラウザの上の帯の色（<meta name="theme-color">）。ライトはテーマの色、ダークは背景の色にする。
- * index.html の初期値は、既定（オレンジ・ライト）の primary.main と同じにしておく。
+ * index.html の初期値は、既定（あお・ライト）の primary.main と同じにしておく。
  */
 export const browserBarColorOf = (theme: ReturnType<typeof createAppTheme>) =>
     theme.palette.mode === 'dark' ? theme.palette.background.default : theme.palette.primary.main;

@@ -6,27 +6,24 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import Collapse from '@mui/material/Collapse';
-import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useSnackbar } from 'notistack';
 import { AllergenCategoryMark, NoAvoidedAllergenNotice } from '../../../entities/allergen-judgement';
 import { useLatestProposalJob, useListedProducts, useRefreshMenu, useStartProposal, useUpdateBudget } from '../../../entities/menu';
 import type { MenuDetail, MenuProposalOutcome } from '../../../entities/menu';
 import { errorMessageOf, isJobFinished, useJobPolling } from '../../../shared/api';
-import { formatDateLabel, formatDateTime, formatYen, readPreference, writePreference } from '../../../shared/lib';
-import { DAY_TYPE_LABEL, JOB_STATE, MENU_STATUS, PREFERENCE_KEY } from '../../../shared/type';
+import { formatDateLabel, formatDateTime, formatYen } from '../../../shared/lib';
+import { JOB_STATE, MENU_STATUS } from '../../../shared/type';
 import { JobProgress } from '../../../shared/ui';
 import { BudgetFitDialog } from './BudgetFitDialog';
 import { ConfirmMenuDialog } from './ConfirmMenuDialog';
 import { DayCard } from './DayCard';
+import { MenuIssuesDialog } from './MenuIssuesDialog';
 import { OrderListDialog } from './OrderListDialog';
-
-const isBooleanText = (value: unknown): value is 'true' | 'false' => value === 'true' || value === 'false';
 
 /** 問題のある日を「11/16（月）・11/20（金）」の形で並べる（同じ日は1回。日に結びつかないものは「週全体」） */
 const issueDays = (issues: MenuDetail['issues']) =>
@@ -45,13 +42,16 @@ interface MenuBoardProps {
      * null（置き場所がまだできていない）のあいだは出さない（一度列の上に出てから動くのを避ける）
      */
     commandBarContainer?: HTMLElement | null;
+    /** 「パッケージで確認する」（画面を離れずに、アレルゲン確認のダイアログを開く。ダイアログはページが持つ） */
+    onCheckAllergen: (productId: string) => void;
 }
 
 /**
- * SC-09 手順4 献立案（T4-05・T4-06・T4-07・T4-11）。週の実績 / 週の予算と確定などのボタン（コマンドバー。ページが用意した
- * 3列の上の場所に出す）、「要望をこう理解しました」（折りたためる）・日に結びつかない警告、その下に日ごとのカード（横に並べる）。作成中は段階を示し、失敗したら要望を残したまま「もう一度作る」を出す。
+ * SC-09 手順4 献立案（T4-05・T4-06・T4-07・T4-11）。週の実績 / 週の予算・確かめることの件数と確定などのボタン（コマンドバー。
+ * ページが用意した3列の上の場所に出す）、日に結びつかない警告、その下に日ごとのカード（横に並べる）。作成中は段階を示し、失敗したら要望を残したまま「もう一度作る」を出す。
+ * 画面の上を広く使うため、「要望をこう理解しました」は AI チャットの見出しのボタン（InterpretedRequestsButton）から開く。
  */
-export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEditRequest, commandBarContainer }: MenuBoardProps) => {
+export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEditRequest, commandBarContainer, onCheckAllergen }: MenuBoardProps) => {
     const { data: latest } = useLatestProposalJob(menu.id);
     const { data: listed } = useListedProducts(menu.id);
     const refresh = useRefreshMenu(menu.id);
@@ -70,16 +70,17 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
     const [isBudgetFitOpen, setIsBudgetFitOpen] = useState(false);
     const [isOrderListOpen, setIsOrderListOpen] = useState(false);
     const [budgetDraft, setBudgetDraft] = useState(String(menu.weeklyBudget));
-    // 「要望をこう理解しました」を折りたたんでいるか（次に開いたときも同じにする）
-    const [isRequestsCollapsed, setIsRequestsCollapsed] = useState(
-        () => readPreference(PREFERENCE_KEY.MENU_REQUESTS_COLLAPSED, isBooleanText, 'false') === 'true',
-    );
-
-    const handleToggleRequests = () => {
-        const next = !isRequestsCollapsed;
-        setIsRequestsCollapsed(next);
-        writePreference(PREFERENCE_KEY.MENU_REQUESTS_COLLAPSED, String(next));
-    };
+    const [isIssuesOpen, setIsIssuesOpen] = useState(false);
+    // 開いている商品のカード（既定は閉じる）。献立を直すと日ごとのカードが作り直されるので、ここで持つ
+    const [expandedItemIds, setExpandedItemIds] = useState<ReadonlySet<string>>(() => new Set());
+    const toggleItem = (itemId: string) =>
+        setExpandedItemIds((prev) => {
+            const next = new Set(prev);
+            if (!next.delete(itemId)) {
+                next.add(itemId);
+            }
+            return next;
+        });
 
     useEffect(() => {
         if (job && isJobFinished(job)) {
@@ -94,11 +95,16 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
     const outcome = job?.state === JOB_STATE.SUCCEEDED ? job.result : null;
     // 日に結びつかない警告（日ごとのカードには出ないもの）
     const weekIssues = menu.issues.filter((i) => !i.date && i.kind !== 'OverBudget');
-    // 上部のまとめ。日ごとのカードは横に並び、画面の外の日の 🔴/🟡 に気づけないため、件数と日を出す（区分は API の結果のまま）
+    // コマンドバーのまとめ。日ごとのカードは横に並び、画面の外の日の 🔴/🟡 に気づけないため、件数を出す（区分は API の結果のまま）
     const blocked = menu.issues.filter((i) => i.kind === 'AllergenBlocked');
     const warnings = menu.issues.filter((i) => i.kind === 'AllergenWarning');
     const otherBlocking = menu.issues.filter((i) => i.blocksConfirmation && i.kind !== 'AllergenBlocked');
-    const interpreted = menu.interpretedRequests;
+    const issuesToCheck = [...blocked, ...warnings, ...otherBlocking];
+    // 「確かめること」からダイアログで記録して0件になったら、開いている状態も戻す
+    // （戻さないと、あとで新しい問題が出たときに、押していないのにダイアログが開く）
+    if (isIssuesOpen && issuesToCheck.length === 0) {
+        setIsIssuesOpen(false);
+    }
 
     const retry = () =>
         startProposal.mutate(menu.requestText ?? '', {
@@ -149,6 +155,34 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                 )}
                 {menu.week.isOverBudget && (
                     <Typography sx={{ color: 'error.main', fontWeight: 600 }}>⚠ 週の予算を {formatYen(-menu.week.remaining)} 超えています</Typography>
+                )}
+                {/* 確かめることの件数。日ごとのカードは横に並び、画面の外の日の 🔴/🟡 に気づけないため、区分名と件数を常に出す。
+                    押すと、日ごとに何を確かめるかをダイアログで出す（区分は API の結果のまま） */}
+                {issuesToCheck.length > 0 && (
+                    <Box component="section" aria-label="確かめること" sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {/* どの日かはツールチップで添える（describeChild：ボタンの名前は「使えません 1件」のまま、日は説明として読む） */}
+                        {blocked.length > 0 && (
+                            <Tooltip title={issueDays(blocked)} describeChild>
+                                <Button variant="outlined" color="error" onClick={() => setIsIssuesOpen(true)} sx={{ fontWeight: 700 }}>
+                                    <AllergenCategoryMark category="Blocked" isInherit /> {blocked.length}件
+                                </Button>
+                            </Tooltip>
+                        )}
+                        {warnings.length > 0 && (
+                            <Tooltip title={issueDays(warnings)} describeChild>
+                                <Button variant="outlined" color="warning" onClick={() => setIsIssuesOpen(true)} sx={{ color: 'warning.dark', fontWeight: 700 }}>
+                                    <AllergenCategoryMark category="Warning" isInherit /> {warnings.length}件
+                                </Button>
+                            </Tooltip>
+                        )}
+                        {otherBlocking.length > 0 && (
+                            <Tooltip title={issueDays(otherBlocking)} describeChild>
+                                <Button variant="outlined" color="error" onClick={() => setIsIssuesOpen(true)} sx={{ fontWeight: 700 }}>
+                                    ⚠ 確定できない問題 {otherBlocking.length}件
+                                </Button>
+                            </Tooltip>
+                        )}
+                    </Box>
                 )}
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
@@ -203,85 +237,6 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                 </Alert>
             )}
 
-            {(blocked.length > 0 || warnings.length > 0 || otherBlocking.length > 0) && (
-                <Paper component="section" aria-label="確かめること" variant="outlined" sx={{ px: 2, py: 1 }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.5, sm: 2 }} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                        {blocked.length > 0 && (
-                            <Typography sx={{ color: 'error.main', fontWeight: 700 }}>
-                                <AllergenCategoryMark category="Blocked" /> {blocked.length}件（{issueDays(blocked)}）
-                            </Typography>
-                        )}
-                        {warnings.length > 0 && (
-                            <Typography sx={{ color: 'warning.dark', fontWeight: 600 }}>
-                                <AllergenCategoryMark category="Warning" isInherit /> {warnings.length}件（{issueDays(warnings)}）
-                            </Typography>
-                        )}
-                        {otherBlocking.length > 0 && (
-                            <Typography sx={{ color: 'error.main', fontWeight: 600 }}>
-                                ⚠ 確定できない問題 {otherBlocking.length}件{otherBlocking.some((i) => i.date) ? `（${issueDays(otherBlocking)}）` : ''}
-                            </Typography>
-                        )}
-                    </Stack>
-                </Paper>
-            )}
-
-            {interpreted && (interpreted.days.length > 0 || interpreted.policies.length > 0 || interpreted.rejected.length > 0) && (
-                <Card>
-                    <CardContent sx={isRequestsCollapsed ? { py: 1, '&:last-child': { pb: 1 } } : undefined}>
-                        {/* 折りたたんでも見出しは残す。反映しなかった要望があるときは、折りたたんでいても件数を出す */}
-                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: isRequestsCollapsed ? 0 : 1 }}>
-                            <Typography variant="h3" component="h2" sx={{ flex: 1, minWidth: 0 }}>
-                                要望をこう理解しました
-                            </Typography>
-                            {isRequestsCollapsed && interpreted.rejected.length > 0 && (
-                                <Chip size="small" color="warning" label={`反映しなかった要望 ${interpreted.rejected.length}件`} />
-                            )}
-                            <IconButton
-                                aria-label={isRequestsCollapsed ? '要望の読み取りを開く' : '要望の読み取りを折りたたむ'}
-                                aria-expanded={!isRequestsCollapsed}
-                                onClick={handleToggleRequests}
-                                size="small"
-                                edge="end"
-                                sx={{ transform: isRequestsCollapsed ? 'none' : 'rotate(180deg)' }}
-                            >
-                                <ExpandMoreIcon />
-                            </IconButton>
-                        </Stack>
-                        <Collapse in={!isRequestsCollapsed}>
-                            <Stack component="ul" spacing={0.5} sx={{ pl: 2.5, m: 0 }}>
-                                {interpreted.days.map((d) => (
-                                    <li key={d.date}>
-                                        {formatDateLabel(d.date)}：
-                                        {[d.childrenCount !== null ? `人数 ${d.childrenCount}人` : null, d.dayType ? DAY_TYPE_LABEL[d.dayType] : null, d.label ? `「${d.label}」` : null]
-                                            .filter(Boolean)
-                                            .join('・')}
-                                    </li>
-                                ))}
-                                {interpreted.policies.map((p) => (
-                                    <li key={p.text}>
-                                        {p.days && p.days.length > 0 ? `${p.days.map(formatDateLabel).join('・')}：` : '毎日：'}
-                                        {p.text}
-                                    </li>
-                                ))}
-                            </Stack>
-                            {interpreted.rejected.length > 0 && (
-                                <Alert severity="warning" sx={{ mt: 1 }}>
-                                    <Typography sx={{ fontWeight: 700 }}>反映しなかった要望</Typography>
-                                    {interpreted.rejected.map((r) => (
-                                        <Typography key={r.text} variant="body2">
-                                            ・{r.text}：{r.reason}
-                                        </Typography>
-                                    ))}
-                                </Alert>
-                            )}
-                            <Typography variant="caption" color="text.secondary">
-                                人数・種別・見出しは、日ごとのカードの「詳細設定」で直せます。
-                            </Typography>
-                        </Collapse>
-                    </CardContent>
-                </Card>
-            )}
-
             {outcome && outcome.removedItems.length > 0 && (
                 <Alert severity="warning">
                     <Typography sx={{ fontWeight: 700 }}>直しきれなかった問題（外した商品）</Typography>
@@ -329,6 +284,9 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                         issues={menu.issues.filter((issue) => issue.date === day.date)}
                         candidates={candidates}
                         isBusy={isRunning}
+                        expandedItemIds={expandedItemIds}
+                        onToggleItem={toggleItem}
+                        onCheckAllergen={onCheckAllergen}
                     />
                 ))}
             </Box>
@@ -342,6 +300,13 @@ export const MenuBoard = ({ menu, isBudgetFitRequested, onBudgetFitClosed, onEdi
                     setIsConfirmOpen(false);
                     enqueueSnackbar('献立を保存しました（確定済み）', { variant: 'success' });
                 }}
+            />
+            <MenuIssuesDialog
+                menu={menu}
+                issues={issuesToCheck}
+                isOpen={isIssuesOpen && issuesToCheck.length > 0}
+                onClose={() => setIsIssuesOpen(false)}
+                onCheckAllergen={onCheckAllergen}
             />
             <OrderListDialog menu={menu} isOpen={isOrderListOpen} onClose={() => setIsOrderListOpen(false)} />
             <BudgetFitDialog

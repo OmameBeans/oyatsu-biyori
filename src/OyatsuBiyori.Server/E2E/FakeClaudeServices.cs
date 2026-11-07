@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Security.Cryptography;
+using System.Text.Json;
 using OyatsuBiyori.Biz;
 using OyatsuBiyori.Biz.Entities;
 using OyatsuBiyori.Biz.Interfaces;
@@ -6,7 +7,13 @@ using OyatsuBiyori.Biz.Interfaces;
 namespace OyatsuBiyori.Server.E2E;
 
 /// <summary>
-/// E2E 用の偽のチラシの読み取り。画像は見ずに、架空のチラシの正解データ（samples/flyers/*.expected.json）を返す。
+/// E2E 用の偽のチラシの読み取り。架空のチラシの正解データ（samples/flyers/*.expected.json）を返す。
+/// 送られた画像が架空のチラシの画像（正解データの images にあるもの）とバイト列まで同じなら、その画像に写っている商品を返す
+/// （読み取り精度の測定の自己確認は PNG をそのまま送るので、チラシごと・画像ごとに正解が返る）。
+/// どれとも同じでなければ、設定のチラシ（E2E:FlyerSample）の全商品を返す。
+/// 正解データの項目がない・null の商品は「読めなかった」として null で返す（メーカー・税込価格など。再入力の分類を確かめるため）。
+/// "nonFood": true の商品は食品以外の印を付け、"nonFoodReason" を理由にして返す（FR-IMPORT-20）。画面から送る画像はブラウザで JPEG に描き直される
+/// （imagePrep.ts）ため一致せず、E2E では送ったファイルにかかわらず、いつも設定のチラシが返る。
 /// 費用がかからず、毎回同じ結果になる。アプリの検証・アレルゲンの判定は本物を通す。
 /// </summary>
 public sealed class FakeFlyerReader(IHostEnvironment environment, IConfiguration configuration) : IFlyerReader
@@ -16,42 +23,85 @@ public sealed class FakeFlyerReader(IHostEnvironment environment, IConfiguration
 
     public async Task<Result<FlyerReading>> ReadAsync(IReadOnlyList<ClaudeImage> images, IReadOnlyList<Allergen> allergens, CancellationToken cancellationToken)
     {
-        var relative = _configuration["E2E:FlyerSample"] ?? "../../samples/flyers/flyer-01.expected.json";
-        var path = Path.GetFullPath(Path.Combine(_environment.ContentRootPath, relative));
-        await using var stream = File.OpenRead(path);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        var relative = _configuration["E2E:FlyerSample"] ?? "../../samples/flyers/flyer-02.expected.json";
+        var fallbackPath = Path.GetFullPath(Path.Combine(_environment.ContentRootPath, relative));
+        var sentHashes = images.Select(i => Convert.ToHexString(SHA256.HashData(i.Data))).ToHashSet(StringComparer.Ordinal);
 
+        // 送られた画像と同じ画像を、架空のチラシの正解データから探し、写っている商品を集める
         var items = new List<FlyerReadProduct>();
-        foreach (var item in document.RootElement.GetProperty("items").EnumerateArray())
+        foreach (var path in Directory.GetFiles(Path.GetDirectoryName(fallbackPath)!, "flyer-*.expected.json").Order(StringComparer.Ordinal))
         {
-            var labels = item.GetProperty("allergenLabel").EnumerateArray().Select(e => e.GetString()!).ToList();
-            var labelText = labels.Count == 0 ? null : string.Join("・", labels);
-            var parsed = FlyerAllergenPlanner.ParseLabel(labelText, allergens);
-            var codes = parsed.Allergens.Select(a => allergens.First(x => x.Id == a.Id).Code).ToList();
-            var pieces = item.GetProperty("piecesPerPackCandidates").EnumerateArray().Select(e => e.GetInt32()).ToList();
-            items.Add(new FlyerReadProduct(
-                item.GetProperty("name").GetString()!,
-                item.GetProperty("maker").GetString(),
-                item.GetProperty("volume").GetString(),
-                item.GetProperty("priceExcludingTax").GetInt32(),
-                item.GetProperty("priceIncludingTax").GetInt32(),
-                item.GetProperty("code").GetString(),
-                item.GetProperty("ageLabel").GetString(),
-                labelText,
-                labels.Count == 0,
-                codes,
-                parsed.UnmappedTerms,
-                item.GetProperty("description").GetString(),
-                item.TryGetProperty("bulk", out var bulk) && bulk.ValueKind == JsonValueKind.String ? bulk.GetString() : null,
-                pieces.Count == 0 ? null : pieces[0],
-                pieces.Count == 0 ? "内容量から入数が分かりません" : "内容量の表記から求めました",
-                SnackTypeFrom(item.GetProperty("snackCategory").GetString()),
-                [],
-                []));
+            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
+            var codes = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var image in document.RootElement.GetProperty("images").EnumerateObject())
+            {
+                var file = Path.Combine(Path.GetDirectoryName(path)!, image.Name);
+                if (!image.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(file)
+                    && sentHashes.Contains(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(file, cancellationToken)))))
+                {
+                    codes.UnionWith(image.Value.EnumerateArray().Select(c => c.GetString()!));
+                }
+            }
+
+            items.AddRange(document.RootElement.GetProperty("items").EnumerateArray()
+                .Where(i => codes.Contains(i.GetProperty("code").GetString()!))
+                .Select(i => ToProduct(i, allergens)));
+        }
+
+        if (items.Count == 0)
+        {
+            using var fallback = JsonDocument.Parse(await File.ReadAllTextAsync(fallbackPath, cancellationToken));
+            items.AddRange(fallback.RootElement.GetProperty("items").EnumerateArray().Select(i => ToProduct(i, allergens)));
         }
 
         return Result<FlyerReading>.Ok(new FlyerReading(items));
     }
+
+    /// <summary>
+    /// 正解データの1商品を、読み取った商品にする。アレルゲンの表記はチラシに書いてあるとおりの略記（allergenLabelText。「乳・麦」など）のまま渡し、
+    /// 品目（allergenCodes）は Claude が正しく対応づけた場合と同じく、品目名（allergenLabel）から求める。
+    /// アプリがもう一度表記を対応づけるとき（ParseLabel）に、略記を品目に当てられること（「麦」が「品目不明」にならないこと。D-96）を E2E で確かめるため
+    /// </summary>
+    private static FlyerReadProduct ToProduct(JsonElement item, IReadOnlyList<Allergen> allergens)
+    {
+        var labels = item.GetProperty("allergenLabel").EnumerateArray().Select(e => e.GetString()!).ToList();
+        var labelText = item.TryGetProperty("allergenLabelText", out var rawLabel) && rawLabel.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(rawLabel.GetString())
+            ? rawLabel.GetString()
+            : labels.Count == 0 ? null : string.Join("・", labels);
+        var parsed = FlyerAllergenPlanner.ParseLabel(labels.Count == 0 ? null : string.Join("・", labels), allergens);
+        var codes = parsed.Allergens.Select(a => allergens.First(x => x.Id == a.Id).Code).ToList();
+        var pieces = item.GetProperty("piecesPerPackCandidates").EnumerateArray().Select(e => e.GetInt32()).ToList();
+        var isNonFood = item.TryGetProperty("nonFood", out var nonFood) && nonFood.ValueKind == JsonValueKind.True;
+        return new FlyerReadProduct(
+            StringOrNull(item, "name") ?? string.Empty,
+            StringOrNull(item, "maker"),
+            StringOrNull(item, "volume"),
+            IntOrNull(item, "priceExcludingTax"),
+            IntOrNull(item, "priceIncludingTax"),
+            StringOrNull(item, "code"),
+            StringOrNull(item, "ageLabel"),
+            labelText,
+            labels.Count == 0,
+            codes,
+            parsed.UnmappedTerms,
+            StringOrNull(item, "description"),
+            item.TryGetProperty("bulk", out var bulk) && bulk.ValueKind == JsonValueKind.String ? bulk.GetString() : null,
+            pieces.Count == 0 ? null : pieces[0],
+            pieces.Count == 0 ? "内容量から入数が分かりません" : "内容量の表記から求めました",
+            SnackTypeFrom(StringOrNull(item, "snackCategory")),
+            [],
+            [],
+            isNonFood,
+            isNonFood ? StringOrNull(item, "nonFoodReason") ?? "食品以外の掲載品のため" : null);
+    }
+
+    /// <summary>正解データの文字の項目（ない・null・空なら null。読めなかった項目を表すため）</summary>
+    private static string? StringOrNull(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()) ? value.GetString() : null;
+
+    /// <summary>正解データの数の項目（ない・null なら null。読めなかった項目を表すため）</summary>
+    private static int? IntOrNull(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetInt32() : null;
 
     private static SnackType? SnackTypeFrom(string? label) => label switch
     {
@@ -106,23 +156,6 @@ public sealed class FakeFlyerReviewer : IFlyerReviewer
             ? []
             : new List<FlyerReviewNote> { new(0, "入数", "個包装の数は説明文にしか書かれていません。入数を確かめてください") };
         return Task.FromResult(Result<FlyerReview>.Ok(new FlyerReview(notes, [], [])));
-    }
-}
-
-/// <summary>E2E 用の偽の照合の判定（よく似ていれば味違い、そうでなければ別の商品）</summary>
-public sealed class FakeProductMatchJudge : IProductMatchJudge
-{
-    public Task<Result<ProductMatchJudgement>> JudgeAsync(ProductMatchInput item, IReadOnlyList<Product> candidates, CancellationToken cancellationToken)
-    {
-        var name = TextNormalizer.ForProductMatch(item.Name);
-        var best = candidates
-            .Select(c => (Product: c, Score: ProductMatcher.DiceCoefficient(name, TextNormalizer.ForProductMatch(c.Name))))
-            .OrderByDescending(c => c.Score)
-            .FirstOrDefault();
-        var judgement = best.Product is not null && best.Score >= 0.5
-            ? new ProductMatchJudgement(ProductMatchVerdict.FlavorVariant, best.Product.Id, "商品名の大部分が同じで、味の部分だけが違います")
-            : new ProductMatchJudgement(ProductMatchVerdict.Different, null, "商品名が違うため、別の商品と考えられます");
-        return Task.FromResult(Result<ProductMatchJudgement>.Ok(judgement));
     }
 }
 

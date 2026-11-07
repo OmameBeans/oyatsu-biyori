@@ -1,5 +1,6 @@
 ﻿using OyatsuBiyori.Biz;
 using OyatsuBiyori.Biz.Entities;
+using OyatsuBiyori.Biz.MasterData;
 using static OyatsuBiyori.Biz.Tests.TestData;
 
 namespace OyatsuBiyori.Biz.Tests;
@@ -43,6 +44,148 @@ public class FlyerAllergenPlannerTests
 
         Assert.Equal(Ids(expected).ToHashSet(), result.Allergens.Select(a => a.Id).ToHashSet());
         Assert.Empty(result.UnmappedTerms);
+    }
+
+    [Theory]
+    [InlineData("麦", new[] { "wheat" })]
+    [InlineData("え", new[] { "shrimp" })]
+    [InlineData("か", new[] { "crab" })]
+    [InlineData("落", new[] { "peanut" })]
+    [InlineData("そ", new[] { "buckwheat" })]
+    [InlineData("く", new[] { "walnut" })]
+    [InlineData("カ", new[] { "cashew" })]
+    [InlineData("ｶ", new[] { "cashew" })]
+    [InlineData("乳・カ", new[] { "milk", "cashew" })]
+    [InlineData("か・カ", new[] { "crab", "cashew" })]
+    [InlineData("乳・麦", new[] { "wheat", "milk" })]
+    [InlineData("（麦・え）", new[] { "shrimp", "wheat" })]
+    [InlineData("卵・乳・麦", new[] { "wheat", "egg", "milk" })]
+    [InlineData("一部に麦を含む", new[] { "wheat" })]
+    [InlineData("乳・麦・小麦", new[] { "wheat", "milk" })]
+    public void D_96_チラシの略記をマスタの品目に当てる(string labelText, string[] expected)
+    {
+        var result = Parse(labelText);
+
+        Assert.Equal(Ids(expected).ToHashSet(), result.Allergens.Select(a => a.Id).ToHashSet());
+        Assert.Empty(result.UnmappedTerms);
+    }
+
+    [Theory]
+    [InlineData("くっきー")]
+    [InlineData("えびせん")]
+    [InlineData("かぼちゃ")]
+    [InlineData("そら豆")]
+    [InlineData("麦芽")]
+    [InlineData("落雁")]
+    [InlineData("カカオ")]
+    public void D_96_略記は語全体が一致したときだけ当て_部分一致では当てない(string term)
+    {
+        var (allergens, isFullyMapped) = FlyerAllergenPlanner.MatchAbbreviations(term, AllAllergens);
+
+        Assert.Empty(allergens);
+        Assert.False(isFullyMapped);
+    }
+
+    [Theory]
+    [InlineData("エ")]
+    [InlineData("ソ")]
+    [InlineData("ク")]
+    [InlineData("ｴ")]
+    public void D_100_エ_ソ_クのカタカナは_ひらがなの略記に当てず品目不明として残す(string labelText)
+    {
+        // マスタの略記はひらがなで書かれているので、カタカナでは当てない（FR-IMPORT-32。職員に選んでもらう。確認する側）
+        var result = Parse(labelText);
+        var (allergens, isFullyMapped) = FlyerAllergenPlanner.MatchAbbreviations(labelText, AllAllergens);
+
+        Assert.Empty(result.Allergens);
+        Assert.Equal([labelText], result.UnmappedTerms);
+        Assert.Empty(allergens);
+        Assert.False(isFullyMapped);
+    }
+
+    [Theory]
+    [InlineData("か", "crab", "cashew")]
+    [InlineData("カ", "cashew", "crab")]
+    [InlineData("ｶ", "cashew", "crab")]
+    public void D_100_ひらがなのかはかに_カタカナのカと半角のｶはカシューナッツにだけ当たる(string term, string expected, string notExpected)
+    {
+        var parsed = Parse(term);
+        var (allergens, isFullyMapped) = FlyerAllergenPlanner.MatchAbbreviations(term, AllAllergens);
+
+        Assert.Equal([Allergen(expected).Id], parsed.Allergens.Select(a => a.Id));
+        Assert.DoesNotContain(parsed.Allergens, a => a.Id == Allergen(notExpected).Id);
+        Assert.Equal([Allergen(expected).Id], allergens.Select(a => a.Id));
+        Assert.True(isFullyMapped);
+    }
+
+    [Theory]
+    [InlineData("エ")]
+    [InlineData("ソ")]
+    [InlineData("ク")]
+    public void D_100_Claude_の未対応の語でも_エ_ソ_クのカタカナは略記に当てない(string term)
+    {
+        var (allergens, isFullyMapped) = FlyerAllergenPlanner.MatchAbbreviations(term, AllAllergens);
+
+        Assert.Empty(allergens);
+        Assert.False(isFullyMapped);
+    }
+
+    [Fact]
+    public void D_100_略記で当たった語と品目を返す()
+    {
+        var parsed = Parse("乳・麦・カ");
+        var matched = FlyerAllergenPlanner.MatchAbbreviations("麦・カ", AllAllergens);
+
+        Assert.Equal(
+            [("カ", Allergen("cashew").Id), ("麦", Allergen("wheat").Id)],
+            parsed.AbbreviationHits.Select(h => (h.Term, h.Allergen.Id)).OrderBy(h => h.Item1, StringComparer.Ordinal));
+        Assert.Equal(
+            [("カ", Allergen("cashew").Id), ("麦", Allergen("wheat").Id)],
+            matched.Hits.Select(h => (h.Term, h.Allergen.Id)).OrderBy(h => h.Item1, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void D_96_Claude_の未対応の語の_なし_は当たらない部分として残す()
+    {
+        var (allergens, isFullyMapped) = FlyerAllergenPlanner.MatchAbbreviations("麦・なし", AllAllergens);
+
+        Assert.Equal([Allergen("wheat").Id], allergens.Select(a => a.Id));
+        Assert.False(isFullyMapped);
+    }
+
+    [Fact]
+    public void D_96_略記に当たらない語は_これまでどおり対応づけできない語として残す()
+    {
+        var walnut = Parse("くっきー");
+        var shrimp = Parse("えびせん");
+
+        Assert.Empty(walnut.Allergens);
+        Assert.Equal(["くっきー"], walnut.UnmappedTerms);
+        // 「えびせん」は品目名「えび」を含むので、品目名の照合（これまでどおり）でえびに当たる
+        Assert.Equal([Allergen("shrimp").Id], shrimp.Allergens.Select(a => a.Id));
+    }
+
+    [Fact]
+    public void D_96_略記は探す言葉に入れない()
+    {
+        // 探す言葉の正規化（かなをそろえる）でも比べる（「カ」→「か」が探す言葉に入っていないことも確かめる）
+        var abbreviations = MasterSeed.LabelAbbreviations().Select(a => TextNormalizer.ForKeywordSearch(a.Abbreviation)).ToHashSet();
+
+        Assert.DoesNotContain(MasterSeed.Keywords(), k => abbreviations.Contains(k.NormalizedKeyword));
+        // 原材料の全文の「くるみ」以外の「く」（「くず粉」など）で、くるみが当たらない
+        Assert.Empty(AllergenKeywordFinder.Find("くず粉、えんどう豆、そら豆", [Allergen("walnut"), Allergen("shrimp"), Allergen("buckwheat")]));
+    }
+
+    [Fact]
+    public void D_96_Claude_の未対応の語は_すべての部分が略記に当たったときだけ外してよい()
+    {
+        var full = FlyerAllergenPlanner.MatchAbbreviations("麦・え", AllAllergens);
+        var partial = FlyerAllergenPlanner.MatchAbbreviations("麦・たまご", AllAllergens);
+
+        Assert.True(full.IsFullyMapped);
+        Assert.Equal(Ids("shrimp", "wheat").ToHashSet(), full.Allergens.Select(a => a.Id).ToHashSet());
+        Assert.False(partial.IsFullyMapped);
+        Assert.Equal([Allergen("wheat").Id], partial.Allergens.Select(a => a.Id));
     }
 
     [Fact]
@@ -158,7 +301,7 @@ public class FlyerAllergenPlannerTests
         var plan = Plan("乳・小麦", null, ["milk"], [.. product.AllergenChecks]);
 
         Assert.Equal(FlyerReferenceDecision.AddForDiscrepancy, plan.Decision);
-        Assert.True(plan.ShouldAddReference(staffTreatsAsFlyerError: true));
+        Assert.True(plan.ShouldAddReference());
         var discrepancy = Assert.Single(plan.Discrepancies);
         Assert.Equal(Allergen("milk").Id, discrepancy.Allergen.Id);
         Assert.True(discrepancy.IsAvoided);
@@ -183,14 +326,17 @@ public class FlyerAllergenPlannerTests
     }
 
     [Fact]
-    public void 避ける品目でない食い違いだけなら職員が選び既定は追加する()
+    public void D_100_避ける品目でない食い違いだけでも_職員に選ばせず必ず追加し_判定は要確認になる()
     {
-        var plan = Plan("乳・小麦", null, ["egg"], ConfirmedAll(Today.AddDays(-10), ["wheat"]));
+        var product = Product("のりしおポテト", ConfirmedAll(Today.AddDays(-10), ["wheat"]));
 
-        Assert.Equal(FlyerReferenceDecision.StaffChoice, plan.Decision);
+        var plan = Plan("乳・小麦", null, ["egg"], [.. product.AllergenChecks]);
+
+        Assert.Equal(FlyerReferenceDecision.AddForDiscrepancy, plan.Decision);
         Assert.False(Assert.Single(plan.Discrepancies).IsAvoided);
         Assert.True(plan.ShouldAddReference());
-        Assert.False(plan.ShouldAddReference(staffTreatsAsFlyerError: true));
+        ApplyTo(product, plan);
+        Assert.Equal(AllergenJudgementCategory.Warning, AllergenJudge.Judge(product, Avoid("egg"), Today, RecheckDays).Category);
     }
 
     [Fact]
@@ -291,7 +437,7 @@ public class FlyerAllergenPlannerTests
         var check = ApplyTo(product, plan);
 
         Assert.Equal(FlyerReferenceDecision.AddForDiscrepancy, plan.Decision);
-        Assert.True(plan.ShouldAddReference(staffTreatsAsFlyerError: true));
+        Assert.True(plan.ShouldAddReference());
         Assert.Equal(Ids("wheat", "milk").ToHashSet(), check.Items.Select(i => i.AllergenId).ToHashSet());
     }
 

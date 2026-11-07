@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ひだまり生協 12月 第1回（架空のチラシ）</title>
+<style>
+  @page { size: 1504px 626px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #fff;
+    color: #222;
+    font-family: "BIZ UDPGothic", "Yu Gothic", "Meiryo", sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .sheet { width: 1504px; height: 626px; padding: 12px; background: #fff; }
+  .head { height: 56px; display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #e2d8cf; }
+  .head .section { background: #8a7b70; color: #fff; font-size: 20px; font-weight: 700; padding: 8px 28px 8px 16px; border-radius: 0 22px 22px 0; }
+  .head .sub { font-size: 14px; color: #6b5e55; }
+  .head .publisher { margin-left: auto; text-align: right; font-size: 12px; color: #6b5e55; line-height: 1.4; }
+  .head .publisher b { font-size: 15px; color: #a04a2c; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 262px; }
+  .foot { height: 22px; font-size: 10.5px; color: #777; padding-top: 5px; text-align: right; }
+
+  /* 1商品（生協のお菓子のページの書き方に寄せた形） */
+  .p-cell { position: relative; padding: 4px 6px 4px 6px; border-right: 1px solid #bdb5ae; border-bottom: 1px solid #bdb5ae; overflow: hidden; }
+  .p-cell:nth-child(4n) { border-right: none; }
+  .p-photo { position: relative; height: 112px; background: linear-gradient(160deg, #f4efe8, #e3dbd1); border-radius: 2px; overflow: hidden; }
+  .p-plate { position: absolute; left: 14px; top: 14px; width: 210px; height: 92px; border-radius: 50%; background: radial-gradient(ellipse at 50% 45%, #fff 0, #fff 55%, #ddd5cc 70%, #4a4440 72%, #2f2a27 100%); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .p-plate span { font-size: 34px; font-family: "Segoe UI Emoji", sans-serif; line-height: 1; }
+  .p-plate span:nth-child(2) { transform: rotate(18deg) translateY(6px); }
+  .p-plate span:nth-child(3) { transform: rotate(-24deg); }
+  .p-pkg { position: absolute; right: 10px; top: 16px; width: 92px; height: 92px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 -10px 0 rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.3); }
+  .p-pkg .icon { font-size: 34px; line-height: 1; font-family: "Segoe UI Emoji", sans-serif; }
+  .p-pkg .label { font-size: 10px; font-weight: 800; color: #fff; text-align: center; margin-top: 4px; padding: 0 4px; text-shadow: 0 1px 1px rgba(0,0,0,0.5); line-height: 1.2; }
+  .p-banner { position: absolute; left: 0; top: 0; background: #fff; border: 1.5px solid #2f6db5; color: #2f6db5; font-size: 11px; font-weight: 700; padding: 1px 8px; }
+  .p-banner.red { background: #d8343b; border-color: #d8343b; color: #fff; }
+  .p-origin { position: absolute; right: 2px; top: 1px; background: #fff; border: 1px solid #999; font-size: 9px; padding: 0 3px; color: #333; white-space: nowrap; line-height: 1.25; }
+  .p-maker { font-size: 10px; margin-top: 2px; color: #333; }
+  .p-name { font-size: 16px; font-weight: 700; line-height: 1.15; white-space: nowrap; letter-spacing: -0.3px; }
+  .p-coop { display: inline-block; border: 1px solid #555; color: #333; font-size: 10px; font-weight: 700; padding: 0 3px; margin-right: 4px; vertical-align: 2px; line-height: 1.2; }
+  .p-volume { font-size: 12px; }
+  .p-bottom { display: grid; grid-template-columns: 112px 110px 1fr; column-gap: 4px; margin-top: 1px; }
+  .p-code { background: #3c3c3c; color: #fff; font-size: 26px; font-weight: 700; line-height: 1.1; padding: 1px 10px; letter-spacing: 1px; }
+  .p-dates { display: flex; margin-top: 2px; border: 1px solid #666; font-size: 9px; line-height: 1.2; }
+  .p-chilled { background: #3c3c3c; color: #fff; writing-mode: vertical-rl; font-size: 9px; font-weight: 700; padding: 2px 1px; }
+  .p-next { padding: 1px 3px; flex: 1; border-right: 1px solid #666; }
+  .p-shelf { padding: 1px 3px; display: flex; align-items: center; }
+  .p-shelf span { border: 1px solid #333; border-radius: 50%; font-size: 8px; padding: 0 1px; margin-right: 1px; }
+  .p-price { display: flex; flex-wrap: wrap; align-items: flex-end; padding: 1px 2px; }
+  .p-price .honntai { font-size: 10px; writing-mode: vertical-rl; line-height: 1; margin-bottom: 3px; }
+  .p-price .num { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+  .p-price .yen { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+  .p-price .tax { width: 100%; font-size: 10.5px; padding-left: 10px; }
+  .p-price.special { background: #d8343b; color: #fff; border-radius: 2px; }
+  .p-unit { font-size: 10px; margin-top: 2px; }
+  .p-desc { font-size: 9.5px; line-height: 1.38; color: #222; }
+  .p-notice { color: #2f6db5; font-weight: 700; }
+  .p-label { white-space: nowrap; }
+  .p-badge { position: absolute; right: 4px; top: 44px; z-index: 1; background: #f5d33b; color: #7a4b00; font-size: 10px; font-weight: 800; text-align: center; line-height: 1.15; padding: 3px 5px; border-radius: 4px 4px 10px 10px; transform: rotate(8deg); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .p-weekly { font-size: 13px; display: block; padding-top: 2px; }
+  .p-cell.above .p-desc { margin: 1px 0 2px; min-height: 28px; }
+  .p-cell.above .p-bottom { grid-template-columns: 150px 1fr; }
+  .p-cell.above .p-mid { text-align: right; }
+  .p-cell.above .p-price { justify-content: flex-end; }
+
+</style>
+</head>
+<body class="">
+<div class="sheet">
+  <div class="head">
+    <div class="section">冷蔵デザート</div>
+    <div class="sub">ゼリー・プリン・ムース</div>
+    <div class="publisher"><b>ひだまり生協</b>　12月 第1回<br>サンプル（架空のチラシ）</div>
+  </div>
+  <div class="grid">
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🥛</span><span>🥛</span><span>🥛</span></div><div class="p-pkg" style="background:#2c6fb5"><div class="icon">🥛</div><div class="label">ミルクムース</div></div><div class="p-origin">製造岐阜。</div></div><div class="p-maker">みるく堂</div><div class="p-name"><span class="p-coop">CO・OP</span>ふんわり ミルクムース</div><div class="p-volume">65g×4</div><div class="p-desc"><span class="p-notice">※洋酒使用。</span>ミルクをたっぷり使って、ふんわり泡立てたムース。1個（65g）92㎉、塩0.07g。<span class="p-label">［乳］</span></div><div class="p-bottom"><div class="p-left"><div class="p-code">8133</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next">次回予定<br>12月1回</div><div class="p-shelf"><span>賞</span>21日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">348</span><span class="yen">円</span><div class="tax">(税込375円)</div></div><div class="p-unit">1個/本体87円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🍮</span><span>🍮</span><span>🍮</span></div><div class="p-pkg" style="background:#e8b34a"><div class="icon">🍮</div><div class="label">たまごプリン</div></div><div class="p-banner ">冷蔵デザート部門 1位</div><div class="p-origin">製造岩手。</div><div class="p-badge">人気<br>ベスト1</div></div><div class="p-maker">あおば酪農</div><div class="p-name">とろける たまごプリン</div><div class="p-volume">75g×3</div><div class="p-desc">やさしい甘さの、ぷるんとかためのプリン。1個78㎉、塩0.08g。<span class="p-label">［卵・乳］</span></div><div class="p-bottom"><div class="p-left"><div class="p-code">433</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next"><b class="p-weekly">毎週</b></div><div class="p-shelf"><span>賞</span>14日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">158</span><span class="yen">円</span><div class="tax">(税込170円)</div></div><div class="p-unit">1個/本体53円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🍊</span><span>🍊</span><span>🍊</span></div><div class="p-pkg" style="background:#f39c12"><div class="icon">🍊</div><div class="label">みかん寒天</div></div><div class="p-origin">製造愛媛。</div></div><div class="p-maker">みかんの里食品</div><div class="p-name">ごろっと みかん寒天</div><div class="p-volume">4個入</div><div class="p-desc">みかんの果肉を、寒天でさっぱりと固めました。1個（90g）61㎉。</div><div class="p-bottom"><div class="p-left"><div class="p-code">8132</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next">次回予定<br>12月2回</div><div class="p-shelf"><span>賞</span>30日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">298</span><span class="yen">円</span><div class="tax">(税込321円)</div></div><div class="p-unit">1個/本体75円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🐰</span><span>🐰</span><span>🐰</span></div><div class="p-pkg" style="background:#7d5ba6"><div class="icon">🐰</div><div class="label">ぶどうゼリー</div></div><div class="p-origin">製造長野。</div></div><div class="p-maker">うさぎ乳業</div><div class="p-name">うさぎのミミ ぶどうゼリー</div><div class="p-volume">6個入</div><div class="p-desc">ぶどうの粒を感じる、甘ずっぱいゼリー。果汁30%。1個（70g）54㎉。</div><div class="p-bottom"><div class="p-left"><div class="p-code">432</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next"><b class="p-weekly">毎週</b></div><div class="p-shelf"><span>賞</span>40日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">258</span><span class="yen">円</span><div class="tax">(税込278円)</div></div><div class="p-unit">1個/本体43円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🍮</span><span>🍮</span><span>🍮</span></div><div class="p-pkg" style="background:#a8662f"><div class="icon">🍮</div><div class="label">焼きプリン</div></div><div class="p-origin">製造岩手。</div></div><div class="p-maker">あおば酪農</div><div class="p-name">こんがり 焼きプリン</div><div class="p-volume">80g×4</div><div class="p-desc">表面をこんがり焼いた、香ばしいプリン。1個（80g）98㎉、塩0.1g。<span class="p-label">［卵・乳］</span></div><div class="p-bottom"><div class="p-left"><div class="p-code">434</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next">次回予定<br>12月2回</div><div class="p-shelf"><span>賞</span>12日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">298</span><span class="yen">円</span><div class="tax">(税込321円)</div></div><div class="p-unit">1個/本体75円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🫐</span><span>🫐</span><span>🫐</span></div><div class="p-pkg" style="background:#8e2c48"><div class="icon">🫐</div><div class="label">レアチーズ</div></div><div class="p-origin">製造岐阜。</div></div><div class="p-maker">みるく堂</div><div class="p-name">ベリーのレアチーズカップ</div><div class="p-volume">70g×3個</div><div class="p-desc">クリームチーズのムースに、ベリーソースを重ねました。1個（70g）131㎉、塩0.11g。ゲル化剤（増粘多糖類）使用。<span class="p-label">［乳・麦］</span></div><div class="p-bottom"><div class="p-left"><div class="p-code">8134</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next">次回予定<br>12月2回</div><div class="p-shelf"><span>賞</span>30日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">378</span><span class="yen">円</span><div class="tax">(税込408円)</div></div><div class="p-unit">1個/本体126円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🐰</span><span>🐰</span><span>🐰</span></div><div class="p-pkg" style="background:#ef7f9a"><div class="icon">🐰</div><div class="label">いちごゼリー</div></div><div class="p-origin">製造長野。</div></div><div class="p-maker">うさぎ乳業</div><div class="p-name">うさぎのミミ いちごゼリー</div><div class="p-volume">6個入</div><div class="p-desc">いちごの果肉が入った、つるんとしたゼリー。果汁10%。1個（70g）49㎉。</div><div class="p-bottom"><div class="p-left"><div class="p-code">431</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next"><b class="p-weekly">毎週</b></div><div class="p-shelf"><span>賞</span>40日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">258</span><span class="yen">円</span><div class="tax">(税込278円)</div></div><div class="p-unit">1個/本体43円</div></div></div></div>
+    <div class="p-cell above"><div class="p-photo"><div class="p-plate"><span>🐻‍❄️</span><span>🐻‍❄️</span><span>🐻‍❄️</span></div><div class="p-pkg" style="background:#7fb3d5"><div class="icon">🐻‍❄️</div><div class="label">ヨーグルトゼリー</div></div><div class="p-origin">製造北海道。</div></div><div class="p-maker">うさぎ乳業</div><div class="p-name">しろくまの ヨーグルトゼリー</div><div class="p-volume">6個入</div><div class="p-desc">ヨーグルトの酸味をいかした、さっぱりしたゼリー。1個（65g）58㎉、塩0.05g。<span class="p-label">［乳］</span></div><div class="p-bottom"><div class="p-left"><div class="p-code">8131</div><div class="p-dates"><div class="p-chilled">冷蔵</div><div class="p-next">次回予定<br>12月3回</div><div class="p-shelf"><span>賞</span>18日</div></div></div><div class="p-mid"><div class="p-price"><span class="honntai">本体</span><span class="num">298</span><span class="yen">円</span><div class="tax">(税込321円)</div></div><div class="p-unit">1個/本体50円</div></div></div></div>
+  </div>
+  <div class="foot">※このチラシは開発用の架空のサンプルです。実在の商品・企業・団体とは関係ありません。価格は本体価格（税込価格）です。</div>
+</div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import DeleteSweepOutlinedIcon from '@mui/icons-material/DeleteSweepOutlined';
@@ -63,6 +63,8 @@ interface ChatPanelProps {
     isCollapsed?: boolean;
     /** 開閉を切り替える（渡さなければ、開閉のボタンを出さない。スマホはタブで切り替えるため） */
     onToggleCollapsed?: () => void;
+    /** 見出しの「チャットを消す」の左に置くボタン（週の要望を開くボタンなど）。閉じた帯にも出す */
+    headerActions?: ReactNode;
 }
 
 /**
@@ -70,7 +72,7 @@ interface ChatPanelProps {
  * 「予算に合わせて」の依頼なら、入れ替え案を出す（U-12）。失敗しても入力した依頼は消さない。
  * 質問には、献立を変えずに文章で答える。返答は届いた順に流し、安全な範囲の Markdown で出す（D-91）。
  */
-export const ChatPanel = ({ menu, onBudgetFitRequested, onUnsavedInputChange, isCollapsed = false, onToggleCollapsed }: ChatPanelProps) => {
+export const ChatPanel = ({ menu, onBudgetFitRequested, onUnsavedInputChange, isCollapsed = false, onToggleCollapsed, headerActions }: ChatPanelProps) => {
     const chat = useChat(menu.id);
     const clearChat = useClearChat(menu.id);
     const [isClearOpen, setIsClearOpen] = useState(false);
@@ -163,6 +165,7 @@ export const ChatPanel = ({ menu, onBudgetFitRequested, onUnsavedInputChange, is
                     AIチャット
                 </Typography>
                 {isRunning && <CircularProgress size={18} aria-label="AI が考えています" />}
+                {headerActions}
             </Paper>
         );
     }
@@ -174,6 +177,7 @@ export const ChatPanel = ({ menu, onBudgetFitRequested, onUnsavedInputChange, is
                 <Typography variant="h3" component="h2" sx={{ flex: 1 }}>
                     AIチャット
                 </Typography>
+                {headerActions}
                 <Tooltip title="チャットを消す">
                     {/* 押せないときもツールチップを出すため span で包む */}
                     <span>

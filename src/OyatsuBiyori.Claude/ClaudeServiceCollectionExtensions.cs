@@ -25,12 +25,13 @@ public static class ClaudeServiceCollectionExtensions
             {
                 ApiKey = apiKey,
                 MaxRetries = 0,
+                // 1回ごとのタイムアウトはアプリ（ClaudeRequestRunner）で用途ごとにかける。SDK 側で先に切られないよう、それより長くしておく
+                Timeout = TimeSpan.FromMinutes(10),
             };
         });
         services.AddScoped<ClaudeRequestRunner>();
         services.AddScoped<IFlyerReader, FlyerReader>();
         services.AddScoped<IFlyerReviewer, FlyerReviewer>();
-        services.AddScoped<IProductMatchJudge, ProductMatchJudge>();
 
         // 献立づくりのエージェントは、設定で Messages API 版と Managed Agents 版を切り替える（D-94）
         services.AddScoped<MenuPlannerAgent>();

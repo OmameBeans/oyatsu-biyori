@@ -22,6 +22,7 @@ public sealed class SettingRepository(OyatsuBiyoriDbContext context) : ISettingR
     {
         return await _context.Allergens
             .Include(a => a.Keywords)
+            .Include(a => a.LabelAbbreviations)
             .OrderBy(a => a.SortOrder)
             .ToListAsync();
     }
@@ -30,6 +31,7 @@ public sealed class SettingRepository(OyatsuBiyoriDbContext context) : ISettingR
     {
         return await _context.Allergens
             .Include(a => a.Keywords)
+            .Include(a => a.LabelAbbreviations)
             .FirstOrDefaultAsync(a => a.Id == allergenId);
     }
 

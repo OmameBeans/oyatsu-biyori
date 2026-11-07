@@ -4,7 +4,7 @@ using OyatsuBiyori.Biz.Entities;
 namespace OyatsuBiyori.Biz.MasterData;
 
 /// <summary>
-/// マスタの初期データ（29品目・施設の追加品目・探す言葉・グループ・施設の条件）。
+/// マスタの初期データ（29品目・施設の追加品目・探す言葉・チラシの表記の略記・グループ・施設の条件）。
 /// 品目は 2026年4月の改正後の29品目（03 §2.1）。制度が変わったら、ここ（とマイグレーション）でマスタを直し、判定のコードは変えない。
 /// </summary>
 public static class MasterSeed
@@ -53,6 +53,23 @@ public static class MasterSeed
         ("pine_nut", "松の実", AllergenCategory.FacilityAdded, false, ["松の実", "松のみ", "パインナッツ"]),
     ];
 
+    /// <summary>
+    /// チラシのアレルゲン表記の略記（code, 略記）。コープのチラシは「乳・麦」「（麦・え）」のように略して書く（D-96、03 §2.5、09 の 4）。
+    /// 探す言葉には入れない（1文字なので、全文検索・商品名の検索で部分一致させると当たりすぎる）。表記の語全体が一致したときだけ当てる
+    /// </summary>
+    private static readonly (string Code, string Abbreviation)[] LabelAbbreviationDefinitions =
+    [
+        ("wheat", "麦"),
+        ("shrimp", "え"),
+        ("crab", "か"),
+        ("peanut", "落"),
+        ("buckwheat", "そ"),
+        ("walnut", "く"),
+        // 「カ」（カタカナ）はカシューナッツ。ひらがなの「か」（かに）とは字で分ける（D-100、FR-IMPORT-30・32）。
+        // 出典：「カ」はユーザー（2026-11-07）から。ほかの6つはダミーのチラシの凡例から（実物の凡例は試用で確かめる）
+        ("cashew", "カ"),
+    ];
+
     /// <summary>グループの定義（03 §2.3）</summary>
     private static readonly (string Key, string Name, string[] Members)[] GroupDefinitions =
     [
@@ -88,6 +105,16 @@ public static class MasterSeed
         IsSeed = true,
         UpdateDateTime = SeedIds.SeededAt,
     }));
+
+    /// <summary>チラシのアレルゲン表記の略記（正規化は表記の対応づけと同じ関数で作る。カタカナをひらがなにしない。FR-IMPORT-32）</summary>
+    public static IEnumerable<AllergenLabelAbbreviation> LabelAbbreviations() => LabelAbbreviationDefinitions.Select(d => new AllergenLabelAbbreviation
+    {
+        Id = SeedIds.For("label-abbreviation:" + d.Code + ":" + d.Abbreviation),
+        AllergenId = AllergenId(d.Code),
+        Abbreviation = d.Abbreviation,
+        NormalizedAbbreviation = TextNormalizer.ForLabelAbbreviation(d.Abbreviation),
+        UpdateDateTime = SeedIds.SeededAt,
+    });
 
     /// <summary>グループ</summary>
     public static IEnumerable<AllergenGroup> Groups() => GroupDefinitions.Select((g, i) => new AllergenGroup

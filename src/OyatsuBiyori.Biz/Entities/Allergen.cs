@@ -24,4 +24,7 @@ public sealed class Allergen : EntityBase
 
     /// <summary>原材料名で探す言葉</summary>
     public List<AllergenKeyword> Keywords { get; set; } = [];
+
+    /// <summary>チラシのアレルゲン表記の略記（「麦」など。チラシの表記の対応づけだけに使う。D-96）</summary>
+    public List<AllergenLabelAbbreviation> LabelAbbreviations { get; set; } = [];
 }

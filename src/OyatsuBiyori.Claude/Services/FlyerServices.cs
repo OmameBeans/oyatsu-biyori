@@ -56,13 +56,28 @@ public sealed class FlyerReader(ClaudeRequestRunner runner) : IFlyerReader
             return result;
         }
 
-        // 味・種類のタグは決まった語だけを残す（D-61）
+        // 味・種類のタグは決まった語だけを残す（D-61）。商品名が読めなかった商品も黙って消さず、再入力にするため残す（09 の 3.1）。
+        // 何も読めていない行（商品名・メーカー・価格・注文番号・内容量がどれもない）だけは、商品ではないものとして除く。
+        // 食品以外の印は、理由がなければ「理由の記載なし」を入れる（外した掲載品に理由を必ず出す。FR-IMPORT-20）
         var items = result.Value!.Items
-            .Where(i => !string.IsNullOrWhiteSpace(i.Name))
-            .Select(i => i with { FlavorTags = i.FlavorTags.Where(ProductTagVocabulary.IsFlavor).Distinct().ToList() })
+            .Where(HasAnyContent)
+            .Select(i => i with
+            {
+                Name = i.Name?.Trim() ?? string.Empty,
+                FlavorTags = i.FlavorTags.Where(ProductTagVocabulary.IsFlavor).Distinct().ToList(),
+                NonFoodReason = i.IsNonFood ? (string.IsNullOrWhiteSpace(i.NonFoodReason) ? "理由の記載なし" : i.NonFoodReason.Trim()) : null,
+            })
             .ToList();
         return Result<FlyerReading>.Ok(new FlyerReading(items));
     }
+
+    private static bool HasAnyContent(FlyerReadProduct item) =>
+        !string.IsNullOrWhiteSpace(item.Name)
+        || !string.IsNullOrWhiteSpace(item.Maker)
+        || !string.IsNullOrWhiteSpace(item.Volume)
+        || !string.IsNullOrWhiteSpace(item.OrderNo)
+        || item.PriceIncludingTax is not null
+        || item.PriceExcludingTax is not null;
 }
 
 /// <summary>
@@ -78,63 +93,21 @@ public sealed class FlyerReviewer(ClaudeRequestRunner runner) : IFlyerReviewer
         {
             index,
             item.Name,
+            item.Maker,
             item.Volume,
             item.PriceExcludingTax,
             item.PriceIncludingTax,
             item.OrderNo,
             item.AllergenLabelText,
             item.AllergenLabelAbsent,
+            item.PiecesPerPackCandidate,
+            item.IsNonFood,
         });
         var text = "次は、別の読み取りがこのチラシから読み取った結果です（index は番号）。チラシの画像と見比べて、読み違い・読み落としを探してください。\n"
             + JsonSerializer.Serialize(listed, JsonSchemas.SerializerOptions);
         List<BetaContentBlockParam> content = [.. images.Select(ImageBlocks.From), new BetaTextBlockParam { Text = text }];
         return await _runner.RunAsync<FlyerReview>(ClaudePurpose.FlyerReview, PromptStore.Get("FlyerReview"), content, cancellationToken);
     }
-}
-
-/// <summary>
-/// 商品照合の判定（Haiku。T3-06）。候補は番号で選ばせ、商品 ID は渡さない（アプリが番号から商品に戻す）。
-/// </summary>
-public sealed class ProductMatchJudge(ClaudeRequestRunner runner) : IProductMatchJudge
-{
-    private readonly ClaudeRequestRunner _runner = runner ?? throw new ArgumentNullException(nameof(runner));
-
-    public async Task<Result<ProductMatchJudgement>> JudgeAsync(ProductMatchInput item, IReadOnlyList<Product> candidates, CancellationToken cancellationToken)
-    {
-        var text = new StringBuilder();
-        text.AppendLine($"チラシの商品：商品名「{item.Name}」・内容量「{item.Volume ?? "不明"}」・メーカー「{item.Maker ?? "不明"}」");
-        text.AppendLine("登録済みの候補：");
-        for (var i = 0; i < candidates.Count; i++)
-        {
-            var c = candidates[i];
-            text.AppendLine($"{i + 1}. 商品名「{c.Name}」・内容量「{c.Volume ?? "不明"}」・メーカー「{c.Maker ?? "不明"}」");
-        }
-
-        var result = await _runner.RunAsync<MatchOutput>(ClaudePurpose.ProductMatch, PromptStore.Get("ProductMatch"), [new BetaTextBlockParam { Text = text.ToString() }], cancellationToken);
-        if (result.HasError)
-        {
-            return Result<ProductMatchJudgement>.Error(result.ErrorMessages[0]);
-        }
-
-        var output = result.Value!;
-        var verdict = output.Verdict;
-        string? productId = null;
-        if (verdict != ProductMatchVerdict.Different)
-        {
-            if (output.CandidateNumber is not int number || number < 1 || number > candidates.Count)
-            {
-                // 番号が候補にないときは、確認する側に倒して「別の商品」にする
-                return Result<ProductMatchJudgement>.Ok(new ProductMatchJudgement(ProductMatchVerdict.Different, null, "候補の番号が読み取れなかったため、別の商品として扱います"));
-            }
-
-            productId = candidates[number - 1].Id;
-        }
-
-        return Result<ProductMatchJudgement>.Ok(new ProductMatchJudgement(verdict, productId, output.Reason));
-    }
-
-    /// <summary>判定の出力（番号は 1 から。別の商品なら null）</summary>
-    internal sealed record MatchOutput(ProductMatchVerdict Verdict, int? CandidateNumber, string Reason);
 }
 
 /// <summary>

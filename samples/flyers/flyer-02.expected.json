@@ -1,0 +1,579 @@
+{
+  "_note": "build.py が flyer-02.json から作った正解データ。直接編集しない。allergenLabel はチラシの略した表記（allergenLabelText）を品目名に直したもの（カ＝カシューナッツ・か＝かに）。snackCategory・piecesPerPackCandidates は Claude の候補の目安（確定は職員）。maker・priceIncludingTax の null はチラシで読めない（再入力になる）、nonFood は食品以外の掲載品（外した掲載品になる）",
+  "source": "flyer-02.json",
+  "images": {
+    "flyer-02.png": [
+      "8107",
+      "8104",
+      "426",
+      "8102",
+      "424",
+      "8101",
+      "422",
+      "8105",
+      "8110",
+      "423",
+      "8103",
+      "8108",
+      "8106",
+      "8109",
+      "421",
+      "425",
+      "427",
+      "428",
+      "8121",
+      "429"
+    ],
+    "flyer-02.pdf": [
+      "8107",
+      "8104",
+      "426",
+      "8102",
+      "424",
+      "8101",
+      "422",
+      "8105",
+      "8110",
+      "423",
+      "8103",
+      "8108",
+      "8106",
+      "8109",
+      "421",
+      "425",
+      "427",
+      "428",
+      "8121",
+      "429"
+    ],
+    "flyer-02-photo-top.png": [
+      "8107",
+      "8104",
+      "426",
+      "8102",
+      "424",
+      "8101",
+      "422",
+      "8105",
+      "8110",
+      "423",
+      "8103",
+      "8108"
+    ],
+    "flyer-02-photo-bottom.png": [
+      "8106",
+      "8109",
+      "421",
+      "425",
+      "427",
+      "428",
+      "8121",
+      "429"
+    ],
+    "flyer-02-photo-full.png": [
+      "8107",
+      "8104",
+      "426",
+      "8102",
+      "424",
+      "8101",
+      "422",
+      "8105",
+      "8110",
+      "423",
+      "8103",
+      "8108",
+      "8106",
+      "8109",
+      "421",
+      "425",
+      "427",
+      "428",
+      "8121",
+      "429"
+    ]
+  },
+  "readingSets": [
+    [
+      "flyer-02.png"
+    ],
+    [
+      "flyer-02-photo-top.png",
+      "flyer-02-photo-bottom.png"
+    ],
+    [
+      "flyer-02-photo-full.png"
+    ]
+  ],
+  "items": [
+    {
+      "code": "8107",
+      "row": 1,
+      "name": "チーズ味 ひねりスティック",
+      "maker": "やまのこ食品",
+      "volume": "12g×9袋",
+      "priceExcludingTax": 398,
+      "priceIncludingTax": 429,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "乳・麦",
+      "description": "チーズを練りこんで、ひねって焼いたスティックスナック。1袋（12g）61㎉、塩0.13g。（乳・麦）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 44
+      },
+      "piecesPerPackCandidates": [
+        9
+      ],
+      "snackCategory": "しょっぱいもの"
+    },
+    {
+      "code": "8104",
+      "row": 1,
+      "name": "ことりのさくさくショコラ",
+      "maker": "ことり堂",
+      "volume": "8個",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "乳・麦",
+      "description": "ココアビスケットで、なめらかなチョコクリームをはさみました。1個（標準11g）58㎉、塩0.03g。（乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        8
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "デモの山場：原材料にヘーゼルナッツペーストを含むが、チラシには探す言葉が出てこない。取り込み直後は「参考」で献立に入り、パッケージの撮影で初めて見つかる（TD-01）"
+    },
+    {
+      "code": "426",
+      "row": 1,
+      "name": "コンソメ ポテトスティック",
+      "maker": "みなと屋",
+      "volume": "20g×4袋",
+      "priceExcludingTax": 268,
+      "priceIncludingTax": 289,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "細切りのポテトを揚げて、コンソメ味に仕上げました。1袋20g 109㎉、塩0.3g。（乳）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 54
+      },
+      "piecesPerPackCandidates": [
+        5
+      ],
+      "snackCategory": "しょっぱいもの",
+      "_trap": "「1袋/本体67円」は1袋あたりの単価で、商品の価格（本体268円）ではない"
+    },
+    {
+      "code": "8102",
+      "row": 1,
+      "name": "CO・OP さくさくクッキー",
+      "maker": "ひだまり生協",
+      "volume": "5袋入",
+      "priceExcludingTax": 178,
+      "priceIncludingTax": 192,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "卵・乳・麦",
+      "description": "バターの香りの、さっくり軽いクッキーです。1袋（2枚）62㎉、塩0.04g。（卵・乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        5
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "取り込みの分類：デモデータの「CO・OP さくさくクッキー」（ひだまり生協・10袋入）と名前＋メーカーが一致するが、内容量が違う（5袋入）ので「再入力」（FR-IMPORT-12）。表記は「（卵・乳・麦）」"
+    },
+    {
+      "code": "424",
+      "row": 2,
+      "name": "どうぶつ型 ココアクッキー",
+      "maker": "もりのこ製菓",
+      "volume": "102g（個装紙込み）",
+      "priceExcludingTax": 258,
+      "priceIncludingTax": 278,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "卵・乳・麦",
+      "description": "※割れやすい商品です。ライオン・ぞう・きりんの形の、ココア味のクッキー。目安12枚。1枚（標準8g）38㎉、塩0.03g。（卵・乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        12
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "内容量は「個装紙込み」の重さで、枚数は説明文の「目安12枚」にしかない"
+    },
+    {
+      "code": "8101",
+      "row": 2,
+      "name": "CO・OP ポテトチップス のりしお",
+      "maker": "ひだまり生協",
+      "volume": "18g×6袋",
+      "priceExcludingTax": 238,
+      "priceIncludingTax": 257,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "国産じゃがいもを薄く切ってからっと揚げ、青のりで仕上げました。1袋（18g）98㎉、塩0.1g。",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 40
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "しょっぱいもの",
+      "_trap": "取り込みの分類：デモデータの「CO・OP ポテトチップス うすしお」の味違い。名前が違うので一致せず、新しい商品（要確認）。「CO・OP」は実物では生協のマーク"
+    },
+    {
+      "code": "422",
+      "row": 2,
+      "name": "いちごチョコがけ ライスパフ",
+      "maker": "ぐんぐん製菓",
+      "volume": "8袋",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "軽いライスパフを固めて、いちご風味のチョコをかけました。1袋（11g）55㎉、塩0.03g。（乳）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 37
+      },
+      "piecesPerPackCandidates": [
+        8
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "「冷蔵」は届け方の印で、商品名に含めない"
+    },
+    {
+      "code": "8105",
+      "row": 2,
+      "name": "ことりのピピ ラムネ",
+      "maker": "ことり堂",
+      "volume": "4g×10袋",
+      "priceExcludingTax": 178,
+      "priceIncludingTax": 192,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "しゅわっととける、ぶどう味のラムネ。ビタミンC入り。1袋（4g）16㎉。",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        10
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "アレルゲンの表記がない（「表記なし」）。一致する商品がないので要確認で、チラシと見比べた印を付けるまで、まとめての登録に入らない（FR-FLYER-04a）"
+    },
+    {
+      "code": "8110",
+      "row": 3,
+      "name": "うすしお ポテトチップス 大袋",
+      "maker": "みなと屋",
+      "volume": "120g",
+      "priceExcludingTax": 268,
+      "priceIncludingTax": 289,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "じゃがいもの味を生かした、うすしお味の大袋。100g 548㎉、塩1.0g。",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [],
+      "snackCategory": "しょっぱいもの",
+      "_trap": "取り込みの分類：大袋で入数の候補が出せず、一致する商品もないので「使えない（入数が分からない）」（FR-IMPORT-10）。デモデータの「CO・OP ポテトチップス うすしお」と名前は似ているが、似ている商品という考えはない"
+    },
+    {
+      "code": "423",
+      "row": 3,
+      "name": "しっとり ミニバウム",
+      "maker": "ふわり洋菓子",
+      "volume": "6個（個包装）",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "卵・乳・麦",
+      "description": "卵をたっぷり使って、しっとり焼き上げた小さなバウムクーヘン。1個（25g）108㎉、塩0.06g。（卵・乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "次回予定の日付が空欄。「今回より値上げ」の帯は商品名に含めない"
+    },
+    {
+      "code": "8103",
+      "row": 3,
+      "name": "くまのポッケ ミルクビスケット",
+      "maker": "もりのこ製菓",
+      "volume": "120g（10袋）",
+      "priceExcludingTax": 328,
+      "priceIncludingTax": 354,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "乳・麦",
+      "description": "くまのかおが楽しい、ミルク風味のひとくちビスケット。1袋（12g）58㎉、塩0.05g。（乳・麦）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 33
+      },
+      "piecesPerPackCandidates": [
+        10
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "取り込みの分類：デモデータの「くまのポッケ ミルクビスケット」（もりのこ製菓）と名前＋メーカー・内容量・入数が一致するので「使える」"
+    },
+    {
+      "code": "8108",
+      "row": 3,
+      "name": "コーンポタージュ味 まるスナック",
+      "maker": "ぽりぽり堂",
+      "volume": "16g×5袋",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "とうもろこしの粉で作った、まるいふわふわスナック。1袋16g 86㎉、塩0.2g。（乳）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 60
+      },
+      "piecesPerPackCandidates": [
+        5
+      ],
+      "snackCategory": "しょっぱいもの"
+    },
+    {
+      "code": "8106",
+      "row": 4,
+      "name": "黒ごま うすやきビスケット",
+      "maker": "ぐんぐん製菓",
+      "volume": "8枚×6袋",
+      "priceExcludingTax": 328,
+      "priceIncludingTax": 354,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "乳・麦",
+      "description": "黒ごまを練りこんで、うすくカリッと焼きました。1袋（8枚）76㎉、塩0.09g。（乳・麦）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 55
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "「8枚」は1袋の枚数で、入数は6袋。ごまは表記に出ない"
+    },
+    {
+      "code": "8109",
+      "row": 4,
+      "name": "キャラメル ポップコーン",
+      "maker": "やまのこ食品",
+      "volume": "18g×5袋",
+      "priceExcludingTax": 328,
+      "priceIncludingTax": 354,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "はじけたてのコーンに、香ばしいキャラメルをからめました。1袋（18g）80㎉、塩0.05g。（乳）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 66
+      },
+      "piecesPerPackCandidates": [
+        5
+      ],
+      "snackCategory": "あまいもの"
+    },
+    {
+      "code": "421",
+      "row": 4,
+      "name": "徳用 ミルクチョコ 小分けパック",
+      "maker": "ことり堂",
+      "volume": "400g（個包装）",
+      "priceExcludingTax": 1280,
+      "priceIncludingTax": 1382,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "まろやかなミルクチョコを、小さな四角にして個包装にしました。標準50個。1個（8g）43㎉、塩0.02g。（乳）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        50
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "価格が4桁で「1,280」とカンマがある。「冷蔵」は届け方の印で、商品名に含めない。個数は説明文の「標準50個」にしかない"
+    },
+    {
+      "code": "425",
+      "row": 4,
+      "name": "根菜チップス",
+      "maker": "ぐんぐん製菓",
+      "volume": "13g×6袋",
+      "priceExcludingTax": 448,
+      "priceIncludingTax": 483,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "れんこん・ごぼう・さつまいもを、うす塩味のチップスにしました。1袋13g 66㎉、塩0.12g。",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 75
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "しょっぱいもの"
+    },
+    {
+      "code": "427",
+      "row": 5,
+      "name": "こつぶ しお豆スナック",
+      "maker": "ぽりぽり堂",
+      "volume": "10g×6袋",
+      "priceExcludingTax": 258,
+      "priceIncludingTax": 278,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "カシューナッツ"
+      ],
+      "allergenLabelText": "乳・カ",
+      "description": "香ばしく炒った豆を、うす塩味の小さなスナックにしました。1袋（10g）52㎉、塩0.08g。（乳・カ）",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1袋",
+        "priceExcludingTax": 43
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "しょっぱいもの",
+      "_trap": "表記は「（乳・カ）」。カタカナの「カ」はカシューナッツ（ひらがなの「か」はかに。FR-IMPORT-32）。デモデータはナッツ類を避けているので「使えない（チラシの表記）」。商品名・説明文にはナッツの言葉を出さない（hazelnutDemo）"
+    },
+    {
+      "code": "428",
+      "row": 5,
+      "name": "ふんわり 抹茶ロール",
+      "maker": "ふわり洋菓子",
+      "volume": "5個（個包装）",
+      "priceExcludingTax": 348,
+      "priceIncludingTax": null,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "卵・乳・麦",
+      "description": "抹茶の生地で、ミルククリームを巻いた小さなロールケーキ。1個（22g）96㎉、塩0.05g。（卵・乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        5
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "税込価格が印刷のかすれで読めない（正解の priceIncludingTax は null）。一致する商品がないので「再入力」で、税込375円を入れると「要確認」になる"
+    },
+    {
+      "code": "8121",
+      "row": 5,
+      "name": "にこにこ ミニドーナツ",
+      "maker": null,
+      "volume": "6個",
+      "priceExcludingTax": 278,
+      "priceIncludingTax": 300,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "卵・乳・麦",
+      "description": "ひとくちサイズの、きなこをまぶした焼きドーナツ。1個（15g）62㎉、塩0.03g。（卵・乳・麦）",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "あまいもの",
+      "_trap": "メーカーの行がない（正解の maker は null）。メーカーが読めないので照合せず「再入力」（FR-IMPORT-03）"
+    },
+    {
+      "code": "429",
+      "row": 5,
+      "name": "キッチン スポンジ 3個",
+      "maker": "くらしのみかた",
+      "volume": "3個",
+      "priceExcludingTax": 198,
+      "priceIncludingTax": 213,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "泡立ちのよい、台所用のやわらかいスポンジ。表は傷つけにくい不織布です。",
+      "bulk": null,
+      "unitPrice": null,
+      "piecesPerPackCandidates": [],
+      "snackCategory": "対象外",
+      "nonFood": true,
+      "nonFoodReason": "台所用品のため",
+      "_trap": "食品以外の掲載品。Claude が食品以外の印と理由を付けて返し、アプリが「外した掲載品」にする（FR-IMPORT-20）。「戻す」で一覧に戻せる"
+    }
+  ]
+}

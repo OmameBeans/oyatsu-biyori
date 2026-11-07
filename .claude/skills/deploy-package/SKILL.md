@@ -14,14 +14,24 @@ description: おやつ日和を本番（IIS）に配置するための成果物�
    ```
    sqlite3 <本番の DB のパス> "select MigrationId from __EFMigrationsHistory order by MigrationId;"
    ```
+3. **D-100（チラシ取り込みの作り直し）を初めて出すとき**は、出す前に、本番の DB で**メーカーが空の商品の件数**をユーザーに確かめてもらう。D-100 から照合は「商品名＋メーカー」の完全一致だけになり、メーカーが空の商品はどのチラシの商品とも一致しなくなる（次の取り込みで新しい商品として二重に登録される。[09 の 9](../../../docs/requirements/09-flyer-import.md#9-データで変えること)・FR-IMPORT-03）。読むだけの SQL なので、アプリを止めなくてよい：
+   ```
+   sqlite3 <本番の DB のパス> "select count(*) from products where IsDisabled = 0 and trim(replace(coalesce(Maker, ''), '　', '')) = '';"
+   sqlite3 <本番の DB のパス> "select Id, Name, Volume, ListedWeekStart from products where IsDisabled = 0 and trim(replace(coalesce(Maker, ''), '　', '')) = '' order by Name;"
+   ```
+   - 0件なら、そのまま進める
+   - 1件以上なら、一覧（2つめの SQL）をユーザーに見てもらい、**配置の前か直後（次の取り込みより前）に、商品一覧でメーカーを入れてもらう**。件数と対応を手順書の「配置の記録」に書く。DB を SQL で直接書き換えない（更新者・更新日時が残らないため）
+   - 記号だけのメーカー（「－」など）も、アプリの正規化では空になる。2つめの SQL の対象外なので、`select Maker, count(*) from products group by Maker order by 2 desc;` でメーカーの値を一度見てもらう
+   - 同じ名前＋メーカーの商品が2件以上あっても（内容量違いを別に登録した名残など）まとめなくてよい（最後に載った週が新しい方を使う。FR-IMPORT-04）
 
 ## 2. 成果物を作る
 
-出力先は `%TEMP%\oyatsu-pub-<yyyyMMdd>`（同じ日に作り直すなら消してから）。PowerShell で：
+出力先は `%TEMP%\oyatsu-pub-<yyyyMMdd-HHmm>`（作った日時。同じ日に何度作っても区別できる。zip の名前にも同じ日時を付ける）。PowerShell の変数は呼び出しをまたいで残らないので、以降の手順の `$out` は、ここで出たフォルダのパスを入れ直して使う：
 
 ```powershell
-$out = "$env:TEMP\oyatsu-pub-$(Get-Date -Format yyyyMMdd)"
+$out = "$env:TEMP\oyatsu-pub-$(Get-Date -Format yyyyMMdd-HHmm)"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+Write-Output "OUT=$out"
 dotnet publish src/OyatsuBiyori.Server -c Release -o "$out\app"
 dotnet ef migrations list --project src/OyatsuBiyori.Migrations --startup-project src/OyatsuBiyori.Server
 ```
@@ -58,7 +68,8 @@ python -I .claude/skills/deploy-package/check_migration.py "<out>/base-for-check
 
 ```powershell
 $items = @("$out\app", ".claude\skills\deploy-package\app_offline.htm"); if (Test-Path "$out\migrate-nobom.sql") { $items += "$out\migrate-nobom.sql" }
-Compress-Archive -Path $items -DestinationPath "$out\oyatsu-biyori-deploy-$(Get-Date -Format yyyyMMdd).zip" -Force
+$stamp = (Split-Path $out -Leaf) -replace '^oyatsu-pub-', ''   # フォルダと同じ日時（yyyyMMdd-HHmm）
+Compress-Archive -Path $items -DestinationPath "$out\oyatsu-biyori-deploy-$stamp.zip" -Force
 ```
 
 `base-for-check.sql` と BOM ありの `migrate.sql` は入れない（検証用・予備）。`app_offline.htm`（メンテナンス中のページ）は `app` の外、zip の直下に入れる。

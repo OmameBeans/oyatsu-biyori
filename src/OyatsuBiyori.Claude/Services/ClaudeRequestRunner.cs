@@ -49,8 +49,10 @@ public sealed class ClaudeRequestRunner(
         CancellationToken cancellationToken)
     {
         var model = _options.ModelFor(purpose);
-        var request = BuildRequest<T>(model, systemPrompt, content, EffortFor(purpose));
-        var response = await SendAsync(purpose, request, cancellationToken);
+        var request = BuildRequest<T>(model, _options.MaxTokensFor(purpose), systemPrompt, content, EffortFor(purpose));
+
+        // 応答が長くなる用途（チラシの読み取りなど）は、非ストリーミングだと API に断られることがあるので、ストリーミングで受けて1つにまとめる
+        var response = await SendStreamingAsync(purpose, request, static () => { }, static _ => { }, cancellationToken);
         if (response.HasError)
         {
             var error = new Result<T>();
@@ -200,12 +202,12 @@ public sealed class ClaudeRequestRunner(
     }
 
     /// <summary>リクエストを作る</summary>
-    private MessageCreateParams BuildRequest<T>(string model, string systemPrompt, IReadOnlyList<BetaContentBlockParam> content, Effort? effort)
+    private static MessageCreateParams BuildRequest<T>(string model, int maxTokens, string systemPrompt, IReadOnlyList<BetaContentBlockParam> content, Effort? effort)
     {
         var request = new MessageCreateParams
         {
             Model = model,
-            MaxTokens = _options.MaxTokens,
+            MaxTokens = maxTokens,
             System = new List<BetaTextBlockParam>
             {
                 new() { Text = PromptStore.Common + "\n\n" + systemPrompt },

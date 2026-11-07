@@ -47,6 +47,21 @@ public class MasterSeedTests
     }
 
     [Fact]
+    public void D_100_チラシの略記はカを足した7つで_正規化は略記の照合と同じ関数で作る()
+    {
+        var abbreviations = MasterSeed.LabelAbbreviations().ToList();
+        var codesById = MasterSeed.Allergens().ToDictionary(a => a.Id, a => a.Code);
+
+        Assert.Equal(
+            new Dictionary<string, string> { ["麦"] = "wheat", ["え"] = "shrimp", ["か"] = "crab", ["落"] = "peanut", ["そ"] = "buckwheat", ["く"] = "walnut", ["カ"] = "cashew" },
+            abbreviations.ToDictionary(a => a.Abbreviation, a => codesById[a.AllergenId]));
+        // カタカナをひらがなにしない（「カ」はカタカナのまま。FR-IMPORT-32）
+        Assert.All(abbreviations, a => Assert.Equal(TextNormalizer.ForLabelAbbreviation(a.Abbreviation), a.NormalizedAbbreviation));
+        Assert.Equal("カ", abbreviations.Single(a => a.Abbreviation == "カ").NormalizedAbbreviation);
+        Assert.Equal(abbreviations.Count, abbreviations.Select(a => a.Id).Distinct().Count());
+    }
+
+    [Fact]
     public void ナッツ類グループは落花生とココナッツを含む11品目で全品目に探す言葉がある()
     {
         var nuts = MasterSeed.Groups().Single(g => g.Name == "ナッツ類（すべて）");

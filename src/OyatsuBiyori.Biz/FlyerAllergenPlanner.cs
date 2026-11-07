@@ -25,9 +25,11 @@ public static class FlyerAllergenPlanner
     /// 対応づけは確認する側に倒す：語が品目名・探す言葉を含めば対応づけ（乳成分・牛乳 → 乳、卵白・鶏卵 → 卵）、
     /// 1つの語が複数の品目に当たればすべて採る（多めに当たっても「参考」の記録として職員の確認に回るだけのため）。
     /// 「なし」「－」だけの表記は「表記なし」として扱い、対応づけできない語にしない（どの品目も「含まない」にはしない）。
+    /// チラシの略記（「麦」→小麦、「え」→えび、「カ」→カシューナッツ など。マスタの略記）は、語全体が一致したときだけ当てる
+    /// （「くっきー」「えびせん」「カカオ」は略記に当てない。D-96）。略記はかな変換をかけずに比べる（「か」＝かに、「カ」＝カシューナッツ。D-100）。
     /// </summary>
     /// <param name="labelText">チラシのアレルゲン表記の原文（なければ null か空）</param>
-    /// <param name="allergens">マスタのすべての品目（探す言葉つき）</param>
+    /// <param name="allergens">マスタのすべての品目（探す言葉・略記つき）</param>
     public static FlyerLabelParseResult ParseLabel(string? labelText, IEnumerable<Allergen> allergens)
     {
         ArgumentNullException.ThrowIfNull(allergens);
@@ -35,6 +37,7 @@ public static class FlyerAllergenPlanner
         var allergenList = allergens.ToList();
         var mapped = new List<Allergen>();
         var unmapped = new List<string>();
+        var abbreviationHits = new List<FlyerAbbreviationHit>();
 
         foreach (var term in (labelText ?? string.Empty).Split(LabelSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -44,7 +47,10 @@ public static class FlyerAllergenPlanner
                 continue;
             }
 
-            var hits = allergenList.Where(a => MatchesLabelTerm(a, normalized)).ToList();
+            // 品目名・探す言葉はかなの違いを問わずに当て、略記はかな変換をかけずに当てる（「か」＝かに、「カ」＝カシューナッツ。FR-IMPORT-32）
+            var abbreviationTerm = NormalizeAbbreviationTerm(term);
+            var abbreviationMatches = allergenList.Where(a => MatchesAbbreviation(a, abbreviationTerm)).ToList();
+            var hits = allergenList.Where(a => MatchesLabelTerm(a, normalized) || abbreviationMatches.Contains(a)).ToList();
             if (hits.Count == 0)
             {
                 unmapped.Add(term);
@@ -52,6 +58,7 @@ public static class FlyerAllergenPlanner
             }
 
             mapped.AddRange(hits);
+            abbreviationHits.AddRange(abbreviationMatches.Select(a => new FlyerAbbreviationHit(term, new AllergenRef(a.Id, a.Name))));
         }
 
         return new FlyerLabelParseResult
@@ -62,6 +69,7 @@ public static class FlyerAllergenPlanner
                 .Select(a => new AllergenRef(a.Id, a.Name))
                 .ToList(),
             UnmappedTerms = unmapped.Distinct(StringComparer.Ordinal).ToList(),
+            AbbreviationHits = abbreviationHits.Distinct().ToList(),
         };
     }
 
@@ -117,15 +125,14 @@ public static class FlyerAllergenPlanner
         }
         else if (hasConfirmed)
         {
-            // 過去に確認済みがある → 追加しない。ただしチラシの品目が「含む」になっていなければ食い違い（SR-20）
+            // 過去に確認済みがある → 追加しない。ただしチラシの品目が「含む」になっていなければ食い違い（SR-20）。
+            // 食い違いがあれば、避ける品目かどうかにかかわらず「参考」の記録を足す（職員に選ばせない。確認する側に倒す。D-100、09 の 3.5）
             discrepancies = notYetContained
                 .Select(a => new FlyerAllergenDiscrepancy(a, avoidedIds.Contains(a.Id), !labelIds.Contains(a.Id)))
                 .ToList();
             decision = discrepancies.Count == 0
                 ? FlyerReferenceDecision.None
-                : discrepancies.Any(d => d.IsAvoided)
-                    ? FlyerReferenceDecision.AddForDiscrepancy
-                    : FlyerReferenceDecision.StaffChoice;
+                : FlyerReferenceDecision.AddForDiscrepancy;
         }
         else
         {
@@ -197,6 +204,67 @@ public static class FlyerAllergenPlanner
             .Any(n => n.Length > 0 && normalizedTerm.Contains(n, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Claude が品目に対応づけられなかった語を、マスタの略記に当てる（D-96）。品目を足す方向にだけ使う。
+    /// 語を区切りで分けた部分（「麦・え」なら「麦」「え」）のどれかが略記と語全体で一致すれば、その品目を返す。
+    /// IsFullyMapped は、空でない部分がすべて略記に当たったときだけ true（そのときだけ未対応の語から外してよい）。
+    /// 正規化で空になる部分（記号だけの部分）は飛ばす。「なし」は ParseLabel と違って除かず、当たらない部分として残す（確認する側に倒す）。
+    /// </summary>
+    /// <param name="term">Claude が対応づけられなかった語</param>
+    /// <param name="allergens">マスタのすべての品目（略記つき）</param>
+    public static FlyerAbbreviationMatch MatchAbbreviations(string term, IEnumerable<Allergen> allergens)
+    {
+        ArgumentNullException.ThrowIfNull(allergens);
+
+        var allergenList = allergens.ToList();
+        var mapped = new List<Allergen>();
+        var abbreviationHits = new List<FlyerAbbreviationHit>();
+        var hasPart = false;
+        var allMapped = true;
+        foreach (var part in (term ?? string.Empty).Split(LabelSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var normalized = StripLabelPhrases(TextNormalizer.ForKeywordSearch(part));
+            if (normalized.Length == 0)
+            {
+                continue;
+            }
+
+            hasPart = true;
+            var hits = allergenList.Where(a => MatchesAbbreviation(a, NormalizeAbbreviationTerm(part))).ToList();
+            if (hits.Count == 0)
+            {
+                allMapped = false;
+                continue;
+            }
+
+            mapped.AddRange(hits);
+            abbreviationHits.AddRange(hits.Select(a => new FlyerAbbreviationHit(part, new AllergenRef(a.Id, a.Name))));
+        }
+
+        var result = mapped
+            .DistinctBy(a => a.Id, StringComparer.Ordinal)
+            .OrderBy(a => a.SortOrder)
+            .Select(a => new AllergenRef(a.Id, a.Name))
+            .ToList();
+        return new FlyerAbbreviationMatch(result, hasPart && allMapped && result.Count > 0, abbreviationHits.Distinct().ToList());
+    }
+
+    /// <summary>
+    /// 表記の語が品目の略記と語全体で一致するか（部分一致では当てない。D-96、FR-IMPORT-31）。
+    /// 語も略記も TextNormalizer.ForLabelAbbreviation（カタカナをひらがなにしない）で正規化して比べる（D-100、FR-IMPORT-32）。
+    /// そのため、ひらがなの「か」はかに、カタカナの「カ」・半角の「ｶ」はカシューナッツにだけ当たる。
+    /// 「エ」「ソ」「ク」（カタカナ）は、マスタの略記（ひらがな）と字が違うので当てない（「品目不明」として職員に選んでもらう。確認する側に倒す）。
+    /// 保存済みの NormalizedAbbreviation は信用せず、略記を毎回正規化し直す（正規化を直したときに古い値でずれないため）
+    /// </summary>
+    private static bool MatchesAbbreviation(Allergen allergen, string abbreviationTerm)
+    {
+        return abbreviationTerm.Length > 0
+            && allergen.LabelAbbreviations.Any(a => string.Equals(TextNormalizer.ForLabelAbbreviation(a.Abbreviation), abbreviationTerm, StringComparison.Ordinal));
+    }
+
+    /// <summary>略記と比べる語（かな変換をかけない正規化のあと、「一部に」「を含む」を除く）</summary>
+    private static string NormalizeAbbreviationTerm(string term) => StripLabelPhrases(TextNormalizer.ForLabelAbbreviation(term));
+
     /// <summary>品目名の書き方（「落花生（ピーナッツ）」→「落花生（ピーナッツ）」「落花生」「ピーナッツ」）</summary>
     private static IEnumerable<string> NameVariants(string name)
     {
@@ -265,6 +333,30 @@ public sealed class FlyerLabelParseResult
 
     /// <summary>対応づけできなかった語（捨てずに職員に確かめさせる）</summary>
     public IReadOnlyList<string> UnmappedTerms { get; init; } = [];
+
+    /// <summary>略記で当てた語と品目（画面で「麦→小麦」のように示すため。品目は Allergens にも入っている）</summary>
+    public IReadOnlyList<FlyerAbbreviationHit> AbbreviationHits { get; init; } = [];
+}
+
+/// <summary>略記で当てた語と品目（D-96・D-100）</summary>
+/// <param name="Term">表記の語（原文のまま。例：麦、カ）</param>
+/// <param name="Allergen">当てた品目</param>
+public sealed record FlyerAbbreviationHit(string Term, AllergenRef Allergen);
+
+/// <summary>
+/// Claude が対応づけられなかった語を略記に当てた結果。
+/// </summary>
+/// <param name="Allergens">当てた品目</param>
+/// <param name="IsFullyMapped">空でない部分がすべて略記に当たったか（そのときだけ未対応の語から外してよい）</param>
+/// <param name="Hits">略記で当てた部分と品目</param>
+public sealed record FlyerAbbreviationMatch(IReadOnlyList<AllergenRef> Allergens, bool IsFullyMapped, IReadOnlyList<FlyerAbbreviationHit> Hits)
+{
+    /// <summary>これまでの書き方（var (allergens, isFullyMapped) = ...）のための分解</summary>
+    public void Deconstruct(out IReadOnlyList<AllergenRef> allergens, out bool isFullyMapped)
+    {
+        allergens = Allergens;
+        isFullyMapped = IsFullyMapped;
+    }
 }
 
 /// <summary>
@@ -285,11 +377,11 @@ public enum FlyerReferenceDecision
     /// <summary>追加する（記録がない、または参考だけでチラシの品目が増えた）</summary>
     Add,
 
-    /// <summary>確認済みの商品で、避ける品目の食い違いがあるので必ず追加する（SR-20。献立に入れられなくなる）</summary>
+    /// <summary>
+    /// 確認済みの商品で、チラシの品目が有効な記録で「含む」になっていないので必ず追加する（SR-20 の見直し。D-100、09 の 3.5）。
+    /// 避ける品目なら献立に入れられなくなり、避ける品目でなければ 🟡（参考）になる。職員に「チラシの誤り」を選ばせることはしない
+    /// </summary>
     AddForDiscrepancy,
-
-    /// <summary>確認済みの商品で、避ける品目でない食い違いだけがある。職員が「確認し直す（追加）」か「チラシの誤り」を選ぶ（既定は追加）</summary>
-    StaffChoice,
 }
 
 /// <summary>
@@ -332,14 +424,6 @@ public sealed class FlyerAllergenPlan
     /// <summary>記録に残す情報源の補足（表記の原文か「表記なし」と、説明文で当たった言葉）</summary>
     public string SourceNote { get; init; } = string.Empty;
 
-    /// <summary>
-    /// 「参考」の記録を追加するか。職員の選択は StaffChoice のときだけ効く（避ける品目の食い違いは選べない）。
-    /// </summary>
-    /// <param name="staffTreatsAsFlyerError">職員が「チラシの誤りとして扱う」を選んだか</param>
-    public bool ShouldAddReference(bool staffTreatsAsFlyerError = false) => Decision switch
-    {
-        FlyerReferenceDecision.Add or FlyerReferenceDecision.AddForDiscrepancy => true,
-        FlyerReferenceDecision.StaffChoice => !staffTreatsAsFlyerError,
-        _ => false,
-    };
+    /// <summary>「参考」の記録を追加するか（職員の選択では変わらない。D-100）</summary>
+    public bool ShouldAddReference() => Decision is FlyerReferenceDecision.Add or FlyerReferenceDecision.AddForDiscrepancy;
 }

@@ -49,8 +49,16 @@ export const ENDPOINT = {
 
     FLYERS_READ: '/api/flyers/read',
     FLYERS_LATEST: '/api/flyers/latest',
+    FLYERS_UPDATE_ITEM: '/api/flyers/updateItem',
+    FLYERS_RESOLVE_TERM: '/api/flyers/resolveTerm',
+    FLYERS_ENTER_PIECES: '/api/flyers/enterPieces',
+    FLYERS_ACCEPT_REASON: '/api/flyers/acceptReason',
+    FLYERS_REMOVE: '/api/flyers/remove',
+    FLYERS_RESTORE: '/api/flyers/restore',
     FLYERS_CONFIRM: '/api/flyers/confirm',
-    FLYERS_CONFIRM_SAME: '/api/flyers/confirmSame',
+    FLYERS_CONFIRM_USABLE: '/api/flyers/confirmUsable',
+    FLYERS_CONFIRM_NEW: '/api/flyers/confirmNew',
+    FLYERS_MARK_LABEL_ABSENT_COMPARED: '/api/flyers/markLabelAbsentCompared',
     FLYERS_ADD_MANUAL: '/api/flyers/addManual',
     FLYERS_DISCARD: '/api/flyers/discard',
 

@@ -29,19 +29,9 @@ public static class ServerServiceCollectionExtensions
 
         // 確定前のチラシの読み取り結果（24時間）
         services.AddSingleton<IFlyerSessionStore, InMemoryFlyerSessionStore>();
-        services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ProductMatchOptions>>().Value);
-        services.AddSingleton(sp => new OyatsuBiyori.Biz.FlyerImport.FlyerImportOptions
-        {
-            ProductMatchCallLimit = sp.GetRequiredService<IConfiguration>().GetValue("Claude:ProductMatchCallLimitPerImport", 30),
-        });
+        services.AddSingleton(new OyatsuBiyori.Biz.FlyerImport.FlyerImportOptions());
 
         services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = MaxRequestBodySize);
-
-        // 商品照合のしきい値・候補の件数（D-02。実際のチラシで調整する）
-        services.AddOptions<ProductMatchOptions>()
-            .BindConfiguration(ProductMatchOptions.SectionName)
-            .Validate(o => o.DiceThreshold is > 0 and <= 1 && o.MaxCandidates >= 1, "ProductMatch の設定が正しくありません（DiceThreshold は 0 より大きく 1 以下、MaxCandidates は 1 以上）")
-            .ValidateOnStart();
 
         // 処理の流れ（Server-Sent Events。JobsController.Stream）も、enum を名前の文字列で送る
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

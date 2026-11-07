@@ -67,7 +67,7 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                         )}
                     </Box>
                     <Stack direction="row" spacing={1}>
-                        <Button onClick={onBackToFlyer}>チラシを取り込み直す</Button>
+                        <Button onClick={onBackToFlyer}>戻る</Button>
                         <Button variant="contained" onClick={onNext}>
                             要望の入力へ
                         </Button>

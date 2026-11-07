@@ -213,7 +213,7 @@ public enum ClaudePurpose
     /// <summary>チラシの読み取りの検証</summary>
     FlyerReview,
 
-    /// <summary>商品照合の判定</summary>
+    /// <summary>商品照合の判定（D-100 でやめた。今は呼ばない。過去の api_usage_logs を読むため値は残す）</summary>
     ProductMatch,
 
     /// <summary>アレルゲン抽出</summary>

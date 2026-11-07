@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -14,123 +15,149 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { DataGrid, useGridApiRef } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 import { jaJP } from '@mui/x-data-grid/locales';
-import { useSnackbar } from 'notistack';
-import type { FlyerItem } from '../../../entities/flyer';
+import { AllergenJudgementLine } from '../../../entities/allergen-judgement';
+import type { FlyerItem, FlyerSession } from '../../../entities/flyer';
 import {
-    allergenChipsOf,
-    checkPointsOf,
-    FLYER_ROW_STATUS,
-    FLYER_ROW_STATUS_COLOR,
-    FLYER_ROW_STATUS_LABEL,
+    filterItems,
     FLYER_ROW_TAB,
-    filterRows,
-    nextUnconfirmedRowId,
-    sameProductSummary,
-    toSortedRows,
+    FLYER_ROW_TABS,
+    flyerTabCount,
+    flyerTabLabel,
+    isPiecesUnknown,
+    isReviewTarget,
+    labelAbsentCompareItemsOf,
+    matchSummaryOf,
+    nextOpenableItemId,
 } from '../model/flyerRows';
-import type { AllergenChip, FlyerItemRow, FlyerRowTab } from '../model/flyerRows';
+import type { FlyerRowTab } from '../model/flyerRows';
 import { FlyerConfirmForm } from './FlyerConfirmForm';
+import { FlyerLabelAbsentCompareDialog } from './FlyerLabelAbsentCompareDialog';
+import { FlyerPiecesInput } from './FlyerPiecesInput';
 import { FlyerReviewDialog } from './FlyerReviewDialog';
+import { FlyerAllergenChips, FlyerStatusCell } from './FlyerStatusChip';
 
 interface FlyerItemGridProps {
     menuId: string;
-    items: FlyerItem[];
+    session: FlyerSession;
+    /** 開いている（確定のフォームで直している途中の）行が変わったとき。まとめて確定・登録から外すために使う */
+    onExpandedIdChange?: (id: string | null) => void;
 }
 
 /** 表の1行。商品の行と、開いている商品のすぐ下に差し込む詳細の行（全部の列をまたぐ） */
-interface GridRow extends FlyerItemRow {
+interface GridRow {
+    id: string;
+    item: FlyerItem;
     isDetail: boolean;
 }
 
 const detailRowId = (id: string) => `${id}__detail`;
-
-const TABS: FlyerRowTab[] = [FLYER_ROW_TAB.ALL, FLYER_ROW_TAB.WARNING, FLYER_ROW_TAB.NEEDS_CHECK, FLYER_ROW_TAB.UNCONFIRMED, FLYER_ROW_TAB.CONFIRMED];
-const tabLabel = (tab: FlyerRowTab) => (tab === FLYER_ROW_TAB.ALL ? 'すべて' : FLYER_ROW_STATUS_LABEL[tab]);
 
 /** 読み上げ用に見出しの文字を隠す（見た目には出さない） */
 const VISUALLY_HIDDEN_SX = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' } as const;
 
 /** 表のふち（左右 1px ずつ） */
 const GRID_BORDER_WIDTH = 2;
-
-/** アレルゲン表記の列の、いちばん狭いときの幅（この幅で折り返しても収まる高さを、行の高さにする） */
-const ALLERGEN_COLUMN_MIN_WIDTH = 200;
-/** セルの左右の余白（DataGrid の既定。10px ずつ） */
-const CELL_PADDING_X = 20;
-/** セルの上下の余白（py: 1） */
-const CELL_PADDING_Y = 16;
-/** 小さいチップの高さと、チップどうしの間（spacing 0.5） */
-const CHIP_HEIGHT = 24;
-const CHIP_GAP = 4;
-/** 表記の原文の行の高さ（body2 の1行） */
-const TEXT_LINE_HEIGHT = 20;
-/** 商品名・同じ商品か（2行）が収まる高さ */
+/** 商品の行のいちばん低い高さ（分類のチップと理由・商品名の2行が収まる） */
 const MIN_ROW_HEIGHT = 64;
-
-/** 小さいチップの幅の見積もり（13px の文字と左右の余白・枠。和文は1文字ほぼ 13px なので、多めに見る） */
-const estimateChipWidth = (label: string) => 13 * label.length + 22;
-
-/** チップを、列のいちばん狭い幅で左から詰めたときの行数 */
-const countChipLines = (chips: AllergenChip[]) => {
-    const available = ALLERGEN_COLUMN_MIN_WIDTH - CELL_PADDING_X;
-    let lines = 0;
-    let used = 0;
-    for (const chip of chips) {
-        const width = Math.min(estimateChipWidth(chip.label), available);
-        if (lines === 0 || used + CHIP_GAP + width > available) {
-            lines++;
-            used = width;
-        } else {
-            used += CHIP_GAP + width;
-        }
-    }
-    return lines;
-};
-
-/** アレルゲン表記の列（原文の1行とチップ）が収まる高さ */
-const allergenCellHeight = (item: FlyerItem) => {
-    const lines = countChipLines(allergenChipsOf(item));
-    const textHeight = item.read.allergenLabelText?.trim() ? TEXT_LINE_HEIGHT : 0;
-    const chipsHeight = lines > 0 ? lines * CHIP_HEIGHT + (lines - 1) * CHIP_GAP + (textHeight ? CHIP_GAP : 0) : 0;
-    return CELL_PADDING_Y + textHeight + chipsHeight;
-};
 
 const NoRowsOverlay = () => (
     <Stack sx={{ height: '100%', minHeight: 96, alignItems: 'center', justifyContent: 'center' }}>
-        <Typography color="text.secondary">この条件に当てはまる商品はありません</Typography>
+        <Typography color="text.secondary">この分類の商品はありません</Typography>
     </Stack>
 );
 
+interface ProductNameCellProps {
+    item: FlyerItem;
+}
+
+/** 商品名と、内容量・税込価格・手入力の印 */
+const ProductNameCell = ({ item }: ProductNameCellProps) => {
+    const read = item.read;
+    return (
+        <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={read.name}>
+                    {read.name || '（商品名なし）'}
+                </Typography>
+                {item.isManual && <Chip size="small" label="手入力" sx={{ flexShrink: 0 }} />}
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {[read.maker ?? 'メーカーなし', read.volume, read.priceIncludingTax !== null ? `税込 ${read.priceIncludingTax}円` : '税込価格なし'].filter(Boolean).join('・')}
+            </Typography>
+        </Box>
+    );
+};
+
+interface MatchCellProps {
+    menuId: string;
+    item: FlyerItem;
+}
+
+/**
+ * 一致した商品（名前＋メーカーが同じ登録済みの商品）と、商品一覧でのアレルゲンの表示（09 の 6）。
+ * 2件以上一致したときは「ほかに同じ名前の商品が n 件」を添える。使えない（入数が分からない）の行には入数の欄を出す
+ */
+const MatchCell = ({ menuId, item }: MatchCellProps) => {
+    const summary = matchSummaryOf(item);
+    return (
+        <Stack spacing={0.5} sx={{ minWidth: 0, width: '100%' }}>
+            <Box sx={{ minWidth: 0 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summary.title}>
+                    {summary.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ overflowWrap: 'anywhere' }}>
+                    {summary.detail}
+                </Typography>
+            </Box>
+            {item.matchedProduct && !item.confirmation && <AllergenJudgementLine judgement={item.matchedProduct.judgement} showNextSteps={false} />}
+            {isPiecesUnknown(item) && <FlyerPiecesInput menuId={menuId} item={item} />}
+        </Stack>
+    );
+};
+
 /**
  * SC-09 手順1 読み取った商品の表（MUI X の DataGrid。無料版）。
- * 状態の順（警告あり → 要確認 → 未確定 → 確定済み）に並べ、タブで絞り込む。並べ替え・列のメニュー・ページ送りは使わない。
+ * 取り込みの分類の順（再入力 → 要確認 → 使える → 使えない → 確定済み。サーバーが並べたまま）に並べ、タブで絞り込む。
+ * 分類・理由・件数はサーバーの値をそのまま出す。並べ替え・列のメニュー・ページ送りは使わない。
  * 行の下の詳細欄（確定のフォーム）は、開いている行のすぐ後ろに全部の列をまたぐ行を差し込んで出す。
- * 初めはどの行も閉じておき、確定したら次の未確定の行を開く。
+ * スマホでは、分類のチップ・商品名・アレルゲン表記を1つの列に縦に並べる（横にスクロールしなくても見えるように）。
  */
-export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
+export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItemGridProps) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const apiRef = useGridApiRef();
-    const { enqueueSnackbar } = useSnackbar();
+    const items = session.items;
 
-    const sortedRows = useMemo(() => toSortedRows(items), [items]);
     const [tab, setTab] = useState<FlyerRowTab>(FLYER_ROW_TAB.ALL);
-    const visibleRows = useMemo(() => filterRows(sortedRows, tab), [sortedRows, tab]);
+    const visibleItems = useMemo(() => filterItems(items, tab), [items, tab]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    // 1件ずつ確かめるダイアログ。開いたときの未確定の商品を、表と同じ状態の順で確かめる
-    const unconfirmedIds = sortedRows.filter((row) => row.status !== FLYER_ROW_STATUS.CONFIRMED).map((row) => row.id);
+    // 開いている行を親に知らせる（フォームで直した内容を、まとめて確定・登録で捨てないように）。表が消えたら閉じた扱いにする
+    useEffect(() => {
+        onExpandedIdChange?.(expandedId);
+    }, [expandedId, onExpandedIdChange]);
+    useEffect(() => () => onExpandedIdChange?.(null), [onExpandedIdChange]);
+    // 1件ずつ確かめるダイアログ。開いたときの再入力・要確認の商品を、表と同じ順で確かめる
+    const reviewIds = items.filter(isReviewTarget).map((item) => item.id);
     const [reviewQueue, setReviewQueue] = useState<string[] | null>(null);
+    // 表記なしの商品のまとめての見比べ（1件ずつ止めずに、まとめてチラシと見比べる。D-97）
+    const labelAbsentItems = labelAbsentCompareItemsOf(items);
+    const labelAbsentPendingCount = labelAbsentItems.filter((item) => !item.isLabelAbsentCompared).length;
+    const [isLabelAbsentDialogOpen, setIsLabelAbsentDialogOpen] = useState(false);
 
     const gridRows = useMemo(
-        () => visibleRows.flatMap((row): GridRow[] => (row.id === expandedId ? [{ ...row, isDetail: false }, { ...row, id: detailRowId(row.id), isDetail: true }] : [{ ...row, isDetail: false }])),
-        [visibleRows, expandedId],
+        () =>
+            visibleItems.flatMap((item): GridRow[] =>
+                item.id === expandedId
+                    ? [
+                          { id: item.id, item, isDetail: false },
+                          { id: detailRowId(item.id), item, isDetail: true },
+                      ]
+                    : [{ id: item.id, item, isDetail: false }],
+            ),
+        [visibleItems, expandedId],
     );
 
-    // 商品の行の高さは、すべての行でそろえる。アレルゲンのチップがいちばん多い行が、列のいちばん狭い幅で折り返しても収まる高さにする
-    // （タブを切り替えても変わらないように、絞り込む前のすべての商品で求める）
-    const productRowHeight = useMemo(() => Math.max(MIN_ROW_HEIGHT, ...items.map(allergenCellHeight)), [items]);
-
-    // 表の見えている幅。スマホで表を横にスクロールしても、詳細欄は見えている幅に収めて左に留める
+    // 表の見えている幅。詳細欄は見えている幅に収めて左に留める
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [viewportWidth, setViewportWidth] = useState<number | null>(null);
     useEffect(() => {
@@ -170,98 +197,91 @@ export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
     };
 
     const handleConfirmed = (item: FlyerItem) => {
-        enqueueSnackbar(`「${item.read.name}」を確定しました`, { variant: 'success' });
-        const nextId = nextUnconfirmedRowId(visibleRows, item.id);
+        const nextId = nextOpenableItemId(visibleItems, item.id);
         scrollRequestRef.current = nextId ? { openId: nextId, confirmedId: item.id } : null;
         setExpandedId(nextId);
     };
 
-    const columns: GridColDef<GridRow>[] = [
-        {
-            field: 'toggle',
-            headerName: '詳細',
-            minWidth: 56,
-            width: 56,
-            sortable: false,
-            align: 'center',
-            renderHeader: () => (
-                <Box component="span" sx={VISUALLY_HIDDEN_SX}>
-                    詳細
-                </Box>
-            ),
-            // 詳細の行は、この列から全部の列をまたぐ
-            colSpan: (_value, row) => (row.isDetail ? columns.length : undefined),
-            renderCell: ({ row, hasFocus }) => {
-                if (row.isDetail) {
-                    return (
-                        // 矢印キーで詳細の行に来たときは、この枠にフォーカスを置く（DataGrid は枠の中の最初の tabindex="0" を選ぶ）。
-                        // 枠そのものでのキーは DataGrid に渡して行の移動に使い、中の入力でのキー・クリックは DataGrid に渡さない
-                        // （渡すと、矢印・Space・Enter をセルの移動に取られ、クリックでセレクトのメニューからフォーカスを奪われる）
-                        <Box
-                            role="group"
-                            aria-label={`「${row.item.read.name}」の詳細`}
-                            tabIndex={hasFocus ? 0 : -1}
-                            onKeyDown={(event) => event.target !== event.currentTarget && event.stopPropagation()}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onMouseUp={(event) => event.stopPropagation()}
-                            sx={{
-                                position: 'sticky',
-                                left: 0,
-                                width: viewportWidth ? `min(100%, ${viewportWidth}px)` : '100%',
-                                p: { xs: 2, sm: 3 },
-                                cursor: 'auto',
-                                textAlign: 'left',
-                                '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineOffset: -2 },
-                            }}
-                        >
-                            <FlyerConfirmForm menuId={menuId} item={row.item} onClose={() => handleToggle(row.item.id)} onSuccess={() => handleConfirmed(row.item)} />
-                        </Box>
-                    );
-                }
-                const isExpanded = row.id === expandedId;
+    const handleRemoved = () => {
+        scrollRequestRef.current = null;
+        setExpandedId(null);
+    };
+
+    const toggleColumn: GridColDef<GridRow> = {
+        field: 'toggle',
+        headerName: '詳細',
+        minWidth: 52,
+        width: 52,
+        sortable: false,
+        align: 'center',
+        renderHeader: () => (
+            <Box component="span" sx={VISUALLY_HIDDEN_SX}>
+                詳細
+            </Box>
+        ),
+        // 詳細の行は、この列から全部の列をまたぐ
+        colSpan: (_value, row) => (row.isDetail ? columns.length : undefined),
+        renderCell: ({ row, hasFocus }) => {
+            if (row.isDetail) {
                 return (
-                    <IconButton
-                        aria-expanded={isExpanded}
-                        aria-label={`「${row.item.read.name}」の詳細を${isExpanded ? '閉じる' : '開く'}`}
-                        onClick={(event) => {
-                            // 行のクリックでも開閉するので、二重に切り替えない
-                            event.stopPropagation();
-                            handleToggle(row.id);
+                    // 矢印キーで詳細の行に来たときは、この枠にフォーカスを置く（DataGrid は枠の中の最初の tabindex="0" を選ぶ）。
+                    // 枠そのものでのキーは DataGrid に渡して行の移動に使い、中の入力でのキー・クリックは DataGrid に渡さない
+                    // （渡すと、矢印・Space・Enter をセルの移動に取られ、クリックでセレクトのメニューからフォーカスを奪われる）
+                    <Box
+                        role="group"
+                        aria-label={`「${row.item.read.name}」の詳細`}
+                        tabIndex={hasFocus ? 0 : -1}
+                        onKeyDown={(event) => event.target !== event.currentTarget && event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onMouseUp={(event) => event.stopPropagation()}
+                        sx={{
+                            position: 'sticky',
+                            left: 0,
+                            width: viewportWidth ? `min(100%, ${viewportWidth}px)` : '100%',
+                            p: { xs: 2, sm: 3 },
+                            cursor: 'auto',
+                            textAlign: 'left',
+                            '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineOffset: -2 },
                         }}
-                        onKeyDown={(event) => event.key === ' ' && event.stopPropagation()}
-                        sx={{ width: 44, height: 44 }}
                     >
-                        {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </IconButton>
+                        <FlyerConfirmForm
+                            key={row.item.id}
+                            menuId={menuId}
+                            item={row.item}
+                            onClose={() => handleToggle(row.item.id)}
+                            onSuccess={() => handleConfirmed(row.item)}
+                            onRemoved={handleRemoved}
+                        />
+                    </Box>
                 );
-            },
+            }
+            const isExpanded = row.id === expandedId;
+            return (
+                <IconButton
+                    aria-expanded={isExpanded}
+                    aria-label={`「${row.item.read.name}」の詳細を${isExpanded ? '閉じる' : '開く'}`}
+                    onClick={(event) => {
+                        // 行のクリックでも開閉するので、二重に切り替えない
+                        event.stopPropagation();
+                        handleToggle(row.id);
+                    }}
+                    onKeyDown={(event) => event.key === ' ' && event.stopPropagation()}
+                    sx={{ width: 44, height: 44 }}
+                >
+                    {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+            );
         },
+    };
+
+    const desktopColumns: GridColDef<GridRow>[] = [
         {
             field: 'status',
-            headerName: '状態',
-            minWidth: 150,
-            width: 150,
+            headerName: '取り込みの分類',
+            minWidth: 160,
+            width: 170,
             sortable: false,
-            renderCell: ({ row }) => {
-                // 「警告あり」「要確認」は、何を確かめるのかを短く添える（詳しくは行を開いた先の「確かめること」）
-                // 確定したあとも、指摘は消さずに出す（選び直すときの手がかり）
-                const reasons = Array.from(new Set(checkPointsOf(row.item).map((point) => point.short)));
-                return (
-                    <Stack sx={{ minWidth: 0, alignItems: 'flex-start' }}>
-                        <Chip
-                            size="small"
-                            color={FLYER_ROW_STATUS_COLOR[row.status]}
-                            variant={row.status === FLYER_ROW_STATUS.UNCONFIRMED ? 'outlined' : 'filled'}
-                            label={FLYER_ROW_STATUS_LABEL[row.status]}
-                        />
-                        {reasons.length > 0 && (
-                            <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.25, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={reasons.join('・')}>
-                                {reasons.join('・')}
-                            </Typography>
-                        )}
-                    </Stack>
-                );
-            },
+            renderCell: ({ row }) => <FlyerStatusCell item={row.item} />,
         },
         {
             field: 'name',
@@ -269,96 +289,99 @@ export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
             minWidth: 200,
             flex: 1.2,
             sortable: false,
-            renderCell: ({ row }) => {
-                const read = row.item.read;
-                return (
-                    <Box sx={{ minWidth: 0 }}>
-                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                            <Typography sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={read.name}>
-                                {read.name}
-                            </Typography>
-                            {row.item.isManual && <Chip size="small" label="手入力" />}
-                        </Stack>
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {[read.volume, read.priceIncludingTax ? `税込 ${read.priceIncludingTax}円` : '税込価格なし'].filter(Boolean).join('・')}
-                        </Typography>
-                    </Box>
-                );
-            },
+            renderCell: ({ row }) => <ProductNameCell item={row.item} />,
         },
         {
             field: 'allergens',
             headerName: 'アレルゲン表記',
-            minWidth: ALLERGEN_COLUMN_MIN_WIDTH,
+            minWidth: 200,
             flex: 1,
             sortable: false,
-            renderCell: ({ row }) => {
-                const labelText = row.item.read.allergenLabelText?.trim();
-                return (
-                    <Box sx={{ minWidth: 0 }}>
-                        {/* 読み取った表記の原文（チラシと見比べられるように。FR-FLYER-04a） */}
-                        {labelText && (
-                            <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={labelText}>
-                                「{labelText}」
-                            </Typography>
-                        )}
-                        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', mt: labelText ? 0.5 : 0 }}>
-                            {allergenChipsOf(row.item).map((chip) => (
-                                // 「表記なし」は読み落としのこともある。点線の枠で、ほかの品目と見分ける
-                                <Chip key={chip.key} size="small" color={chip.color} variant={chip.variant} label={chip.label} title={chip.label} sx={chip.isDashed ? { borderStyle: 'dashed' } : undefined} />
-                            ))}
-                        </Stack>
-                    </Box>
-                );
-            },
+            renderCell: ({ row }) => <FlyerAllergenChips item={row.item} />,
         },
         {
-            field: 'same',
-            headerName: '同じ商品か',
+            field: 'match',
+            headerName: '登録済みの同じ商品',
             minWidth: 240,
-            width: 240,
+            flex: 1,
             sortable: false,
-            renderCell: ({ row }) => {
-                const summary = sameProductSummary(row.item);
-                return (
-                    <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summary.title}>
-                            {summary.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summary.detail}>
-                            {summary.detail || '—'}
-                        </Typography>
-                    </Box>
-                );
-            },
+            renderCell: ({ row }) => <MatchCell menuId={menuId} item={row.item} />,
         },
     ];
 
+    // スマホ：分類のチップ・商品名・アレルゲン表記・同じ商品を1つの列に縦に並べる
+    const mobileColumns: GridColDef<GridRow>[] = [
+        {
+            field: 'summary',
+            headerName: '取り込みの分類・商品',
+            flex: 1,
+            minWidth: 200,
+            sortable: false,
+            renderCell: ({ row }) => (
+                <Stack spacing={0.75} sx={{ minWidth: 0, width: '100%' }}>
+                    <FlyerStatusCell item={row.item} isSingleLine={false} />
+                    <ProductNameCell item={row.item} />
+                    <FlyerAllergenChips item={row.item} isSingleLine={false} />
+                    <MatchCell menuId={menuId} item={row.item} />
+                </Stack>
+            ),
+        },
+    ];
+
+    const columns: GridColDef<GridRow>[] = [toggleColumn, ...(isMobile ? mobileColumns : desktopColumns)];
+
+    // 一覧の Stack は、中身（表の枠の最低の高さ）より小さく縮めない。縮めると、下の「外した掲載品」などが表に重なる
     return (
-        <Stack spacing={1} sx={{ flex: { md: '1 1 auto' }, minHeight: { md: 0 } }}>
-            {unconfirmedIds.length > 0 && (
+        <Stack spacing={1} sx={{ flex: { md: '1 0 auto' } }}>
+            {labelAbsentItems.length > 0 && (
+                <Paper
+                    variant="outlined"
+                    component="section"
+                    aria-labelledby="label-absent-summary-heading"
+                    sx={{ flexShrink: 0, px: 2, py: 1.5, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'center' } }}
+                >
+                    <Stack sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography id="label-absent-summary-heading" sx={{ fontWeight: 700 }}>
+                            アレルゲンの表記がないと読んだ {labelAbsentItems.length}件
+                        </Typography>
+                        <Typography variant="body2" color={labelAbsentPendingCount > 0 ? 'warning.dark' : 'text.secondary'}>
+                            {labelAbsentPendingCount > 0 ? `まだチラシと見比べていない ${labelAbsentPendingCount}件は、まとめて確定に入りません` : 'すべてチラシと見比べました'}
+                        </Typography>
+                    </Stack>
+                    <Button variant="outlined" onClick={() => setIsLabelAbsentDialogOpen(true)} sx={{ flexShrink: 0, minHeight: 44 }}>
+                        表記なしの商品をチラシと見比べる
+                    </Button>
+                </Paper>
+            )}
+            {reviewIds.length > 0 && (
                 <Button
-                    variant="contained"
+                    variant="outlined"
                     size="large"
                     onClick={() => {
                         setExpandedId(null);
-                        setReviewQueue(unconfirmedIds);
+                        setReviewQueue(reviewIds);
                     }}
                     sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' }, flexShrink: 0 }}
                 >
-                    未確定を1件ずつ確かめる（{unconfirmedIds.length}件）
+                    未確定を1件ずつ確かめる（再入力・要確認 {reviewIds.length}件）
                 </Button>
             )}
+            <Typography id="flyer-category-heading" variant="subtitle2" component="h3" sx={{ flexShrink: 0, fontWeight: 700, pt: 0.5 }}>
+                取り込みの分類
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 400 }}>
+                    （チラシの商品を今週の商品に入れられるか。献立のアレルゲンの表示とは別のものです）
+                </Typography>
+            </Typography>
             <Tabs
                 value={tab}
                 onChange={(_, value: FlyerRowTab) => handleTabChange(value)}
                 variant="scrollable"
                 allowScrollButtonsMobile
-                aria-label="状態で絞り込む"
+                aria-label="取り込みの分類で絞り込む"
                 sx={{ flexShrink: 0, borderBottom: 1, borderColor: 'divider' }}
             >
-                {TABS.map((value) => (
-                    <Tab key={value} value={value} label={`${tabLabel(value)} ${filterRows(sortedRows, value).length}`} />
+                {FLYER_ROW_TABS.map((value) => (
+                    <Tab key={value} value={value} label={`${flyerTabLabel(value)} ${flyerTabCount(session, value)}`} />
                 ))}
             </Tabs>
             <Box ref={wrapperRef} sx={{ flex: { md: '1 1 auto' }, minHeight: { md: 320 }, minWidth: 0 }}>
@@ -367,9 +390,9 @@ export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
                     aria-label="読み取った商品"
                     rows={gridRows}
                     columns={columns}
-                    // 商品の行はそろえた高さ、詳細の行は中身に合わせる
-                    getRowHeight={({ model }) => (model.isDetail ? 'auto' : productRowHeight)}
-                    getEstimatedRowHeight={() => productRowHeight}
+                    // 行の高さは中身に合わせる（チップや一致した商品のアレルゲンの表示が折り返しても切れないように）
+                    getRowHeight={() => 'auto'}
+                    getEstimatedRowHeight={() => (isMobile ? 160 : 80)}
                     getRowClassName={({ row }) => (row.isDetail ? 'flyer-detail-row' : row.id === expandedId ? 'flyer-expanded-row' : '')}
                     getCellClassName={({ row }) => (row.isDetail ? 'flyer-detail-cell' : '')}
                     onRowClick={({ row }) => !row.isDetail && handleToggle(row.id)}
@@ -387,7 +410,7 @@ export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
                         '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700 },
                         '& .MuiDataGrid-row': { cursor: 'pointer', scrollMarginTop: 72 },
                         // DataGrid はセルに行の高さぶんの line-height を付ける。チップなどの行が広がらないように戻す
-                        '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center', py: 1, lineHeight: 'normal' },
+                        '& .MuiDataGrid-cell': { display: 'flex', alignItems: 'center', py: 1, lineHeight: 'normal', minHeight: MIN_ROW_HEIGHT },
                         '& .flyer-expanded-row, & .flyer-expanded-row:hover': { bgcolor: 'action.selected' },
                         '& .flyer-detail-row, & .flyer-detail-row:hover': { bgcolor: 'background.default', cursor: 'auto' },
                         '& .flyer-detail-cell': { display: 'block', p: 0, overflow: 'visible', whiteSpace: 'normal' },
@@ -395,6 +418,7 @@ export const FlyerItemGrid = ({ menuId, items }: FlyerItemGridProps) => {
                     }}
                 />
             </Box>
+            {isLabelAbsentDialogOpen && <FlyerLabelAbsentCompareDialog menuId={menuId} items={labelAbsentItems} isOpen onClose={() => setIsLabelAbsentDialogOpen(false)} />}
             {reviewQueue && <FlyerReviewDialog menuId={menuId} items={items} queue={reviewQueue} isOpen onClose={() => setReviewQueue(null)} />}
         </Stack>
     );

@@ -33,7 +33,6 @@ public static class E2EEnvironment
         DemoDataGuard.EnsureAllowed(environment, configuration);
         services.Replace(ServiceDescriptor.Scoped<IFlyerReader, FakeFlyerReader>());
         services.Replace(ServiceDescriptor.Scoped<IFlyerReviewer, FakeFlyerReviewer>());
-        services.Replace(ServiceDescriptor.Scoped<IProductMatchJudge, FakeProductMatchJudge>());
         services.Replace(ServiceDescriptor.Scoped<IMenuPlannerAgent, FakeMenuPlannerAgent>());
         services.Replace(ServiceDescriptor.Scoped<IBudgetFitExplainer, FakeBudgetFitExplainer>());
         services.Replace(ServiceDescriptor.Scoped<IAllergenExtractor, FakeAllergenExtractor>());

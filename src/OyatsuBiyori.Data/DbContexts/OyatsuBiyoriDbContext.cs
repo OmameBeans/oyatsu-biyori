@@ -94,6 +94,7 @@ public sealed class OyatsuBiyoriDbContext(DbContextOptions<OyatsuBiyoriDbContext
             entity.ToTable("allergens");
             entity.HasIndex(e => e.Code).IsUnique();
             entity.HasMany(e => e.Keywords).WithOne(e => e.Allergen).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(e => e.LabelAbbreviations).WithOne(e => e.Allergen).OnDelete(DeleteBehavior.Cascade);
             entity.HasData(MasterSeed.Allergens());
         });
 
@@ -102,6 +103,14 @@ public sealed class OyatsuBiyoriDbContext(DbContextOptions<OyatsuBiyoriDbContext
             entity.ToTable("allergen_keywords");
             entity.HasIndex(e => new { e.AllergenId, e.NormalizedKeyword }).IsUnique();
             entity.HasData(MasterSeed.Keywords());
+        });
+
+        builder.Entity<AllergenLabelAbbreviation>(entity =>
+        {
+            // チラシの表記の略記（D-96）。探す言葉とは別の表にする（全文検索・商品名の検索には使わない）
+            entity.ToTable("allergen_label_abbreviations");
+            entity.HasIndex(e => new { e.AllergenId, e.NormalizedAbbreviation }).IsUnique();
+            entity.HasData(MasterSeed.LabelAbbreviations());
         });
 
         builder.Entity<AllergenGroup>(entity =>

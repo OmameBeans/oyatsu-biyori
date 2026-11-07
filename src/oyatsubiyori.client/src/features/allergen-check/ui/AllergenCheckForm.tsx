@@ -28,6 +28,11 @@ import { ImagePicker, JobProgress } from '../../../shared/ui';
 
 interface AllergenCheckFormProps {
     product: ProductDetail;
+    /**
+     * ダイアログで開いたときの「閉じる」（献立案の画面など）。渡すと、記録したあとに「商品の詳細へ戻る」と献立へのリンクの代わりに
+     * 「閉じる」を出す（今の画面にとどまるため）。渡さなければ SC-08 の画面として動く
+     */
+    onDone?: () => void;
 }
 
 type Decision = 'contains' | 'notContains' | 'undecided';
@@ -82,7 +87,7 @@ const HighlightedText = ({ text, ranges }: { text: string; ranges: KeywordRange[
  * AI が「含む」としなかった品目は未確定のまま並べ、「残りをすべて含まないにする」を職員が押して決める（自動で確定しない。FR-PROD-06）。
  * パッケージで記録できるのは、全文があり、すべての品目を決めたときだけ（SR-12・SR-15）。判定・強調の範囲はサーバーで求める。
  */
-export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
+export const AllergenCheckForm = ({ product, onDone }: AllergenCheckFormProps) => {
     const startExtraction = useStartExtraction(product.id);
     const record = useRecordCheck(product.id);
     const [images, setImages] = useState<PreparedImage[]>([]);
@@ -176,9 +181,15 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                         </Typography>
                         {result.usages.map((usage) => (
                             <Box key={`${usage.menuId}-${usage.date}`}>
-                                <Link component={RouterLink} to={menuPath(usage.menuId, 4)} color="inherit" sx={{ fontWeight: 600 }}>
-                                    {formatDateLabel(usage.date)}の献立で使われています
-                                </Link>
+                                {onDone ? (
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                        {formatDateLabel(usage.date)}の献立で使われています
+                                    </Typography>
+                                ) : (
+                                    <Link component={RouterLink} to={menuPath(usage.menuId, 4)} color="inherit" sx={{ fontWeight: 600 }}>
+                                        {formatDateLabel(usage.date)}の献立で使われています
+                                    </Link>
+                                )}
                             </Box>
                         ))}
                     </Alert>
@@ -186,9 +197,15 @@ export const AllergenCheckForm = ({ product }: AllergenCheckFormProps) => {
                     <Alert severity="info">この商品を使う今日以降の献立はありません。</Alert>
                 )}
                 <Box>
-                    <Button component={RouterLink} to={productPath(product.id)}>
-                        商品の詳細へ戻る
-                    </Button>
+                    {onDone ? (
+                        <Button variant="contained" onClick={onDone}>
+                            閉じる
+                        </Button>
+                    ) : (
+                        <Button component={RouterLink} to={productPath(product.id)}>
+                            商品の詳細へ戻る
+                        </Button>
+                    )}
                 </Box>
             </Stack>
         );

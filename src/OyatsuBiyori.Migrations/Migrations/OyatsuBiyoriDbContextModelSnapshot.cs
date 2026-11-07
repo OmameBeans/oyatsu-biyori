@@ -1131,6 +1131,95 @@ namespace OyatsuBiyori.Migrations.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OyatsuBiyori.Biz.Entities.AllergenLabelAbbreviation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Abbreviation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AllergenId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedAbbreviation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdateDateTime")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdateUserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AllergenId", "NormalizedAbbreviation")
+                        .IsUnique();
+
+                    b.ToTable("allergen_label_abbreviations", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "6dc8cd42-a464-5cce-98c5-4691ba1b729c",
+                            Abbreviation = "麦",
+                            AllergenId = "403f3d51-956c-5848-b7f3-411324ae00f7",
+                            NormalizedAbbreviation = "麦",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "e31068d1-20ad-5c15-9a92-1ec4cf6562fc",
+                            Abbreviation = "え",
+                            AllergenId = "f15f03dd-1e21-5c81-8d08-9aa2bda54afb",
+                            NormalizedAbbreviation = "え",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "932cf2c8-df47-52dd-a96c-37bd00cdaf5d",
+                            Abbreviation = "か",
+                            AllergenId = "0fe7fdc2-ff60-56f8-a099-e7822aecf133",
+                            NormalizedAbbreviation = "か",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "87ef7b09-f621-5614-8206-0accdaea59f3",
+                            Abbreviation = "落",
+                            AllergenId = "67a65d9c-8b2a-598e-85d8-891be56e9ce7",
+                            NormalizedAbbreviation = "落",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "7c89cb49-90dc-5c13-81da-956a121446a9",
+                            Abbreviation = "そ",
+                            AllergenId = "a8c6b740-dc83-5039-ae1c-1363572c3777",
+                            NormalizedAbbreviation = "そ",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "b444e0b4-6947-5d1c-943a-22322b3c7299",
+                            Abbreviation = "く",
+                            AllergenId = "cac5c06c-3692-53f1-9a39-1b27cb6ef16f",
+                            NormalizedAbbreviation = "く",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "4ac2a530-431b-5bc3-b5f6-a6068211f532",
+                            Abbreviation = "カ",
+                            AllergenId = "2ad0d7cf-4b00-52a6-b63f-dcf475d37ae8",
+                            NormalizedAbbreviation = "カ",
+                            UpdateDateTime = new DateTime(2026, 11, 3, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("OyatsuBiyori.Biz.Entities.ApiUsageLog", b =>
                 {
                     b.Property<string>("Id")
@@ -1771,6 +1860,17 @@ namespace OyatsuBiyori.Migrations.Migrations
                     b.Navigation("Allergen");
                 });
 
+            modelBuilder.Entity("OyatsuBiyori.Biz.Entities.AllergenLabelAbbreviation", b =>
+                {
+                    b.HasOne("OyatsuBiyori.Biz.Entities.Allergen", "Allergen")
+                        .WithMany("LabelAbbreviations")
+                        .HasForeignKey("AllergenId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Allergen");
+                });
+
             modelBuilder.Entity("OyatsuBiyori.Biz.Entities.AvoidedAllergen", b =>
                 {
                     b.HasOne("OyatsuBiyori.Biz.Entities.Allergen", "Allergen")
@@ -1837,6 +1937,8 @@ namespace OyatsuBiyori.Migrations.Migrations
             modelBuilder.Entity("OyatsuBiyori.Biz.Entities.Allergen", b =>
                 {
                     b.Navigation("Keywords");
+
+                    b.Navigation("LabelAbbreviations");
                 });
 
             modelBuilder.Entity("OyatsuBiyori.Biz.Entities.AllergenCheck", b =>

@@ -113,29 +113,31 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
     {
         var p = new Dictionary<string, Product>(StringComparer.Ordinal);
 
-        // チラシ（samples/flyers/flyer-01）と同じ商品・味違い・内容量違い
-        p["yasai-senbei"] = Product("ぴよぴよ やさいせんべい", "ひだまり米菓", "45g", 12, SnackType.Salty, 159, "8101", flavor: "せんべい");
-        Confirmed(p["yasai-senbei"], 20, "米、かぼちゃ、にんじん、砂糖、食塩", []);
-        p["usushio"] = Product("CO・OP ポテトチップス うすしお", "ひだまり生協", "18g×6袋", 6, SnackType.Salty, 257, "8102", flavor: "スナック");
+        // チラシ（samples/flyers/flyer-01〜03）と同じ商品・味違い・内容量違い。同じ商品は、チラシの注文番号にそろえる
+        // 同じ商品：やさいせんべい（flyer-01）・ミルクビスケット（flyer-02）・いちごゼリー・ヨーグルトゼリー（flyer-03）
+        // 味違い：ポテトチップス うすしお（flyer-02 の のりしお。flyer-02 の「うすしお ポテトチップス 大袋」は名前の似た別商品）。内容量違い：さくさくクッキー（flyer-02 は5袋入）・小魚あられ・海苔せんべい（flyer-01）
+        p["yasai-senbei"] = Product("ひだまり やさいせんべい", "ひだまり米菓", "8枚（個包装）", 8, SnackType.Salty, 213, "8111", flavor: "せんべい");
+        Confirmed(p["yasai-senbei"], 20, "うるち米（国産）、かぼちゃ、ほうれん草、にんじん、砂糖、食塩", []);
+        p["usushio"] = Product("CO・OP ポテトチップス うすしお", "ひだまり生協", "18g×6袋", 6, SnackType.Salty, 257, "7213", flavor: "スナック");
         Confirmed(p["usushio"], 20, "じゃがいも（国産）、植物油、食塩", []);
-        p["sakusaku-cookie"] = Product("CO・OP さくさくクッキー", "ひだまり生協", "10袋入", 10, SnackType.Sweet, 410, "8105", flavor: "焼き菓子");
+        p["sakusaku-cookie"] = Product("CO・OP さくさくクッキー", "ひだまり生協", "10袋入", 10, SnackType.Sweet, 410, "7214", flavor: "焼き菓子");
         Confirmed(p["sakusaku-cookie"], 20, "小麦粉、砂糖、バター、鶏卵、食塩／膨張剤、（一部に小麦・卵・乳成分を含む）", ["wheat", "egg", "milk"]);
-        p["ichigo-jelly"] = Product("うさぎのミミ いちごゼリー", "うさぎ乳業", "6個入", 6, SnackType.Smooth, 278, "8107", character: "うさぎのミミ", flavor: "ゼリー");
+        p["ichigo-jelly"] = Product("うさぎのミミ いちごゼリー", "うさぎ乳業", "6個入", 6, SnackType.Smooth, 278, "431", character: "うさぎのミミ", flavor: "ゼリー");
         Confirmed(p["ichigo-jelly"], 100, "果糖ぶどう糖液糖、いちご果汁、ゲル化剤（増粘多糖類）、酸味料、香料", []);
-        p["kozakana"] = Product("にこにこ 小魚あられ", "にこにこフーズ", "4g×3袋", 3, SnackType.Salty, 222, "8106", flavor: "せんべい");
+        p["kozakana"] = Product("にこにこ 小魚あられ", "にこにこフーズ", "4g×3袋", 3, SnackType.Salty, 222, "7215", flavor: "せんべい");
         Reference(p["kozakana"], 30, AllergenCheckSource.Flyer, "表記なし", []);
         p["milk-biscuit"] = Product("くまのポッケ ミルクビスケット", "もりのこ製菓", "120g（10袋）", 10, SnackType.Sweet, 354, "8103", character: "くまのポッケ", flavor: "焼き菓子");
         Confirmed(p["milk-biscuit"], 20, "小麦粉、砂糖、ショートニング、全粉乳、食塩／膨張剤、（一部に小麦・乳成分を含む）", ["wheat", "milk"]);
+        p["yogurt-jelly"] = Product("しろくまの ヨーグルトゼリー", "うさぎ乳業", "6個入", 6, SnackType.Smooth, 318, "8131", character: "しろくま", flavor: "ゼリー");
+        Confirmed(p["yogurt-jelly"], 20, "砂糖、乳製品、ゲル化剤（増粘多糖類）、酸味料、香料、（一部に乳成分を含む）", ["milk"]);
+        p["umi-senbei"] = Product("まるまる 海苔せんべい", "ひだまり米菓", "12枚", 12, SnackType.Salty, 248, "7204", flavor: "せんべい");
+        Confirmed(p["umi-senbei"], 20, "うるち米、しょうゆ、のり、砂糖（一部に小麦・大豆を含む）", ["wheat", "soybean"]);
 
         // チラシにない商品（確認済み・参考・不明・要再確認・未確認の品目あり・使わない が混ざる）
         p["okome-snack"] = Product("もぐもぐ おこめスナック", "ひだまり米菓", "10袋", 10, SnackType.Salty, 298, "7201", flavor: "スナック");
         Confirmed(p["okome-snack"], 20, "うるち米（国産）、植物油、砂糖、食塩", []);
-        p["yogurt-jelly"] = Product("しろくまの ヨーグルトゼリー", "うさぎ乳業", "6個入", 6, SnackType.Smooth, 318, "7202", character: "しろくま", flavor: "ゼリー");
-        Confirmed(p["yogurt-jelly"], 20, "砂糖、乳製品、ゲル化剤（増粘多糖類）、酸味料、香料、（一部に乳成分を含む）", ["milk"]);
         p["mushipan"] = Product("ふんわり 蒸しパン", "ふわり洋菓子", "5個", 5, SnackType.Sweet, 268, "7203", flavor: "パン");
         Confirmed(p["mushipan"], 20, "小麦粉、砂糖、鶏卵、牛乳、植物油／膨張剤、（一部に小麦・卵・乳成分を含む）", ["wheat", "egg", "milk"]);
-        p["umi-senbei"] = Product("まるまる 海苔せんべい", "ひだまり米菓", "12枚", 12, SnackType.Salty, 248, "7204", flavor: "せんべい");
-        Confirmed(p["umi-senbei"], 20, "うるち米、しょうゆ、のり、砂糖（一部に小麦・大豆を含む）", ["wheat", "soybean"]);
         p["kokutou-fugashi"] = Product("ほっこり 黒糖ふ菓子", "やまぶき屋", "8本", 8, SnackType.Sweet, 198, "7205", flavor: "焼き菓子");
         Confirmed(p["kokutou-fugashi"], 20, "小麦粉、黒糖、砂糖、水あめ（一部に小麦を含む）", ["wheat"]);
         p["mikan-jelly-old"] = Product("ぷるぷる みかんゼリー", "うさぎ乳業", "6個入", 6, SnackType.Smooth, 268, "7206", flavor: "ゼリー");
@@ -151,7 +153,7 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
         p["kinako-cookie"] = Product("どんぐり きなこクッキー", "やまぶき屋", "10枚", 10, SnackType.Sweet, 248, "7212", flavor: "焼き菓子");
         Confirmed(p["kinako-cookie"], 20, "小麦粉、きな粉、砂糖、植物油（一部に小麦・大豆を含む）", ["wheat", "soybean"]);
         p["kinako-cookie"].IsDisabled = true;
-        p["mugicha"] = Product("CO・OP 麦茶（国産六条大麦）", "ひだまり生協", "125ml×18", 18, SnackType.NotSnack, 777, "8111", flavor: "お茶");
+        p["mugicha"] = Product("CO・OP 麦茶（国産六条大麦）", "ひだまり生協", "125ml×18", 18, SnackType.NotSnack, 777, "7216", flavor: "お茶");
         return p;
     }
 

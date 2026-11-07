@@ -62,10 +62,13 @@ internal static class TestData
         return check;
     }
 
-    /// <summary>架空の商品</summary>
+    /// <summary>架空のメーカー（チラシの取り込みの照合は名前＋メーカーの完全一致。D-100）</summary>
+    public const string TestMaker = "ひだまり製菓";
+
+    /// <summary>架空の商品（メーカーは TestMaker）</summary>
     public static Product Product(string name, params AllergenCheck[] checks)
     {
-        var product = new Product { Name = name, NormalizedName = TextNormalizer.ForProductMatch(name) };
+        var product = new Product { Name = name, NormalizedName = TextNormalizer.ForProductMatch(name), Maker = TestMaker };
         foreach (var check in checks)
         {
             check.ProductId = product.Id;
@@ -96,6 +99,11 @@ internal static class TestData
         foreach (var keyword in MasterSeed.Keywords())
         {
             byId[keyword.AllergenId].Keywords.Add(keyword);
+        }
+
+        foreach (var abbreviation in MasterSeed.LabelAbbreviations())
+        {
+            byId[abbreviation.AllergenId].LabelAbbreviations.Add(abbreviation);
         }
 
         return allergens;

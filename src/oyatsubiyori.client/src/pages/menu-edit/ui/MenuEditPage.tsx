@@ -15,10 +15,11 @@ import type { Theme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import { useSnackbar } from 'notistack';
 import { useFlyerImport } from '../../../entities/flyer';
+import { AllergenCheckDialog } from '../../../features/allergen-check';
 import { useMenu } from '../../../entities/menu';
 import { FlyerImportStep } from '../../../features/flyer-import';
 import { ListedProductsStep } from '../../../features/listed-products';
-import { MenuBoard } from '../../../features/menu-board';
+import { InterpretedRequestsButton, MenuBoard } from '../../../features/menu-board';
 import { ChatPanel } from '../../../features/menu-chat';
 import { MenuProductPanel } from '../../../features/menu-products';
 import { RequestStep } from '../../../features/menu-request';
@@ -113,13 +114,17 @@ export const MenuEditPage = () => {
     const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
     // 手順3の「いつもの条件」の変更ダイアログ
     const [isConditionsOpen, setIsConditionsOpen] = useState(false);
+    // 手順4の「パッケージで確認する」で確かめている商品（画面を離れずにダイアログで確かめる）
+    const [checkingProductId, setCheckingProductId] = useState<string | null>(null);
     const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
     const stepperRef = useRef<HTMLDivElement>(null);
 
     const hasItems = menu.days.some((day) => day.items.length > 0);
     const isReading = !!flyerImport.job && !isJobFinished(flyerImport.job);
-    const hasUnconfirmed = (flyerImport.session?.unconfirmedCount ?? 0) > 0;
+    // 確定できる・直せる行（再入力・要確認・使えるの未確定）が残っていれば手順1から。使えないの行は確定しないので数えない（件数はサーバーの値）
+    const flyerCounts = flyerImport.session?.counts;
+    const hasUnconfirmed = !!flyerCounts && flyerCounts.needsInput + flyerCounts.new + flyerCounts.usable > 0;
     const defaultStep = isReading || hasUnconfirmed || menu.listedCount === 0 ? 1 : hasItems || menu.requestText ? 4 : 2;
     const step = Number(params.get('step')) || defaultStep;
     const goStep = (next: number) => setParams({ step: String(next) }, { replace: false });
@@ -211,6 +216,7 @@ export const MenuEditPage = () => {
                                             isBudgetFitRequested={isBudgetFitRequested}
                                             onBudgetFitClosed={() => setIsBudgetFitRequested(false)}
                                             onEditRequest={() => goStep(3)}
+                                            onCheckAllergen={setCheckingProductId}
                                         />
                                     </Box>
                                 }
@@ -222,6 +228,7 @@ export const MenuEditPage = () => {
                                             onUnsavedInputChange={setUnsavedInput}
                                             isCollapsed={isWide && isChatCollapsed}
                                             onToggleCollapsed={isWide ? toggleChat : undefined}
+                                            headerActions={<InterpretedRequestsButton menu={menu} />}
                                         />
                                     </Box>
                                 }
@@ -231,6 +238,7 @@ export const MenuEditPage = () => {
                 )}
             </PageErrorBoundary>
             <ConditionsDialog menu={menu} isOpen={isConditionsOpen} onClose={() => setIsConditionsOpen(false)} />
+            <AllergenCheckDialog productId={checkingProductId} onClose={() => setCheckingProductId(null)} />
             <ConfirmDialog
                 isOpen={isLeaveConfirmOpen}
                 title="作成を中断して一覧へ戻りますか？"

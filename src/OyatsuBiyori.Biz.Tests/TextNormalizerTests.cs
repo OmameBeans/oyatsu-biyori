@@ -163,4 +163,17 @@ public class TextNormalizerTests
         // 空の言葉はすべての商品に当たってしまうため、登録時に拒む（T1-21）
         Assert.Equal(string.Empty, TextNormalizer.ForKeywordSearch("・・・ "));
     }
+
+    [Theory]
+    [InlineData("カ", "カ")]
+    [InlineData("ｶ", "カ")]
+    [InlineData("か", "か")]
+    [InlineData(" （麦） ", "麦")]
+    [InlineData("ｴ", "エ")]
+    public void 略記の照合用の正規化はカタカナをひらがなにしない(string text, string expected)
+    {
+        // 「か」（かに）と「カ」（カシューナッツ）を字で分けるため（D-100、FR-IMPORT-32）
+        Assert.Equal(expected, TextNormalizer.ForLabelAbbreviation(text));
+        Assert.Equal(string.Empty, TextNormalizer.ForLabelAbbreviation(null));
+    }
 }

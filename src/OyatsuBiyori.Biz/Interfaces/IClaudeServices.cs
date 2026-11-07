@@ -43,6 +43,11 @@ public sealed record FlyerReading(IReadOnlyList<FlyerReadProduct> Items);
 /// <param name="SnackType">おやつの分類の候補</param>
 /// <param name="CharacterTags">キャラクターのタグ</param>
 /// <param name="FlavorTags">味・種類のタグ（決まった語）</param>
+/// <param name="IsNonFood">
+/// 食品以外の掲載品（洗剤・日用品・おもちゃなど）か（FR-IMPORT-20）。アプリはこの商品を分類せず「外した掲載品」に入れる（職員は「戻す」で戻せる）。
+/// 大袋のお菓子・乳幼児向けの商品・飲み物は食品なので false
+/// </param>
+/// <param name="NonFoodReason">食品以外とした理由（IsNonFood のときだけ。画面の「外した掲載品」に出す）</param>
 public sealed record FlyerReadProduct(
     string Name,
     string? Maker,
@@ -61,7 +66,9 @@ public sealed record FlyerReadProduct(
     string? PiecesPerPackReason,
     SnackType? SnackType,
     IReadOnlyList<string> CharacterTags,
-    IReadOnlyList<string> FlavorTags);
+    IReadOnlyList<string> FlavorTags,
+    bool IsNonFood = false,
+    string? NonFoodReason = null);
 
 /// <summary>
 /// 読み取りの検証（別の呼び出し。T3-05）。疑わしい箇所・読み落とした商品・読み落としたアレルゲン表記だけを返させる（書き換えさせない）。
@@ -86,34 +93,6 @@ public sealed record FlyerMissedProduct(string Name, string Reason);
 
 /// <summary>読み落としたアレルゲン表記（確認を増やす方向の指摘だけ採用する。SR-19）</summary>
 public sealed record FlyerMissedAllergenLabel(int Index, string LabelText, string Reason);
-
-/// <summary>
-/// 商品照合の判定（Haiku。T3-06）。アプリのルールで決まらなかったものだけを回す。結果は候補で、確定は職員。
-/// </summary>
-public interface IProductMatchJudge
-{
-    /// <summary>1商品と候補（5件まで）を比べる</summary>
-    Task<Result<ProductMatchJudgement>> JudgeAsync(ProductMatchInput item, IReadOnlyList<Product> candidates, CancellationToken cancellationToken);
-}
-
-/// <summary>照合の判定の種類</summary>
-public enum ProductMatchVerdict
-{
-    /// <summary>同じ商品</summary>
-    Same,
-
-    /// <summary>味違い</summary>
-    FlavorVariant,
-
-    /// <summary>内容量違い</summary>
-    VolumeVariant,
-
-    /// <summary>別の商品（迷う場合もこれ）</summary>
-    Different,
-}
-
-/// <summary>照合の判定（ProductId は候補のどれか。別の商品なら null）</summary>
-public sealed record ProductMatchJudgement(ProductMatchVerdict Verdict, string? ProductId, string Reason);
 
 /// <summary>
 /// パッケージの原材料表示からの読み取り（Sonnet・4枚まで。T5-01）。結果は候補で、「確認済み」にするのは職員だけ（SR-03）。

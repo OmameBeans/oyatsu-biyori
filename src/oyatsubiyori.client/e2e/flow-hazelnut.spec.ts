@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test';
 import type { Browser, TestInfo } from '@playwright/test';
 import { COLOR_MODE } from '../src/shared/type/colorMode';
 import { PREFERENCE_KEY } from '../src/shared/type/preferenceKey';
-import { captureScreen, captureScreenAs, expectReadable, listedProductItem, openFlyerItemDetail } from './helpers';
+import { captureScreen, captureScreenAs, expectReadable, flyerCategoryChip, flyerRow, listedProductItem, openFlyerItemDetail, productItem } from './helpers';
 
-const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-01.png');
+const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-02.png');
 const PACKAGE_IMAGE = path.resolve(process.cwd(), '../../samples/packages/package-8104-back.png');
 
 /**
@@ -76,11 +76,13 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         await page.getByRole('region', { name: /^来週 / }).getByRole('button', { name: /献立を作る|開く/ }).click();
         await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
         await page.getByRole('button', { name: '読み取る' }).click();
-        await expect(page.getByText('読み取った商品 20件')).toBeVisible({ timeout: 30_000 });
+        // flyer-02 の20商品のうち、食品以外の1件は外した掲載品になる（D-100）
+        await expect(page.getByText('読み取った商品 19件')).toBeVisible({ timeout: 30_000 });
+        // 登録済みの商品に同じ名前とメーカーの商品がなく、表記（乳・麦）に避ける品目もないので、取り込みの分類は要確認（09 の 3）
+        await expect(flyerCategoryChip(flyerRow(page, 'ことりのさくさくショコラ'))).toHaveText('要確認');
         const chocolate = await openFlyerItemDetail(page, 'ことりのさくさくショコラ');
-        await chocolate.getByLabel('新しい商品として登録').check();
-        await chocolate.getByRole('button', { name: '確定する' }).click();
-        await expect(page.getByText('「ことりのさくさくショコラ」を確定しました')).toBeVisible();
+        await chocolate.getByRole('button', { name: '新しい商品として登録', exact: true }).click();
+        await expect(page.getByText('「ことりのさくさくショコラ」を新しい商品として登録しました')).toBeVisible();
 
         // 2. 今週の商品では 🟡 要確認（チラシの情報だけ）で、献立に入れられる
         await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
@@ -95,32 +97,48 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         await wednesday.getByRole('button', { name: '足す' }).click();
         await expect(wednesday.getByText('ことりのさくさくショコラ')).toBeVisible();
 
-        // 4. カードからアレルゲン確認へ進み、パッケージを撮って読み取る
-        await wednesday.getByRole('link', { name: 'パッケージで確認する' }).first().click();
-        await expect(page).toHaveURL(/\/products\/[0-9a-f-]+\/check/);
-        const productUrl = new URL(page.url()).pathname.replace(/\/check$/, '');
-        await page.getByTestId('file-input').setInputFiles(PACKAGE_IMAGE);
-        await page.getByRole('button', { name: '読み取る', exact: true }).click();
-        await expect(page.getByLabel('原材料の全文')).toHaveValue(/ヘーゼルナッ\nツペースト/, { timeout: 30_000 });
+        // 4. 商品のカードは閉じていても 🟡 要確認 の印が出る。開いて「パッケージで確認する」を押すと、
+        //    画面を離れずにアレルゲン確認のダイアログが開き、パッケージを撮って読み取れる
+        await expect(wednesday.getByRole('button', { name: 'ことりのさくさくショコラの詳細を開く' })).toHaveAttribute('aria-expanded', 'false');
+        await wednesday.getByRole('button', { name: 'ことりのさくさくショコラの詳細を開く' }).click();
+        await wednesday.getByRole('button', { name: 'パッケージで確認する' }).first().click();
+        const menuPathBefore = new URL(page.url()).pathname;
+        const checkDialog = page.getByRole('dialog', { name: /^アレルゲン確認：/ });
+        await expect(checkDialog).toBeVisible();
+        expect(new URL(page.url()).pathname).toBe(menuPathBefore);
+        await checkDialog.getByTestId('file-input').setInputFiles(PACKAGE_IMAGE);
+        await checkDialog.getByRole('button', { name: '読み取る', exact: true }).click();
+        await expect(checkDialog.getByLabel('原材料の全文')).toHaveValue(/ヘーゼルナッ\nツペースト/, { timeout: 30_000 });
 
         // 5. 改行をまたいでも、当たった言葉を強調し、「含まない」にしても 🔴 が消えないことを示す
-        await expect(page.getByText(/^原材料に、避ける品目の言葉があります：.*ヘーゼルナッツ/)).toBeVisible();
-        await expect(page.getByText(/^原材料に.*『含まない』にしても、使えません の表示は消えません/)).toBeVisible();
+        await expect(checkDialog.getByText(/^原材料に、避ける品目の言葉があります：.*ヘーゼルナッツ/)).toBeVisible();
+        await expect(checkDialog.getByText(/^原材料に.*『含まない』にしても、使えません の表示は消えません/)).toBeVisible();
 
         // 職員が全文から言葉を消しても、AI が読み取った全文に言葉があることを示し続ける
-        await page.getByLabel('原材料の全文').fill('小麦粉（国内製造）、砂糖、全粉乳（一部に小麦・乳成分・大豆を含む）');
-        await expect(page.getByText(/^AI が読み取った全文に、避ける品目の言葉があります：.*ヘーゼルナッツ/)).toBeVisible();
-        await expect(page.getByRole('button', { name: 'パッケージで確認して記録' })).toBeDisabled();
-        await page.getByRole('button', { name: /残りをすべて含まないにする/ }).click();
-        await captureScreen(page, testInfo, 'sc-08-allergen-check');
-        await page.getByRole('button', { name: 'パッケージで確認して記録' }).click();
+        await checkDialog.getByLabel('原材料の全文').fill('小麦粉（国内製造）、砂糖、全粉乳（一部に小麦・乳成分・大豆を含む）');
+        await expect(checkDialog.getByText(/^AI が読み取った全文に、避ける品目の言葉があります：.*ヘーゼルナッツ/)).toBeVisible();
+        await expect(checkDialog.getByRole('button', { name: 'パッケージで確認して記録' })).toBeDisabled();
+        await checkDialog.getByRole('button', { name: /残りをすべて含まないにする/ }).click();
+        await captureScreen(page, testInfo, 'sc-09-step4-allergen-check-dialog');
+        await checkDialog.getByRole('button', { name: 'パッケージで確認して記録' }).click();
 
         // 6. 記録した結果は 🔴 使えません で、使っている献立が目立つ
-        await expect(page.getByText('記録しました')).toBeVisible();
-        await expect(page.getByText('原材料に『ヘーゼルナッツ』があります（ヘーゼルナッツ）').first()).toBeVisible();
-        await expect(page.getByText('今日以降の献立に、使えない商品が入っています', { exact: false })).toBeVisible();
-        await expect(page.getByRole('link', { name: /（水）の献立で使われています/ })).toBeVisible();
-        await captureScreen(page, testInfo, 'sc-08-recorded');
+        await expect(checkDialog.getByText('記録しました')).toBeVisible();
+        await expect(checkDialog.getByText('原材料に『ヘーゼルナッツ』があります（ヘーゼルナッツ）').first()).toBeVisible();
+        await expect(checkDialog.getByText('今日以降の献立に、使えない商品が入っています', { exact: false })).toBeVisible();
+        await expect(checkDialog.getByText(/（水）の献立で使われています/)).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step4-allergen-check-recorded');
+
+        // 閉じると、同じ画面のカードがすぐに 🔴 使えません になる（読み込み直さなくてよい）
+        await checkDialog.getByRole('button', { name: '閉じる', exact: true }).last().click();
+        await expect(checkDialog).toBeHidden();
+        await expect(wednesday.getByText('使えません', { exact: true })).toBeVisible();
+
+        // 商品詳細の場所（ダークの確認で使う）
+        await page.goto('/products');
+        await productItem(page, 'ことりのさくさくショコラ').getByRole('link').click();
+        await expect(page).toHaveURL(/\/products\/[0-9a-f-]+$/);
+        const productUrl = new URL(page.url()).pathname;
 
         // 7. 献立一覧の最上部に警告が出て、そこから献立を開ける
         await page.goto('/menus?view=list');
@@ -131,8 +149,10 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         // 8. 日ごとのカードにも 🔴 と「別の商品に替えてください」が出る
         await page.getByRole('link', { name: /（水）の献立/ }).first().click();
         const card = page.getByRole('region', { name: /（水）の献立$/ });
+        // 閉じたカードにも 🔴 の印が出て、開くと理由と次にすることが出る
         await expect(card.getByText('使えません', { exact: true })).toBeVisible();
         await expect(card.getByTestId('allergen-icon-Blocked')).toBeVisible();
+        await card.getByRole('button', { name: 'ことりのさくさくショコラの詳細を開く' }).click();
         await expect(card.getByText('別の商品に替えてください', { exact: false })).toBeVisible();
 
         // #4 ダークでも、🔴 の知らせ（献立一覧・商品詳細・確定のダイアログ）が読める（PC とスマホ。データは変えない）

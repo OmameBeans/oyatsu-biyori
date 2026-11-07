@@ -13,8 +13,8 @@ test.describe('SC-11 献立一覧（カレンダー）', () => {
         await page.getByRole('button', { name: 'カレンダー' }).click();
         await expect(page).toHaveURL(/\/menus\?view=calendar&month=\d{4}-\d{2}$/);
         await expect(page.getByRole('heading', { name: /^\d{4}年\d{1,2}月$/ })).toBeVisible();
-        // ダミーデータには今週の確定献立があるので、今週の日付が献立へのリンクになる
-        await expect(page.getByRole('link', { name: /の献立$/ }).first()).toBeVisible();
+        // ダミーデータには今週の確定献立があるので、今週の行に「献立を開く」が出る
+        await expect(page.getByRole('link', { name: /〜.+の献立を開く$/ }).first()).toBeVisible();
         // 「今週とこれから」「過去の献立を見る」は一覧のときだけ
         await expect(page.getByRole('region', { name: '今週とこれから' })).toHaveCount(0);
         await captureScreen(page, testInfo, 'sc-11-menu-calendar');
@@ -80,12 +80,14 @@ test.describe('SC-11 献立一覧（カレンダー）', () => {
         await page.goto('/menus?view=calendar');
         await expect(page.getByText(/^(使えません|要確認|使えます)：$/).first()).toBeAttached();
         if (testInfo.project.name === 'mobile') {
-            // スマホは日のマスを出さず、週のカードに日を並べる。週の日付のリンクで献立を開く
-            await page.getByRole('link', { name: /の献立$/ }).first().click();
+            // スマホは日のマスを出さず、週のカードに日を並べる。週の「献立を開く」で献立を開く
+            await page.getByRole('link', { name: /〜.+の献立を開く$/ }).first().click();
             await expect(page).toHaveURL(/\/menus\/[^/?]+$/);
             return;
         }
-        await page.getByRole('link', { name: /の献立を開く$/ }).first().click();
+        // 週の日付は押せない（週の献立は「献立を開く」から開く）
+        await expect(page.getByRole('link', { name: /^\d+\/\d+〜$/ })).toHaveCount(0);
+        await page.getByRole('link', { name: /^\d+\/\d+（.）の献立を開く$/ }).first().click();
         await expect(page).toHaveURL(/\/menus\/[^/?]+\?step=4$/);
     });
 });

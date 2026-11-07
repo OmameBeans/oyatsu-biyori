@@ -1,19 +1,21 @@
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import TuneIcon from '@mui/icons-material/Tune';
 import { useSnackbar } from 'notistack';
@@ -33,7 +35,7 @@ import {
 import type { ListedProduct, MenuDay, MenuDetail, MenuIssue, MenuItem as MenuItemData } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
 import { formatDateLabel, formatPerChild, formatYen } from '../../../shared/lib';
-import { allergenCheckPath, DAY_TYPE_LABEL, MENU_STATUS, SNACK_TYPE_LABEL } from '../../../shared/type';
+import { DAY_TYPE_LABEL, MENU_STATUS, SNACK_TYPE_LABEL } from '../../../shared/type';
 import { ClaudeText } from '../../../shared/ui';
 import { DaySettingsDialog } from './DaySettingsDialog';
 import { ItemCountDialog } from './ItemCountDialog';
@@ -44,6 +46,11 @@ interface DayCardProps {
     issues: MenuIssue[];
     candidates: ListedProduct[];
     isBusy: boolean;
+    /** 開いている商品のカード（献立の商品の id）。献立を直すとカードが作り直されるので、開閉は呼び出し側が持つ */
+    expandedItemIds: ReadonlySet<string>;
+    onToggleItem: (itemId: string) => void;
+    /** 「パッケージで確認する」（画面を離れずに、アレルゲン確認のダイアログを開く） */
+    onCheckAllergen: (productId: string) => void;
 }
 
 /**
@@ -51,8 +58,9 @@ interface DayCardProps {
  * 商品（1つずつ枠に入れる。1人あたりの個数・パック数・金額）・理由・警告、「商品を足す」。3つの部分は罫線で分ける。
  * 金額・判定・警告はサーバーが計算したものを出す。「メーカーへの確認が必要」はどの画面にも出さない（D-93）。
  * カードには、使える商品の一覧から商品をドラッグして足せる。ほかの日のカードの商品をドラッグすると、この日へ動かす（FR-MENU-24）。
+ * 縦の場所を空けるため、商品のカードは閉じた状態で出す（商品名・金額と、アレルゲンなどの注意の印だけ）。開くと、判定の理由・個数・操作が出る。
  */
-export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps) => {
+export const DayCard = ({ menu, day, issues, candidates, isBusy, expandedItemIds, onToggleItem, onCheckAllergen }: DayCardProps) => {
     const addItem = useAddItem(menu.id);
     const moveItem = useMoveItem(menu.id);
     const { enqueueSnackbar } = useSnackbar();
@@ -128,24 +136,38 @@ export const DayCard = ({ menu, day, issues, candidates, isBusy }: DayCardProps)
                             </Typography>
                         )}
                     </Box>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<TuneIcon />}
-                        disabled={isPending}
-                        onClick={() => setIsSettingsOpen(true)}
-                        aria-label={`${formatDateLabel(day.date)}の詳細設定`}
-                        sx={{ flexShrink: 0, bgcolor: 'background.paper' }}
-                    >
-                        詳細設定
-                    </Button>
+                    {/* 場所をとらないように、アイコンだけのボタンにする（何のボタンかはツールチップと読み上げの名前で示す） */}
+                    <Tooltip title="詳細設定（種別・人数・見出し）">
+                        <span>
+                            <IconButton
+                                color="primary"
+                                disabled={isPending}
+                                onClick={() => setIsSettingsOpen(true)}
+                                aria-label={`${formatDateLabel(day.date)}の詳細設定`}
+                                sx={{ flexShrink: 0 }}
+                            >
+                                <TuneIcon />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                 </Box>
             </Box>
 
             {/* 商品（1つずつ罫線の枠に入れる）・理由・この日の警告。PC ではここだけをスクロールする */}
             <Stack spacing={1} sx={{ p: 1.5, flex: 1, minHeight: 0, overflowY: { md: 'auto' }, '& > *': { flexShrink: 0 } }}>
                 {day.items.map((item) => (
-                    <ItemRow key={`${item.id}-${item.perChildCount}-${item.packCount}-${item.productId}`} menu={menu} day={day} item={item} issues={issues.filter((issue) => issue.menuItemId === item.id)} candidates={candidates} isBusy={isPending} />
+                    <ItemRow
+                        key={`${item.id}-${item.perChildCount}-${item.packCount}-${item.productId}`}
+                        menu={menu}
+                        day={day}
+                        item={item}
+                        issues={issues.filter((issue) => issue.menuItemId === item.id)}
+                        candidates={candidates}
+                        isBusy={isPending}
+                        isExpanded={expandedItemIds.has(item.id)}
+                        onToggle={() => onToggleItem(item.id)}
+                        onCheckAllergen={onCheckAllergen}
+                    />
                 ))}
                 {day.items.length === 0 && (
                     <Typography variant="body2" color="text.secondary">
@@ -216,9 +238,16 @@ interface ItemRowProps {
     issues: MenuIssue[];
     candidates: ListedProduct[];
     isBusy: boolean;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onCheckAllergen: (productId: string) => void;
 }
 
-const ItemRow = ({ menu, day, item, issues, candidates, isBusy }: ItemRowProps) => {
+/**
+ * 献立の商品1つのカード。閉じているときは、商品名・金額と、注意の印（アレルゲンの区分・ほかの警告の件数・確認し直し）だけを出す。
+ * アレルゲンの区分（使えません・要確認）は、閉じていても必ず出す（見落とさないように。表示名とアイコンは共通部品から出す）。
+ */
+const ItemRow = ({ menu, day, item, issues, candidates, isBusy, isExpanded, onToggle, onCheckAllergen }: ItemRowProps) => {
     const removeItem = useRemoveItem(menu.id);
     const replaceItem = useReplaceItem(menu.id);
     const acknowledge = useAcknowledge(menu.id);
@@ -231,6 +260,8 @@ const ItemRow = ({ menu, day, item, issues, candidates, isBusy }: ItemRowProps) 
     const isEditing = useIsMenuEditing(menu.id);
     // アレルゲンの警告は共通部品で出すので、ここでは重複・パック数などのほかの警告だけを出す
     const otherIssues = issues.filter((issue) => issue.kind !== 'AllergenWarning' && issue.kind !== 'AllergenBlocked');
+    const isAllergenAttention = !!item.judgement && item.judgement.category !== 'Safe';
+    const isRecheckNeeded = item.needsRecheck && menu.status === MENU_STATUS.CONFIRMED && !!item.judgement;
 
     // 入力欄の文字を選べるように、行全体ではなく持ち手だけをつかめるようにする（ドラッグ中の絵は行全体）
     const handleDragStart = (event: DragEvent) => {
@@ -253,114 +284,145 @@ const ItemRow = ({ menu, day, item, issues, candidates, isBusy }: ItemRowProps) 
                 >
                     <DragIndicatorIcon fontSize="small" />
                 </Box>
-                <Typography sx={{ fontWeight: 600, flex: 1, minWidth: 0 }}>{item.productName}</Typography>
-            </Stack>
-            {(item.snackType || item.tags.length > 0) && (
-                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 0.5 }} useFlexGap>
-                    {item.snackType && <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />}
-                    {item.tags.map((tag) => (
-                        <Chip key={`${tag.kind}-${tag.value}`} size="small" variant="outlined" label={tag.value} sx={{ height: 20, fontSize: 11 }} />
-                    ))}
-                </Stack>
-            )}
-            {item.judgement && item.judgement.category !== 'Safe' && (
-                <Box sx={{ mt: 0.5 }}>
-                    <AllergenJudgementLine judgement={item.judgement} isInMenu />
-                    <Button component={RouterLink} to={allergenCheckPath(item.productId)} size="small">
-                        パッケージで確認する
-                    </Button>
-                </Box>
-            )}
-            {item.needsRecheck && menu.status === MENU_STATUS.CONFIRMED && item.judgement && (
-                <Stack direction="row" spacing={1} sx={{ mt: 0.5, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
-                    <Chip size="small" color="warning" variant="outlined" label="確認し直し" />
-                    <Button
-                        size="small"
-                        disabled={acknowledge.isPending || isBusy}
-                        onClick={() =>
-                            item.judgementFingerprint &&
-                            acknowledge.mutate({ menuItemId: item.id, kind: item.judgement!.kind, fingerprint: item.judgementFingerprint }, { onError: notify })
-                        }
-                    >
-                        ☐ {acknowledgementSentence(item.judgement)}
-                    </Button>
-                </Stack>
-            )}
-            {otherIssues.map((issue) => (
-                <Typography key={issue.message} variant="body2" sx={{ mt: 0.5, color: issue.severity === 'Error' ? 'error.main' : 'warning.dark' }}>
-                    ⚠ {issue.message}
+                {/* 商品名を押しても開閉する（ボタンは右の矢印。読み上げではそちらを使う） */}
+                <Typography onClick={onToggle} sx={{ fontWeight: 600, flex: 1, minWidth: 0, cursor: 'pointer', mt: 0.25 }}>
+                    {item.productName}
                 </Typography>
-            ))}
-            {/* 個数は今の値だけを出し、「個数設定」のダイアログで直す */}
-            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 1.5 }}>
-                <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2">
-                        1人あたり {item.perChildCount}個・{item.packCount}パック
-                    </Typography>
-                    {/* パック数の根拠（人数 × 1人あたり ÷ 入数を切り上げ。計算はサーバー） */}
-                    {item.piecesPerPack !== null && (
-                        <Typography variant="caption" color="text.secondary" component="p">
-                            1パック {item.piecesPerPack}個入り
+                {!isExpanded && <Typography sx={{ fontWeight: 700, flexShrink: 0, mt: 0.25 }}>{formatYen(item.amount)}</Typography>}
+                <IconButton
+                    size="small"
+                    onClick={onToggle}
+                    aria-expanded={isExpanded}
+                    aria-label={`${item.productName}の詳細を${isExpanded ? '閉じる' : '開く'}`}
+                    sx={{ flexShrink: 0, mr: -0.75, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: (theme) => theme.transitions.create('transform') }}
+                >
+                    <ExpandMoreIcon fontSize="small" />
+                </IconButton>
+            </Stack>
+            {/* 閉じているときの注意の印（アレルゲンの区分・ほかの警告・確認し直し）。中身は開くと出る */}
+            {!isExpanded && (isAllergenAttention || otherIssues.length > 0 || isRecheckNeeded) && (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 0.5 }} useFlexGap>
+                    {isAllergenAttention && item.judgement && (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: item.judgement.category === 'Blocked' ? 'error.main' : 'warning.dark' }}>
+                            <AllergenCategoryMark category={item.judgement.category} isInherit />
                         </Typography>
                     )}
-                </Box>
-                <Box sx={{ ml: 'auto', textAlign: 'right', flexShrink: 0 }}>
-                    <Typography variant="caption" color="text.secondary" component="p">
-                        {formatYen(item.unitPrice)} × {item.packCount}パック
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700 }}>{formatYen(item.amount)}</Typography>
-                </Box>
-            </Box>
-            {day.excludedFromAmount && (
-                <Typography variant="caption" color="text.secondary" component="p">
-                    金額に含まれていません
-                </Typography>
+                    {otherIssues.length > 0 && (
+                        <Typography variant="body2" sx={{ color: otherIssues.some((issue) => issue.severity === 'Error') ? 'error.main' : 'warning.dark' }}>
+                            ⚠ ほかの注意 {otherIssues.length}件
+                        </Typography>
+                    )}
+                    {isRecheckNeeded && <Chip size="small" color="warning" variant="outlined" label="確認し直し" />}
+                </Stack>
             )}
-            <Stack direction="row" sx={{ alignItems: 'center', mt: 0.5, mr: -1, mb: -1 }}>
-                <Button
-                    size="small"
-                    startIcon={<EditOutlinedIcon />}
-                    disabled={isPending}
-                    onClick={() => setIsCountOpen(true)}
-                    aria-label={`${item.productName}の個数設定`}
-                    sx={{ ml: -0.5, mr: 'auto' }}
-                >
-                    個数設定
-                </Button>
-                <IconButton aria-label={`${item.productName}を入れ替える`} onClick={() => setIsReplacing(!isReplacing)} disabled={isPending}>
-                    <SwapHorizIcon />
-                </IconButton>
-                <IconButton
-                    aria-label={`${item.productName}を外す`}
-                    disabled={isPending}
-                    onClick={() => removeItem.mutate({ update: { itemId: item.id }, rowVersion: menu.rowVersion }, { onError: notify })}
-                >
-                    <DeleteOutlinedIcon />
-                </IconButton>
-            </Stack>
-            {isReplacing && (
-                <TextField
-                    select
-                    label="入れ替える商品"
-                    value=""
-                    fullWidth
-                    sx={{ mt: 1 }}
-                    onChange={(event) =>
-                        replaceItem.mutate(
-                            { update: { itemId: item.id, productId: event.target.value }, rowVersion: menu.rowVersion },
-                            { onSuccess: () => setIsReplacing(false), onError: notify },
-                        )
-                    }
-                >
-                    {candidates
-                        .filter((candidate) => candidate.productId !== item.productId)
-                        .map((candidate) => (
-                            <MenuItem key={candidate.productId} value={candidate.productId}>
-                                {candidate.name}（{candidate.price !== null ? formatYen(candidate.price) : '価格なし'}）
-                            </MenuItem>
+            <Collapse in={isExpanded} unmountOnExit>
+                {(item.snackType || item.tags.length > 0) && (
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 0.5 }} useFlexGap>
+                        {item.snackType && <Chip size="small" label={SNACK_TYPE_LABEL[item.snackType]} />}
+                        {item.tags.map((tag) => (
+                            <Chip key={`${tag.kind}-${tag.value}`} size="small" variant="outlined" label={tag.value} sx={{ height: 20, fontSize: 11 }} />
                         ))}
-                </TextField>
-            )}
+                    </Stack>
+                )}
+                {item.judgement && item.judgement.category !== 'Safe' && (
+                    <Box sx={{ mt: 0.5 }}>
+                        <AllergenJudgementLine judgement={item.judgement} isInMenu />
+                        <Button size="small" onClick={() => onCheckAllergen(item.productId)}>
+                            パッケージで確認する
+                        </Button>
+                    </Box>
+                )}
+                {isRecheckNeeded && item.judgement && (
+                    <Stack direction="row" spacing={1} sx={{ mt: 0.5, alignItems: 'center', flexWrap: 'wrap' }} useFlexGap>
+                        <Chip size="small" color="warning" variant="outlined" label="確認し直し" />
+                        <Button
+                            size="small"
+                            disabled={acknowledge.isPending || isBusy}
+                            onClick={() =>
+                                item.judgementFingerprint &&
+                                acknowledge.mutate({ menuItemId: item.id, kind: item.judgement!.kind, fingerprint: item.judgementFingerprint }, { onError: notify })
+                            }
+                        >
+                            ☐ {acknowledgementSentence(item.judgement)}
+                        </Button>
+                    </Stack>
+                )}
+                {otherIssues.map((issue) => (
+                    <Typography key={issue.message} variant="body2" sx={{ mt: 0.5, color: issue.severity === 'Error' ? 'error.main' : 'warning.dark' }}>
+                        ⚠ {issue.message}
+                    </Typography>
+                ))}
+                {/* 個数は今の値だけを出し、「個数設定」のダイアログで直す */}
+                <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 1.5 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body2">
+                            1人あたり {item.perChildCount}個・{item.packCount}パック
+                        </Typography>
+                        {/* パック数の根拠（人数 × 1人あたり ÷ 入数を切り上げ。計算はサーバー） */}
+                        {item.piecesPerPack !== null && (
+                            <Typography variant="caption" color="text.secondary" component="p">
+                                1パック {item.piecesPerPack}個入り
+                            </Typography>
+                        )}
+                    </Box>
+                    <Box sx={{ ml: 'auto', textAlign: 'right', flexShrink: 0 }}>
+                        <Typography variant="caption" color="text.secondary" component="p">
+                            {formatYen(item.unitPrice)} × {item.packCount}パック
+                        </Typography>
+                        <Typography sx={{ fontWeight: 700 }}>{formatYen(item.amount)}</Typography>
+                    </Box>
+                </Box>
+                {day.excludedFromAmount && (
+                    <Typography variant="caption" color="text.secondary" component="p">
+                        金額に含まれていません
+                    </Typography>
+                )}
+                <Stack direction="row" sx={{ alignItems: 'center', mt: 0.5, mr: -1, mb: -1 }}>
+                    <Button
+                        size="small"
+                        startIcon={<EditOutlinedIcon />}
+                        disabled={isPending}
+                        onClick={() => setIsCountOpen(true)}
+                        aria-label={`${item.productName}の個数設定`}
+                        sx={{ ml: -0.5, mr: 'auto' }}
+                    >
+                        個数設定
+                    </Button>
+                    <IconButton aria-label={`${item.productName}を入れ替える`} onClick={() => setIsReplacing(!isReplacing)} disabled={isPending}>
+                        <SwapHorizIcon />
+                    </IconButton>
+                    <IconButton
+                        aria-label={`${item.productName}を外す`}
+                        disabled={isPending}
+                        onClick={() => removeItem.mutate({ update: { itemId: item.id }, rowVersion: menu.rowVersion }, { onError: notify })}
+                    >
+                        <DeleteOutlinedIcon />
+                    </IconButton>
+                </Stack>
+                {isReplacing && (
+                    <TextField
+                        select
+                        label="入れ替える商品"
+                        value=""
+                        fullWidth
+                        sx={{ mt: 1 }}
+                        onChange={(event) =>
+                            replaceItem.mutate(
+                                { update: { itemId: item.id, productId: event.target.value }, rowVersion: menu.rowVersion },
+                                { onSuccess: () => setIsReplacing(false), onError: notify },
+                            )
+                        }
+                    >
+                        {candidates
+                            .filter((candidate) => candidate.productId !== item.productId)
+                            .map((candidate) => (
+                                <MenuItem key={candidate.productId} value={candidate.productId}>
+                                    {candidate.name}（{candidate.price !== null ? formatYen(candidate.price) : '価格なし'}）
+                                </MenuItem>
+                            ))}
+                    </TextField>
+                )}
+            </Collapse>
             <ItemCountDialog
                 key={isCountOpen ? 'count-open' : 'count-closed'}
                 menu={menu}

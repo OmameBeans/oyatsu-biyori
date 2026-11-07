@@ -16,10 +16,14 @@ docs/
 │   ├── 06-non-functional.md      非機能要件（セキュリティ・性能・運用など）
 │   ├── 07-open-questions.md      未決事項・現場へのヒアリング項目
 │   ├── 08-hackathon.md           提出物・デモ・現場での試用・Claude Code の活用（ハッカソン）
+│   ├── 09-flyer-import.md        チラシ取り込みの分類（照合・使えない / 再入力 / 要確認 / 使える・確定。D-100）
 │   └── index.html                上の md をまとめた閲覧用ページ（生成物・直接編集しない）
 ├── implementation-tasks/         実装タスク
 │   ├── implementation-tasks.md   要件定義を実装の単位に分解したもの
 │   └── index.html                上の md の閲覧用ページ（生成物・直接編集しない）
+├── thumbnail/                    YouTube の動画のサムネイル（1280×720）
+│   ├── thumbnail.html            元の HTML（アイコンは public/oyatsu-menu-icon.svg と同じ）
+│   └── thumbnail.png             アップロード用の画像（上の HTML を Edge で撮ったもの）
 └── context/                      手元だけの資料（公開しない・.gitignore で除外）
 ```
 

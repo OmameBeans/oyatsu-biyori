@@ -92,7 +92,7 @@ test.describe('SC-03・SC-04・SC-12 設定', () => {
 });
 
 /** 色のテーマの表示名（設定の「見た目」タブのラジオボタンの名前。#2） */
-const COLOR_THEME_LABELS = ['オレンジ（いつもの色）', 'あお', 'むらさき', 'グレー'] as const;
+const COLOR_THEME_LABELS = ['オレンジ', 'あお（いつもの色）', 'むらさき', 'グレー'] as const;
 
 /** primary の色が出ているところの色を読む：選ばれたタブの文字の色と、「見た目」タブの「色のテーマ」で選ばれたラジオの色 */
 const readPrimaryColors = async (page: Page) => ({
@@ -126,13 +126,13 @@ test.describe('#2 見た目（色のテーマ）', () => {
     test('#2 色のテーマを選ぶと、再読み込みなしで色が変わり、再読み込みしても残る', async ({ page }, testInfo) => {
         const isPc = testInfo.project.name === 'pc';
         await page.goto('/settings?tab=appearance');
-        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        await expect(page.getByRole('radio', { name: 'あお（いつもの色）' })).toBeChecked();
         const before = await readPrimaryColors(page);
         const sidebarBefore = isPc ? await readSidebarColors(page) : null;
 
-        await page.getByRole('radio', { name: 'あお' }).check();
-        await expect(page.getByRole('radio', { name: 'あお' })).toBeChecked();
-        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).not.toBeChecked();
+        await page.getByRole('radio', { name: 'オレンジ' }).check();
+        await expect(page.getByRole('radio', { name: 'オレンジ' })).toBeChecked();
+        await expect(page.getByRole('radio', { name: 'あお（いつもの色）' })).not.toBeChecked();
         await expect.poll(async () => (await readPrimaryColors(page)).tab).not.toBe(before.tab);
         const after = await readPrimaryColors(page);
         expect(after.radio).not.toBe(before.radio);
@@ -145,7 +145,7 @@ test.describe('#2 見た目（色のテーマ）', () => {
         await captureScreen(page, testInfo, 'sc-03-appearance');
 
         await page.reload();
-        await expect(page.getByRole('radio', { name: 'あお' })).toBeChecked();
+        await expect(page.getByRole('radio', { name: 'オレンジ' })).toBeChecked();
         expect(await readPrimaryColors(page)).toEqual(after);
     });
 
@@ -158,7 +158,7 @@ test.describe('#2 見た目（色のテーマ）', () => {
             Storage.prototype.setItem = fail;
         });
         await page.goto('/settings?tab=appearance');
-        await expect(page.getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        await expect(page.getByRole('radio', { name: 'あお（いつもの色）' })).toBeChecked();
         const before = await readPrimaryColors(page);
         await page.getByRole('radio', { name: 'むらさき' }).check();
         await expect(page.getByRole('radio', { name: 'むらさき' })).toBeChecked();
@@ -276,7 +276,7 @@ test.describe('#4 見た目（明るさ）', () => {
         // ブラウザの上の帯は、ライトはテーマの色、ダークは背景の色
         await expect(browserBar(page)).not.toHaveAttribute('content', lightBar);
         // 色のテーマの選択はそのまま
-        await expect(page.getByRole('radiogroup', { name: '色のテーマ' }).getByRole('radio', { name: 'オレンジ（いつもの色）' })).toBeChecked();
+        await expect(page.getByRole('radiogroup', { name: '色のテーマ' }).getByRole('radio', { name: 'あお（いつもの色）' })).toBeChecked();
         await expectNoHorizontalOverflow(page, [modeGroup.getByRole('radio', { name: 'システム（端末の設定に合わせる）' })]);
         await captureScreen(page, testInfo, 'dark-sc-03-appearance');
 

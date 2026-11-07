@@ -1,0 +1,259 @@
+{
+  "_note": "build.py が flyer-03.json から作った正解データ。直接編集しない。allergenLabel はチラシの略した表記（allergenLabelText）を品目名に直したもの（カ＝カシューナッツ・か＝かに）。snackCategory・piecesPerPackCandidates は Claude の候補の目安（確定は職員）。maker・priceIncludingTax の null はチラシで読めない（再入力になる）、nonFood は食品以外の掲載品（外した掲載品になる）",
+  "source": "flyer-03.json",
+  "images": {
+    "flyer-03.png": [
+      "8133",
+      "433",
+      "8132",
+      "432",
+      "434",
+      "8134",
+      "431",
+      "8131"
+    ],
+    "flyer-03.pdf": [
+      "8133",
+      "433",
+      "8132",
+      "432",
+      "434",
+      "8134",
+      "431",
+      "8131"
+    ],
+    "flyer-03-photo-top.png": [
+      "8133",
+      "433",
+      "8132",
+      "432"
+    ],
+    "flyer-03-photo-bottom.png": [
+      "434",
+      "8134",
+      "431",
+      "8131"
+    ],
+    "flyer-03-photo-full.png": [
+      "8133",
+      "433",
+      "8132",
+      "432",
+      "434",
+      "8134",
+      "431",
+      "8131"
+    ]
+  },
+  "readingSets": [
+    [
+      "flyer-03.png"
+    ],
+    [
+      "flyer-03-photo-top.png",
+      "flyer-03-photo-bottom.png"
+    ],
+    [
+      "flyer-03-photo-full.png"
+    ]
+  ],
+  "items": [
+    {
+      "code": "8133",
+      "row": 1,
+      "name": "CO・OP ふんわり ミルクムース",
+      "maker": "みるく堂",
+      "volume": "65g×4",
+      "priceExcludingTax": 348,
+      "priceIncludingTax": 375,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "※洋酒使用。ミルクをたっぷり使って、ふんわり泡立てたムース。1個（65g）92㎉、塩0.07g。［乳］",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 87
+      },
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "「※洋酒使用。」の注意書きが説明文の頭にある（アレルゲンではないが、子どもに出すかは職員が判断する）"
+    },
+    {
+      "code": "433",
+      "row": 1,
+      "name": "とろける たまごプリン",
+      "maker": "あおば酪農",
+      "volume": "75g×3",
+      "priceExcludingTax": 158,
+      "priceIncludingTax": 170,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳"
+      ],
+      "allergenLabelText": "卵・乳",
+      "description": "やさしい甘さの、ぷるんとかためのプリン。1個78㎉、塩0.08g。［卵・乳］",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 53
+      },
+      "piecesPerPackCandidates": [
+        3
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "「人気ベスト1」「冷蔵デザート部門 1位」は商品名に含めない"
+    },
+    {
+      "code": "8132",
+      "row": 1,
+      "name": "ごろっと みかん寒天",
+      "maker": "みかんの里食品",
+      "volume": "4個入",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "みかんの果肉を、寒天でさっぱりと固めました。1個（90g）61㎉。",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 75
+      },
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "デモデータの「ぷるぷる みかんゼリー」とは別商品"
+    },
+    {
+      "code": "432",
+      "row": 1,
+      "name": "うさぎのミミ ぶどうゼリー",
+      "maker": "うさぎ乳業",
+      "volume": "6個入",
+      "priceExcludingTax": 258,
+      "priceIncludingTax": 278,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "ぶどうの粒を感じる、甘ずっぱいゼリー。果汁30%。1個（70g）54㎉。",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 43
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "照合：431「うさぎのミミ いちごゼリー」と同じメーカーの味違い。D-100 では名前が違うので別の商品（一致せず「要確認」。アレルゲン確認を引き継がない）"
+    },
+    {
+      "code": "434",
+      "row": 2,
+      "name": "こんがり 焼きプリン",
+      "maker": "あおば酪農",
+      "volume": "80g×4",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "卵",
+        "乳"
+      ],
+      "allergenLabelText": "卵・乳",
+      "description": "表面をこんがり焼いた、香ばしいプリン。1個（80g）98㎉、塩0.1g。［卵・乳］",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 75
+      },
+      "piecesPerPackCandidates": [
+        4
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "照合：433「とろける たまごプリン」とは別商品（同じメーカーのプリン。D-100 では名前が違えば、メーカーが同じでも一致しない）"
+    },
+    {
+      "code": "8134",
+      "row": 2,
+      "name": "ベリーのレアチーズカップ",
+      "maker": "みるく堂",
+      "volume": "70g×3個",
+      "priceExcludingTax": 378,
+      "priceIncludingTax": 408,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳",
+        "小麦"
+      ],
+      "allergenLabelText": "乳・麦",
+      "description": "クリームチーズのムースに、ベリーソースを重ねました。1個（70g）131㎉、塩0.11g。ゲル化剤（増粘多糖類）使用。［乳・麦］",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 126
+      },
+      "piecesPerPackCandidates": [
+        3
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "「ゲル化剤（増粘多糖類）使用」は添加物の表示で、アレルゲンの表記ではない"
+    },
+    {
+      "code": "431",
+      "row": 2,
+      "name": "うさぎのミミ いちごゼリー",
+      "maker": "うさぎ乳業",
+      "volume": "6個入",
+      "priceExcludingTax": 258,
+      "priceIncludingTax": 278,
+      "ageLabel": null,
+      "allergenLabel": [],
+      "allergenLabelText": null,
+      "description": "いちごの果肉が入った、つるんとしたゼリー。果汁10%。1個（70g）49㎉。",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 43
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "照合：デモデータの「うさぎのミミ いちごゼリー」と同じ商品。次回予定の代わりに「毎週」"
+    },
+    {
+      "code": "8131",
+      "row": 2,
+      "name": "しろくまの ヨーグルトゼリー",
+      "maker": "うさぎ乳業",
+      "volume": "6個入",
+      "priceExcludingTax": 298,
+      "priceIncludingTax": 321,
+      "ageLabel": null,
+      "allergenLabel": [
+        "乳"
+      ],
+      "allergenLabelText": "乳",
+      "description": "ヨーグルトの酸味をいかした、さっぱりしたゼリー。1個（65g）58㎉、塩0.05g。［乳］",
+      "bulk": null,
+      "unitPrice": {
+        "unit": "1個",
+        "priceExcludingTax": 50
+      },
+      "piecesPerPackCandidates": [
+        6
+      ],
+      "snackCategory": "デザート・飲料",
+      "_trap": "照合：デモデータの「しろくまの ヨーグルトゼリー」と同じ商品。表記は角括弧の「［乳］」"
+    }
+  ]
+}

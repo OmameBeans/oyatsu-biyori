@@ -1,412 +1,640 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import FormControl from '@mui/material/FormControl';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormHelperText from '@mui/material/FormHelperText';
 import FormLabel from '@mui/material/FormLabel';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
-import Radio from '@mui/material/Radio';
-import RadioGroup from '@mui/material/RadioGroup';
 import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { FLYER_CHOICE, useConfirmFlyerItem } from '../../../entities/flyer';
-import type { FlyerChoice, FlyerItem, FlyerMatchProduct } from '../../../entities/flyer';
+import { useSnackbar } from 'notistack';
+import { AllergenJudgementLine } from '../../../entities/allergen-judgement';
+import {
+    FLYER_ITEM_FIELD,
+    FLYER_ITEM_STATUS,
+    FLYER_REASON_CODE,
+    useAcceptFlyerReason,
+    useConfirmFlyerItem,
+    useRemoveFlyerItem,
+    useResolveFlyerTerm,
+    useUpdateFlyerItem,
+} from '../../../entities/flyer';
+import type { FlyerItem, FlyerItemReason } from '../../../entities/flyer';
 import { useAllergenMaster } from '../../../entities/settings';
 import { errorMessageOf } from '../../../shared/api';
 import { SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
 import { ClaudeText, ConfirmDialog } from '../../../shared/ui';
-import { checkPointsOf, issueTargetOf } from '../model/flyerRows';
-import type { IssueTarget } from '../model/flyerRows';
-import { verdictLabel } from '../model/labels';
+import { confirmResultMessages, FIELD_LABEL, isPiecesUnknown } from '../model/flyerRows';
 
 interface FlyerConfirmFormProps {
     menuId: string;
     item: FlyerItem;
     onClose: () => void;
+    /** 確定したとき */
     onSuccess: () => void;
+    /** 外したとき（確定の取り消しも） */
+    onRemoved?: () => void;
     /** 「閉じる」のボタンの文言（1件ずつ確かめるダイアログでは「表に戻る」） */
     closeLabel?: string;
+    /** ボタンを出す場所（ダイアログのフッター）。なければフォームの下に出す */
+    actionsContainer?: HTMLElement | null;
 }
 
+/** 商品の基本の入力欄 */
+type FieldKey = 'name' | 'maker' | 'volume' | 'orderNo' | 'priceIncludingTax' | 'priceExcludingTax' | 'piecesPerPack' | 'snackType';
+/** 理由を出す場所（入力欄のそば・アレルゲン表記・品目の分からない語・上の一覧） */
+type ReasonTarget = FieldKey | 'allergenLabel' | 'terms' | 'top';
+
+const FIELD_KEYS: FieldKey[] = ['name', 'maker', 'volume', 'orderNo', 'priceIncludingTax', 'priceExcludingTax', 'piecesPerPack', 'snackType'];
+
+/** 読み取りの検証の指摘（Claude の項目名）から、出す欄を決める。「アレルゲン」をいちばん先に、「税抜」が「価格」より先に当たるように並べる */
+const REVIEW_FIELD_WORDS: [string, ReasonTarget][] = [
+    ['アレルゲン', 'allergenLabel'],
+    ['入数', 'piecesPerPack'],
+    ['内容量', 'volume'],
+    ['税抜', 'priceExcludingTax'],
+    ['税込', 'priceIncludingTax'],
+    ['価格', 'priceIncludingTax'],
+    ['商品名', 'name'],
+    ['メーカー', 'maker'],
+    ['注文番号', 'orderNo'],
+    ['分類', 'snackType'],
+];
+
 /**
- * 「同じ商品」として選べる候補。サーバーが決めた sameChoiceProductIds の商品だけ
- * （内容量違い・味違いを「同じ」にすると、別の商品の確認を引き継いでしまうため。SR-05）
+ * 理由を出す場所（表示の振り分けだけ。分類はサーバーが決める）。
+ * 使えないの理由は、表記の品目（直せる）以外は上の一覧に出す（職員の操作では外せないため。SR-10・09 の 3.6）
  */
-const sameCandidates = (item: FlyerItem): FlyerMatchProduct[] => {
-    const all = [...item.sameProducts, ...item.volumeVariants, ...item.candidates];
-    return all.filter(
-        (product, index) => item.sameChoiceProductIds.includes(product.productId) && all.findIndex((p) => p.productId === product.productId) === index,
-    );
+const reasonTargetOf = (reason: FlyerItemReason): ReasonTarget => {
+    if (reason.level === 'Unusable') {
+        return reason.code === FLYER_REASON_CODE.AVOIDED_IN_LABEL ? 'allergenLabel' : 'top';
+    }
+    if (reason.code === FLYER_REASON_CODE.UNMAPPED_TERM) {
+        return 'terms';
+    }
+    if (reason.code === FLYER_REASON_CODE.LABEL_ABSENT_BUT_MASTER_CONTAINS) {
+        return 'allergenLabel';
+    }
+    if (reason.code === FLYER_REASON_CODE.REVIEW_NOTE) {
+        return REVIEW_FIELD_WORDS.find(([word]) => reason.field?.includes(word))?.[1] ?? 'top';
+    }
+    if (reason.field === FLYER_ITEM_FIELD.ALLERGEN_LABEL) {
+        return 'allergenLabel';
+    }
+    return FIELD_KEYS.find((key) => key === reason.field) ?? 'top';
 };
 
 const NONE = '__none__';
 
-/** 指摘を改行で並べる（helperText は改行をそのまま見せる） */
-const NEWLINE = '\n';
-const NEWLINE_WARN = NEWLINE + '⚠ ';
+/** 理由のある欄の見た目（橙の太い枠。🔴 の赤とは分ける） */
+const REASON_FIELD_SX = { '& .MuiOutlinedInput-notchedOutline': { borderColor: 'warning.main', borderWidth: 2 } } as const;
 
-/** 指摘のある欄の見た目（黄色の太い枠と、黄色の説明。🔴 の赤とは分ける） */
-const ISSUE_FIELD_SX = {
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'warning.main', borderWidth: 2 },
-    '& .MuiFormHelperText-root': { color: 'warning.dark', whiteSpace: 'pre-wrap' },
-} as const;
-/** 商品の基本の入力欄 */
-type FieldKey = 'name' | 'maker' | 'volume' | 'orderNo' | 'price' | 'priceExcluding' | 'pieces' | 'snackType';
-
+const toText = (value: number | null | undefined) => (value === null || value === undefined ? '' : value.toString());
 const toNumber = (value: string): number | null => (value.trim() === '' ? null : Number(value));
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+interface ReasonLinesProps {
+    reasons: FlyerItemReason[];
+    onAccept?: (reason: FlyerItemReason) => void;
+    isAccepting: boolean;
+}
+
+/** 理由の文と「このままでよい」（読み取りの検証の指摘は Claude の文なので、テキストとしてだけ出す） */
+const ReasonLines = ({ reasons, onAccept, isAccepting }: ReasonLinesProps) => (
+    <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+        {reasons.map((reason) => (
+            <Stack key={reason.key} direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.25, sm: 1 }} sx={{ alignItems: { sm: 'center' } }}>
+                <Box sx={{ flex: 1, minWidth: 0, color: reason.level === 'Unusable' ? 'error.main' : 'warning.dark' }}>
+                    {reason.code === FLYER_REASON_CODE.REVIEW_NOTE ? (
+                        <ClaudeText text={`⚠ ${reason.field ?? ''}：${reason.message}`} color="inherit" />
+                    ) : (
+                        <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                            {reason.level === 'Unusable' ? '● ' : '⚠ '}
+                            {reason.message}
+                        </Typography>
+                    )}
+                </Box>
+                {reason.canAccept && onAccept && (
+                    <Button size="small" variant="outlined" color="inherit" disabled={isAccepting} onClick={() => onAccept(reason)} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+                        このままでよい
+                    </Button>
+                )}
+            </Stack>
+        ))}
+    </Stack>
+);
 
 /**
- * 取り込みの1商品を確かめて確定する（T3-08・T3-10）。読み取り結果の表の、行の下の詳細欄に出す。
- * 選択肢は「同じ商品」「味違い・内容量違いとして登録」「新しい商品」「取り込まない」。
- * 対応づけできなかったアレルゲン表記の語は、品目を選ぶか「対応する品目なし」を選ぶまで確定できない（サーバーでも止める）。
+ * 取り込みの1商品を確かめる（SC-09 手順1。読み取り結果の表の、行の下の詳細欄と「1件ずつ確かめる」に出す）。
+ * することは取り込みの分類（サーバーが決める）で変わる（09 の 5）。
+ * - 再入力：理由の欄だけを開き、理由をそばに出す。直して「直した内容で分類し直す」か「このままでよい」。確定はできない
+ * - 要確認：「新しい商品として登録」／使える：「確定する」（一致した商品とアレルゲンの表示を並べる）
+ * - 使えない：今週の商品に入らない。読み違いのときは表記の品目だけ直せる
+ * - 確定済み：「確定を取り消す」（外した掲載品に移る。「戻す」で一覧に戻して確定し直す）
+ * 直した内容は、確定の前にサーバーに送って分類し直す（直したまま確定ボタンは押せない）
  */
-export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, closeLabel = '閉じる' }: FlyerConfirmFormProps) => {
+export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, closeLabel = '閉じる', actionsContainer }: FlyerConfirmFormProps) => {
     const { data: master } = useAllergenMaster();
+    const updateItem = useUpdateFlyerItem(menuId);
+    const resolveTerm = useResolveFlyerTerm(menuId);
+    const acceptReason = useAcceptFlyerReason(menuId);
+    const removeItem = useRemoveFlyerItem(menuId);
     const confirm = useConfirmFlyerItem(menuId);
+    const { enqueueSnackbar } = useSnackbar();
     const read = item.read;
-    const candidates = sameCandidates(item);
-    const variantNames = [...item.volumeVariants, ...item.candidates].filter((p) => !item.sameChoiceProductIds.includes(p.productId)).map((p) => p.name);
+    const isConfirmed = item.status === FLYER_ITEM_STATUS.CONFIRMED;
+    const isUsable = item.status === FLYER_ITEM_STATUS.USABLE;
+    const isNew = item.status === FLYER_ITEM_STATUS.NEW;
+    const isUnusable = item.status === FLYER_ITEM_STATUS.UNUSABLE;
+    const isNeedsInput = item.status === FLYER_ITEM_STATUS.NEEDS_INPUT;
+    // 入数が分からない行は、表の行の入数の欄で入れる（入れ直した商品として扱うため、ここでは入数の欄を出さない）
+    const isPiecesInRow = isPiecesUnknown(item);
+    // 使えるの確定では、おやつの分類・タグは商品一覧の値を使い、上書きしない（09 の 5.1）
+    const usesMasterSnackType = !!item.matchedProduct;
 
-    const [choice, setChoice] = useState<FlyerChoice>(item.confirmation?.choice ?? item.suggestedChoice);
-    const [productId, setProductId] = useState<string>(
-        (item.confirmation?.choice === FLYER_CHOICE.SAME ? item.confirmation.productId : null) ?? item.suggestedProductId ?? candidates[0]?.productId ?? '',
-    );
     const [name, setName] = useState(read.name);
-    const [volume, setVolume] = useState(read.volume ?? '');
     const [maker, setMaker] = useState(read.maker ?? '');
-    const [price, setPrice] = useState(read.priceIncludingTax?.toString() ?? '');
-    const [priceExcluding, setPriceExcluding] = useState(read.priceExcludingTax?.toString() ?? '');
+    const [volume, setVolume] = useState(read.volume ?? '');
     const [orderNo, setOrderNo] = useState(read.orderNo ?? '');
-    const [pieces, setPieces] = useState(read.piecesPerPackCandidate?.toString() ?? '');
+    const [price, setPrice] = useState(toText(read.priceIncludingTax));
+    const [priceExcluding, setPriceExcluding] = useState(toText(read.priceExcludingTax));
+    const [pieces, setPieces] = useState(toText(read.piecesPerPackCandidate));
+    // 表の行の入数の欄で入れたなど、サーバーの入数の候補がフォームの外で変わったら、フォームの値も合わせる
+    // （古い空の値のまま「分類し直す」を押して、入れた入数を消さないように）
+    const [syncedPieces, setSyncedPieces] = useState(read.piecesPerPackCandidate);
+    if (read.piecesPerPackCandidate !== syncedPieces) {
+        setSyncedPieces(read.piecesPerPackCandidate);
+        setPieces(toText(read.piecesPerPackCandidate));
+    }
     const [snackType, setSnackType] = useState<SnackType | ''>(read.snackType ?? '');
-    const [labelIds, setLabelIds] = useState<string[]>(item.labelAllergens.map((a) => a.id));
-    const [termMapping, setTermMapping] = useState<Record<string, string>>({});
+    const [labelIds, setLabelIds] = useState<string[]>(() => item.labelAllergens.map((a) => a.id));
     const [characterTags, setCharacterTags] = useState<string[]>(read.characterTags);
-    const [treatAsFlyerError, setTreatAsFlyerError] = useState(false);
     const [addingAllergen, setAddingAllergen] = useState('');
     const [removingAllergen, setRemovingAllergen] = useState<string | null>(null);
     const [isOtherFieldsOpen, setIsOtherFieldsOpen] = useState(false);
+    const [isCancelOpen, setIsCancelOpen] = useState(false);
 
-    const unresolved = item.unmappedTerms.filter((term) => !termMapping[term]);
-    // 読み取りの検証の指摘は、当てはまる入力欄のそばに出す（何を確かめて、どこを直せばよいかが分かるように）
-    const issuesByTarget = item.issues.reduce<Partial<Record<IssueTarget, string[]>>>((acc, issue) => {
-        const target = issueTargetOf(issue.field);
-        acc[target] = [...(acc[target] ?? []), target === 'other' ? `${issue.field}：${issue.message}` : issue.message];
-        return acc;
-    }, {});
-    /** 指摘のある欄に付ける props（黄色の枠と、指摘の文。Claude の文もテキストとしてだけ出す） */
-    const issueProps = (target: IssueTarget, helperText?: string) => {
-        const messages = issuesByTarget[target];
-        if (!messages) {
-            return helperText ? { helperText } : {};
-        }
-        return { helperText: ['⚠ ' + messages.join(NEWLINE_WARN), helperText].filter(Boolean).join(NEWLINE), sx: ISSUE_FIELD_SX };
+    // 理由を場所ごとに分ける
+    const reasonsAt = (target: ReasonTarget) => item.reasons.filter((reason) => reasonTargetOf(reason) === target);
+    const fieldReasonKeys = FIELD_KEYS.filter((key) => reasonsAt(key).length > 0);
+    // 開いて出す欄：理由のある欄（直したあとに理由が消えても、入力の途中で欄が閉じないよう、開いたときの欄は出し続ける）と、
+    // 新しく登録するのに足りない欄（おやつの分類・入数）
+    const [initialOpenKeys] = useState<FieldKey[]>(() => [
+        ...fieldReasonKeys,
+        ...(!usesMasterSnackType && !read.snackType ? (['snackType'] as const) : []),
+        ...(item.piecesPerPack === null && !isPiecesInRow ? (['piecesPerPack'] as const) : []),
+    ]);
+    const openKeys = new Set<FieldKey>([...initialOpenKeys, ...fieldReasonKeys]);
+
+    const allergenName = (id: string) => master.allergens.find((a) => a.id === id)?.name ?? id;
+    const abbreviationTermsOf = (id: string) => Array.from(new Set(item.abbreviationHits.filter((hit) => hit.allergen.id === id).map((hit) => hit.term)));
+    const conflictOf = (key: FieldKey) => item.duplicateConflicts.find((conflict) => conflict.field === key);
+
+    const isLabelChanged = !sameSet(labelIds, item.labelAllergens.map((a) => a.id));
+    const isTagsChanged = !sameSet(characterTags, read.characterTags);
+    const isDirty =
+        !isConfirmed &&
+        (name.trim() !== read.name.trim() ||
+            maker.trim() !== (read.maker ?? '').trim() ||
+            volume.trim() !== (read.volume ?? '').trim() ||
+            orderNo.trim() !== (read.orderNo ?? '').trim() ||
+            toNumber(price) !== read.priceIncludingTax ||
+            toNumber(priceExcluding) !== read.priceExcludingTax ||
+            (!isPiecesInRow && toNumber(pieces) !== read.piecesPerPackCandidate) ||
+            (snackType || null) !== read.snackType ||
+            isLabelChanged ||
+            isTagsChanged);
+
+    const handleAccept = (reason: FlyerItemReason) =>
+        acceptReason.mutate(
+            { itemId: item.id, reasonKey: reason.key },
+            { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
+        );
+
+    const handleResolveTerm = (term: string, value: string) =>
+        resolveTerm.mutate(
+            { itemId: item.id, term, allergenIds: value === NONE ? [] : [value] },
+            { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
+        );
+
+    const handleUpdate = () =>
+        updateItem.mutate(
+            {
+                itemId: item.id,
+                name: name.trim(),
+                maker: maker.trim() || null,
+                volume: volume.trim() || null,
+                priceIncludingTax: toNumber(price),
+                priceExcludingTax: toNumber(priceExcluding),
+                orderNo: orderNo.trim() || null,
+                piecesPerPack: isPiecesInRow ? read.piecesPerPackCandidate : toNumber(pieces),
+                snackType: snackType || null,
+                targetAgeLabel: read.targetAgeLabel,
+                characterTags: isTagsChanged ? characterTags : null,
+                labelAllergenIds: isLabelChanged ? labelIds : null,
+            },
+            {
+                onSuccess: () => enqueueSnackbar(`「${name.trim() || read.name}」を直して、分類し直しました`, { variant: 'success' }),
+            },
+        );
+
+    const handleConfirm = () =>
+        confirm.mutate(item.id, {
+            onSuccess: (result) => {
+                confirmResultMessages(result, isNew ? `「${read.name}」を新しい商品として登録しました` : `「${read.name}」を確定しました`).forEach(({ message, variant }) =>
+                    enqueueSnackbar(message, { variant }),
+                );
+                onSuccess();
+            },
+        });
+
+    const handleRemove = () =>
+        removeItem.mutate(item.id, {
+            onSuccess: () => {
+                setIsCancelOpen(false);
+                enqueueSnackbar(
+                    isConfirmed
+                        ? `「${read.name}」の確定を取り消し、外した掲載品に移しました。「戻す」で一覧に戻すと、確定し直せます`
+                        : `「${read.name}」を外しました。一覧の下の「外した掲載品」から戻せます`,
+                    { variant: 'success' },
+                );
+                onRemoved?.();
+            },
+            onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
+        });
+
+    /** 入力欄と、そのそばの理由・二重に読んだ値 */
+    const fieldBlock = (key: FieldKey, node: ReactNode, setValue?: (value: string) => void) => {
+        const reasons = reasonsAt(key);
+        const conflict = conflictOf(key);
+        return (
+            <Box key={key} sx={{ display: 'grid', alignContent: 'start' }}>
+                {node}
+                {reasons.length > 0 && <ReasonLines reasons={reasons} onAccept={isConfirmed ? undefined : handleAccept} isAccepting={acceptReason.isPending} />}
+                {conflict && setValue && (
+                    <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                            読んだ値：
+                        </Typography>
+                        {conflict.values.map((value) => (
+                            <Chip key={value} size="small" variant="outlined" label={value} onClick={() => setValue(value)} aria-label={`${FIELD_LABEL[key] ?? ''}を「${value}」にする`} />
+                        ))}
+                    </Stack>
+                )}
+            </Box>
+        );
     };
-    // 直してほしい欄（指摘がある・読み取れず空）は、いつも出す。ほかの欄は1行の要約にまとめ、「ほかの項目も直す」で開く
-    // （どの欄を出すかは読み取った内容で決め、入力の途中で欄が消えないようにする）
-    const needsFix: Record<FieldKey, boolean> = {
-        name: !!issuesByTarget.name || !read.name.trim(),
-        maker: !!issuesByTarget.maker,
-        volume: !!issuesByTarget.volume || !read.volume,
-        orderNo: !!issuesByTarget.orderNo,
-        price: !!issuesByTarget.price || read.priceIncludingTax === null,
-        priceExcluding: !!issuesByTarget.priceExcluding,
-        pieces: !!issuesByTarget.pieces || read.piecesPerPackCandidate === null,
-        snackType: !!issuesByTarget.snackType || !read.snackType,
-    };
+    const fieldSx = (key: FieldKey) => (reasonsAt(key).length > 0 ? REASON_FIELD_SX : undefined);
+
     const fields: { key: FieldKey; label: string; summary: string; node: ReactNode }[] = [
         {
             key: 'name',
             label: '商品名',
             summary: name,
-            node: <TextField label="商品名" value={name} onChange={(event) => setName(event.target.value)} disabled={choice === FLYER_CHOICE.SAME} {...issueProps('name')} />,
+            node: fieldBlock('name', <TextField label="商品名" value={name} onChange={(event) => setName(event.target.value)} sx={fieldSx('name')} disabled={isConfirmed} />, setName),
         },
         {
             key: 'maker',
             label: 'メーカー',
             summary: maker,
-            node: <TextField label="メーカー" value={maker} onChange={(event) => setMaker(event.target.value)} disabled={choice === FLYER_CHOICE.SAME} {...issueProps('maker')} />,
+            node: fieldBlock(
+                'maker',
+                <TextField
+                    label="メーカー"
+                    value={maker}
+                    onChange={(event) => setMaker(event.target.value)}
+                    sx={fieldSx('maker')}
+                    disabled={isConfirmed}
+                    helperText="商品名とメーカーが同じ商品を、登録済みの商品と同じとみなします"
+                />,
+                setMaker,
+            ),
         },
         {
             key: 'volume',
             label: '内容量',
             summary: volume,
-            node: <TextField label="内容量" value={volume} onChange={(event) => setVolume(event.target.value)} disabled={choice === FLYER_CHOICE.SAME} {...issueProps('volume')} />,
+            node: fieldBlock('volume', <TextField label="内容量" value={volume} onChange={(event) => setVolume(event.target.value)} sx={fieldSx('volume')} disabled={isConfirmed} />, setVolume),
         },
         {
             key: 'orderNo',
             label: '注文番号',
             summary: orderNo,
-            node: <TextField label="注文番号" value={orderNo} onChange={(event) => setOrderNo(event.target.value)} {...issueProps('orderNo')} />,
+            node: fieldBlock('orderNo', <TextField label="注文番号" value={orderNo} onChange={(event) => setOrderNo(event.target.value)} sx={fieldSx('orderNo')} disabled={isConfirmed} />, setOrderNo),
         },
         {
-            key: 'price',
+            key: 'priceIncludingTax',
             label: '税込',
             summary: price ? `${price}円` : '',
-            node: <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} {...issueProps('price')} />,
+            node: fieldBlock(
+                'priceIncludingTax',
+                <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} sx={fieldSx('priceIncludingTax')} disabled={isConfirmed} />,
+                setPrice,
+            ),
         },
         {
-            key: 'priceExcluding',
+            key: 'priceExcludingTax',
             label: '税抜',
             summary: priceExcluding ? `${priceExcluding}円` : '',
-            node: <TextField label="税抜価格（円）" type="number" value={priceExcluding} onChange={(event) => setPriceExcluding(event.target.value)} {...issueProps('priceExcluding')} />,
-        },
-        {
-            key: 'pieces',
-            label: '入数',
-            summary: pieces ? `${pieces}人分` : '',
-            node: (
+            node: fieldBlock(
+                'priceExcludingTax',
                 <TextField
-                    label="入数（1つで何人分か）"
+                    label="税抜価格（円）"
                     type="number"
-                    value={pieces}
-                    onChange={(event) => setPieces(event.target.value)}
-                    {...issueProps('pieces', read.piecesPerPackReason ? `候補の理由：${read.piecesPerPackReason}` : '内容量から入数が分かりません。1パックで何人分かを入れてください')}
-                />
+                    value={priceExcluding}
+                    onChange={(event) => setPriceExcluding(event.target.value)}
+                    sx={fieldSx('priceExcludingTax')}
+                    disabled={isConfirmed}
+                />,
+                setPriceExcluding,
             ),
         },
-        {
-            key: 'snackType',
-            label: '分類',
-            summary: snackType ? SNACK_TYPE_LABEL[snackType] : '',
-            node: (
-                <FormControl size="small" sx={issuesByTarget.snackType ? ISSUE_FIELD_SX : undefined}>
-                    <InputLabel id={`snack-${item.id}`}>おやつの分類</InputLabel>
-                    <Select labelId={`snack-${item.id}`} label="おやつの分類" value={snackType} onChange={(event) => setSnackType(event.target.value as SnackType)}>
-                        {Object.values(SNACK_TYPE).map((type) => (
-                            <MenuItem key={type} value={type}>
-                                {SNACK_TYPE_LABEL[type]}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                    {issuesByTarget.snackType && <FormHelperText>{'⚠ ' + issuesByTarget.snackType.join(NEWLINE_WARN)}</FormHelperText>}
-                </FormControl>
-            ),
-        },
+        ...(isPiecesInRow
+            ? []
+            : [
+                  {
+                      key: 'piecesPerPack' as const,
+                      label: '入数',
+                      summary: pieces ? `${pieces}人分` : item.piecesPerPack !== null ? `${item.piecesPerPack}人分（商品一覧）` : '',
+                      node: fieldBlock(
+                          'piecesPerPack',
+                          <TextField
+                              label="入数（1つで何人分か）"
+                              type="number"
+                              value={pieces}
+                              onChange={(event) => setPieces(event.target.value)}
+                              sx={fieldSx('piecesPerPack')}
+                              disabled={isConfirmed}
+                              helperText={
+                                  read.piecesPerPackReason
+                                      ? `候補の理由：${read.piecesPerPackReason}`
+                                      : item.matchedProduct?.piecesPerPack
+                                        ? `空なら、商品一覧の入数（${item.matchedProduct.piecesPerPack}）を使います`
+                                        : '1パックで何人分かを入れてください'
+                              }
+                          />,
+                          setPieces,
+                      ),
+                  },
+              ]),
+        ...(usesMasterSnackType
+            ? []
+            : [
+                  {
+                      key: 'snackType' as const,
+                      label: '分類',
+                      summary: snackType ? SNACK_TYPE_LABEL[snackType] : '',
+                      node: fieldBlock(
+                          'snackType',
+                          <FormControl size="small" sx={fieldSx('snackType')} disabled={isConfirmed}>
+                              <InputLabel id={`snack-${item.id}`}>おやつの分類</InputLabel>
+                              <Select labelId={`snack-${item.id}`} label="おやつの分類" value={snackType} onChange={(event) => setSnackType(event.target.value as SnackType)}>
+                                  {Object.values(SNACK_TYPE).map((type) => (
+                                      <MenuItem key={type} value={type}>
+                                          {SNACK_TYPE_LABEL[type]}
+                                      </MenuItem>
+                                  ))}
+                              </Select>
+                          </FormControl>,
+                      ),
+                  },
+              ]),
     ];
-    const fixFields = fields.filter((field) => needsFix[field.key]);
-    const otherFields = fields.filter((field) => !needsFix[field.key]);
+    const fixFields = fields.filter((field) => openKeys.has(field.key));
+    const otherFields = fields.filter((field) => !openKeys.has(field.key));
     const tagNames = [...characterTags, ...read.flavorTags];
-    const otherSummary = [...otherFields.map((field) => `${field.label} ${field.summary || 'なし'}`), `タグ ${tagNames.length > 0 ? tagNames.join('・') : 'なし'}`].join('・');
-    const checkPoints = checkPointsOf(item);
-    const submitLabel = item.confirmation ? '確定し直す' : '確定する';
-    const allergenName = (id: string) => master.allergens.find((a) => a.id === id)?.name ?? id;
-    const isSkip = choice === FLYER_CHOICE.SKIP;
-    // 選んだ「同じ商品」の候補との食い違い（候補ごとにサーバーが求めたもの）
-    const selectedPlan = choice === FLYER_CHOICE.SAME ? item.plansByProduct[productId] : undefined;
-    const discrepancies = selectedPlan?.discrepancies ?? [];
-    const hasStaffChoice = selectedPlan?.referenceDecision === 'StaffChoice';
+    const otherSummary = [
+        ...otherFields.map((field) => `${field.label} ${field.summary || 'なし'}`),
+        ...(usesMasterSnackType ? [] : [`タグ ${tagNames.length > 0 ? tagNames.join('・') : 'なし'}`]),
+    ].join('・');
 
-    const handleSubmit = () => {
-        const mapped = Object.values(termMapping).filter((value) => value !== NONE);
-        confirm.mutate(
-            {
-                itemId: item.id,
-                choice,
-                productId: choice === FLYER_CHOICE.SAME ? productId : null,
-                name,
-                maker: maker || null,
-                volume: volume || null,
-                piecesPerPack: toNumber(pieces),
-                piecesEdited: toNumber(pieces) !== read.piecesPerPackCandidate,
-                snackType: snackType || null,
-                snackTypeEdited: snackType !== (read.snackType ?? ''),
-                priceIncludingTax: toNumber(price),
-                priceExcludingTax: toNumber(priceExcluding),
-                orderNo: orderNo || null,
-                targetAgeLabel: read.targetAgeLabel,
-                characterTags,
-                flavorTags: read.flavorTags,
-                labelAllergenIds: Array.from(new Set([...labelIds, ...mapped])),
-                resolvedTerms: Object.keys(termMapping),
-                treatAsFlyerError: hasStaffChoice && treatAsFlyerError,
-            },
-            { onSuccess },
-        );
-    };
+    const topReasons = reasonsAt('top');
+    const allergenReasons = reasonsAt('allergenLabel');
+    const termReasons = reasonsAt('terms');
+    const hasUnresolvedTerms = item.unresolvedTerms.length > 0;
+    const confirmLabel = isNew ? '新しい商品として登録' : '確定する';
+    const canConfirm = (isUsable || isNew) && !isDirty && !hasUnresolvedTerms && !confirm.isPending && !updateItem.isPending;
+
+    const actions = (
+        <Stack direction="row" spacing={1} useFlexGap sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {isConfirmed ? (
+                <Button color="error" onClick={() => setIsCancelOpen(true)} disabled={removeItem.isPending}>
+                    確定を取り消す
+                </Button>
+            ) : (
+                <Button color="inherit" onClick={handleRemove} disabled={removeItem.isPending}>
+                    外す
+                </Button>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Button onClick={onClose}>{closeLabel}</Button>
+            {!isConfirmed && (
+                <Button variant={isDirty || !(isUsable || isNew) ? 'contained' : 'outlined'} onClick={handleUpdate} disabled={!isDirty || updateItem.isPending}>
+                    直した内容で分類し直す
+                </Button>
+            )}
+            {(isUsable || isNew) && (
+                <Button variant="contained" onClick={handleConfirm} disabled={!canConfirm}>
+                    {confirmLabel}
+                </Button>
+            )}
+        </Stack>
+    );
 
     return (
         <Box component="section" aria-label={`「${read.name}」を確かめる`}>
             <Stack spacing={2.5}>
-                {/* 何を確かめて、どこで何を選ぶ・直すか（状態が「警告あり」「要確認」になった理由ごと） */}
-                {checkPoints.length > 0 ? (
-                    <Alert severity="warning" icon={false} aria-label="確かめること">
-                        <Typography sx={{ fontWeight: 700, mb: 0.5 }}>確かめること</Typography>
-                        <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
-                            {checkPoints.map((point) => (
-                                <Typography key={point.key} component="li" variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mb: 0.5 }}>
-                                    {point.guide}
-                                </Typography>
-                            ))}
-                        </Box>
+                {/* 何をすればよいか（分類ごと） */}
+                {isNeedsInput && (
+                    <Alert severity="warning" aria-label="確かめること">
+                        読み取りに足りないところか、おかしいところがあります。理由の出ている欄をチラシと見比べて直し、「直した内容で分類し直す」を押してください。合っていれば「このままでよい」を押してください。直すまで確定できません。
+                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} onAccept={handleAccept} isAccepting={acceptReason.isPending} />}
+                    </Alert>
+                )}
+                {isUnusable && (
+                    <Alert severity="error" aria-label="今週の商品に入らない理由">
+                        この商品は今週の商品に入りません。何もしなくて構いません。
+                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} isAccepting={false} />}
+                        {isPiecesInRow && <Typography variant="body2">個包装の数が分かれば、表の行の「入数」に入れて「分類し直す」を押してください。</Typography>}
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            確かめたら「{submitLabel}」を押してください。
+                            チラシの表記の読み違いのときは、下の「チラシのアレルゲン表記」の品目を直せます。説明文・商品名・商品一覧の記録で当たったものは、ここでは外せません（商品一覧のパッケージでの確認で直します）。
                         </Typography>
                     </Alert>
-                ) : (
-                    <Typography variant="body2">読み取りで気になるところは見つかりませんでした。チラシと見比べて、合っていれば「{submitLabel}」を押してください。</Typography>
+                )}
+                {isNew && (
+                    <Alert severity="info" icon={false}>
+                        登録済みの商品に、同じ名前とメーカーの商品はありません。チラシと見比べて、合っていれば「{confirmLabel}」を押してください（アレルゲンはチラシの表記として記録します）。
+                    </Alert>
+                )}
+                {isUsable && <Typography variant="body2">登録済みの商品と同じです。チラシと見比べて、合っていれば「{confirmLabel}」を押してください。</Typography>}
+                {isConfirmed && item.confirmation && (
+                    <Alert severity="success" icon={false}>
+                        {item.confirmation.kind === 'CreatedNew'
+                            ? `新しい商品「${item.confirmation.productName}」として登録しました。`
+                            : `登録済みの商品「${item.confirmation.productName}」に確定しました。`}
+                        {item.recordedDiscrepancyAllergens.length > 0 &&
+                            ` チラシの表記がパッケージでの確認と食い違っていたため、チラシの表記を記録しました（${item.recordedDiscrepancyAllergens.map((a) => a.name).join('・')}）。`}
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            選び直すときは「確定を取り消す」を押し、一覧の下の「外した掲載品」から「戻す」で戻して、もう一度確かめてください。
+                        </Typography>
+                    </Alert>
+                )}
+                {(isUsable || isNew) && topReasons.length > 0 && <ReasonLines reasons={topReasons} onAccept={handleAccept} isAccepting={acceptReason.isPending} />}
+                {item.notices.map((notice) => (
+                    <Alert key={notice.key} severity={item.discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning'}>
+                        {notice.message}
+                    </Alert>
+                ))}
+                {(isUsable || isNew) && item.bulkExclusions.length > 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                        この商品は、まとめての確定・登録に入りません（1件ずつ確定してください）。
+                    </Typography>
                 )}
 
-                <FormControl>
-                    <FormLabel>同じ商品かどうか</FormLabel>
-                    <RadioGroup value={choice} onChange={(event) => setChoice(event.target.value as FlyerChoice)}>
-                        <FormControlLabel value={FLYER_CHOICE.SAME} control={<Radio />} label="登録済みの商品と同じ" disabled={candidates.length === 0} />
-                        {choice === FLYER_CHOICE.SAME && candidates.length > 0 && (
-                            <Select value={productId} onChange={(event) => setProductId(event.target.value)} sx={{ ml: 4, mb: 1, maxWidth: 'calc(100% - 32px)' }} size="small" aria-label="同じ商品">
-                                {candidates.map((p) => (
-                                    <MenuItem key={p.productId} value={p.productId}>
-                                        {p.name}（{p.volume ?? '内容量なし'}）{p.isDisabled ? '・使わない商品' : ''}
-                                        {!p.makerCompared ? '・メーカー未確認' : ''}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        )}
-                        <FormControlLabel value={FLYER_CHOICE.VARIANT} control={<Radio />} label="味違い・内容量違いとして登録（アレルゲンの確認は引き継ぎません）" />
-                        {variantNames.length > 0 && (
-                            <Typography variant="caption" color="text.secondary" sx={{ ml: 4 }}>
-                                似ている商品：{variantNames.join('・')}（同じ商品とは分からないため、別の商品として登録します）
+                {/* 一致した商品（名前＋メーカーが同じ登録済みの商品）と、商品一覧でのアレルゲンの表示 */}
+                {item.matchedProduct && (
+                    <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                        <FormLabel sx={{ display: 'block', mb: 0.5 }}>{isConfirmed ? '確定した商品' : '登録済みの同じ商品'}</FormLabel>
+                        <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{item.matchedProduct.name}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {[
+                                item.matchedProduct.maker,
+                                item.matchedProduct.volume ?? '内容量なし',
+                                item.matchedProduct.piecesPerPack !== null ? `入数 ${item.matchedProduct.piecesPerPack}` : '入数なし',
+                            ]
+                                .filter(Boolean)
+                                .join('・')}
+                        </Typography>
+                        <AllergenJudgementLine judgement={item.matchedProduct.judgement} />
+                        {item.otherMatchCount > 0 && (
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                ほかに同じ名前の商品が {item.otherMatchCount}件あります（最後にチラシに載った商品を使っています）。
                             </Typography>
                         )}
-                        <FormControlLabel value={FLYER_CHOICE.NEW} control={<Radio />} label="新しい商品として登録" />
-                        <FormControlLabel value={FLYER_CHOICE.SKIP} control={<Radio />} label="取り込まない（おやつに使わない）" />
-                    </RadioGroup>
-                    {item.judgement && (
-                        <Alert severity="info" sx={{ mt: 1 }}>
-                            AI の判定：{verdictLabel(item.judgement.verdict)}
-                            {item.judgement.productName ? `（${item.judgement.productName}）` : ''}
-                            <ClaudeText text={item.judgement.reason} />
-                        </Alert>
+                    </Box>
+                )}
+
+                {fixFields.length > 0 && (
+                    <Box>
+                        <FormLabel sx={{ display: 'block', mb: 1.5 }}>{isNeedsInput ? '直してほしい欄（チラシと見比べてください）' : '確かめてほしい欄'}</FormLabel>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>{fixFields.map((field) => field.node)}</Box>
+                    </Box>
+                )}
+                {read.bulkNote && <Typography variant="body2">まとめ買い：{read.bulkNote}（価格は注文の単位あたり）</Typography>}
+
+                <Box>
+                    <FormLabel>チラシのアレルゲン表記</FormLabel>
+                    <Typography sx={{ my: 0.5, overflowWrap: 'anywhere' }}>
+                        {read.allergenLabelText?.trim() ? `「${read.allergenLabelText}」` : '表記なし（読み落としの可能性があります。チラシと見比べてください）'}
+                    </Typography>
+                    {item.isLabelAbsent && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {item.canMarkLabelAbsentCompared
+                                ? `表の上の「表記なしの商品をチラシと見比べる」で、ほかの表記なしの商品とまとめて見比べられます${item.isLabelAbsentCompared ? '（見比べ済み）' : '（見比べるまで、まとめての確定に入りません）'}。表記があれば、下の「品目を足す」で足してください。`
+                                : 'チラシでこの商品のアレルゲン表記を探し、表記があれば下の「品目を足す」で足してください。'}
+                        </Typography>
                     )}
-                </FormControl>
-
-                {!isSkip && (
-                    <>
-                        {fixFields.length > 0 && (
-                            <Box>
-                                <FormLabel sx={{ display: 'block', mb: 1.5 }}>直してほしい欄（チラシと見比べてください）</FormLabel>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                                    {fixFields.map((field) => (
-                                        <Box key={field.key} sx={{ display: 'grid' }}>
-                                            {field.node}
-                                        </Box>
-                                    ))}
-                                </Box>
-                            </Box>
+                    {allergenReasons.length > 0 && <ReasonLines reasons={allergenReasons} onAccept={isConfirmed ? undefined : handleAccept} isAccepting={acceptReason.isPending} />}
+                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', my: 1 }} useFlexGap>
+                        {labelIds.length === 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                                表記の品目なし
+                            </Typography>
                         )}
-                        {read.bulkNote && <Typography variant="body2">まとめ買い：{read.bulkNote}（価格は注文の単位あたり）</Typography>}
+                        {labelIds.map((id) => {
+                            const terms = abbreviationTermsOf(id);
+                            const label = terms.length > 0 ? `${terms.join('・')}→${allergenName(id)}` : allergenName(id);
+                            return <Chip key={id} label={label} onDelete={isConfirmed ? undefined : () => setRemovingAllergen(id)} />;
+                        })}
+                    </Stack>
+                    {!isConfirmed && (
+                        <Stack direction="row" spacing={1}>
+                            <Select size="small" value={addingAllergen} displayEmpty onChange={(event) => setAddingAllergen(event.target.value)} sx={{ minWidth: 180, maxWidth: '100%' }} aria-label="品目を足す">
+                                <MenuItem value="">品目を足す</MenuItem>
+                                {master.allergens
+                                    .filter((a) => !labelIds.includes(a.id))
+                                    .map((a) => (
+                                        <MenuItem key={a.id} value={a.id}>
+                                            {a.name}
+                                        </MenuItem>
+                                    ))}
+                            </Select>
+                            <Button
+                                disabled={!addingAllergen}
+                                onClick={() => {
+                                    setLabelIds([...labelIds, addingAllergen]);
+                                    setAddingAllergen('');
+                                }}
+                            >
+                                足す
+                            </Button>
+                        </Stack>
+                    )}
+                    {item.descriptionHitWords.length > 0 && (
+                        <Typography variant="body2" sx={{ mt: 1, color: 'warning.dark' }}>
+                            チラシの説明文に、避ける品目の言葉があります：{item.descriptionHitWords.join('・')}（ここでは外せません）
+                        </Typography>
+                    )}
+                </Box>
 
-                        <Box>
-                            <FormLabel>チラシのアレルゲン表記</FormLabel>
-                            <Typography sx={{ my: 0.5 }}>{read.allergenLabelText ? `「${read.allergenLabelText}」` : '表記なし（読み落としの可能性があります。チラシと見比べてください）'}</Typography>
-                            {(issuesByTarget.allergens ?? []).map((message, index) => (
-                                <Alert key={`${index}-${message}`} severity="warning" sx={{ mb: 1 }}>
-                                    <ClaudeText text={message} />
-                                    チラシと見比べて、足りない品目があれば下の「品目を足す」で足してください。
-                                </Alert>
-                            ))}
-                            <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mb: 1 }} useFlexGap>
-                                {labelIds.map((id) => (
-                                    <Chip key={id} label={allergenName(id)} onDelete={() => setRemovingAllergen(id)} />
-                                ))}
-                            </Stack>
-                            <Stack direction="row" spacing={1}>
-                                <Select size="small" value={addingAllergen} displayEmpty onChange={(event) => setAddingAllergen(event.target.value)} sx={{ minWidth: 200 }} aria-label="品目を足す">
-                                    <MenuItem value="">品目を足す</MenuItem>
-                                    {master.allergens
-                                        .filter((a) => !labelIds.includes(a.id))
-                                        .map((a) => (
+                {item.unmappedTerms.length > 0 && (
+                    <Box>
+                        <FormLabel>品目の分からない表記の語（品目を選ぶか「対応する品目なし」を選んでください）</FormLabel>
+                        {termReasons.length > 0 && <ReasonLines reasons={termReasons} isAccepting={false} />}
+                        {item.unmappedTerms.map((term) => {
+                            const resolved = item.resolvedTerms.find((r) => r.term === term);
+                            const value = resolved ? (resolved.allergens[0]?.id ?? NONE) : '';
+                            return (
+                                <Stack key={term} direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+                                    <Typography sx={{ minWidth: 80 }}>「{term}」</Typography>
+                                    <Select
+                                        size="small"
+                                        value={value}
+                                        displayEmpty
+                                        disabled={isConfirmed || resolveTerm.isPending}
+                                        onChange={(event) => event.target.value && handleResolveTerm(term, event.target.value)}
+                                        sx={{ minWidth: 200, maxWidth: '100%' }}
+                                        aria-label={`「${term}」の品目`}
+                                    >
+                                        <MenuItem value="">選んでください</MenuItem>
+                                        <MenuItem value={NONE}>対応する品目なし</MenuItem>
+                                        {master.allergens.map((a) => (
                                             <MenuItem key={a.id} value={a.id}>
                                                 {a.name}
                                             </MenuItem>
                                         ))}
-                                </Select>
-                                <Button
-                                    disabled={!addingAllergen}
-                                    onClick={() => {
-                                        setLabelIds([...labelIds, addingAllergen]);
-                                        setAddingAllergen('');
-                                    }}
-                                >
-                                    足す
-                                </Button>
-                            </Stack>
-                            {item.descriptionHitWords.length > 0 && (
-                                <Alert severity="warning" sx={{ mt: 1 }}>
-                                    商品名・説明文に、避ける品目の言葉があります：{item.descriptionHitWords.join('・')}（含むとして記録します）
-                                </Alert>
-                            )}
-                        </Box>
+                                    </Select>
+                                </Stack>
+                            );
+                        })}
+                    </Box>
+                )}
 
-                        {item.unmappedTerms.length > 0 && (
-                            <Box>
-                                <FormLabel>品目に当てはめられなかった表記の語（確定の前に選んでください）</FormLabel>
-                                {item.unmappedTerms.map((term) => (
-                                    <Stack key={term} direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
-                                        <Typography sx={{ minWidth: 100 }}>「{term}」</Typography>
-                                        <Select
-                                            size="small"
-                                            value={termMapping[term] ?? ''}
-                                            displayEmpty
-                                            onChange={(event) => setTermMapping({ ...termMapping, [term]: event.target.value })}
-                                            sx={{ minWidth: 220 }}
-                                            aria-label={`「${term}」の品目`}
-                                        >
-                                            <MenuItem value="">選んでください</MenuItem>
-                                            <MenuItem value={NONE}>対応する品目なし</MenuItem>
-                                            {master.allergens.map((a) => (
-                                                <MenuItem key={a.id} value={a.id}>
-                                                    {a.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </Stack>
-                                ))}
-                            </Box>
-                        )}
-
-                        {choice === FLYER_CHOICE.SAME && discrepancies.length > 0 && (
-                            <Alert severity={discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning'}>
-                                パッケージで確認した内容と、チラシの表記が食い違っています：{discrepancies.map((d) => d.allergen.name).join('・')}
-                                {discrepancies.some((d) => d.isAvoided)
-                                    ? '。避ける品目のため、チラシの表記を記録します（パッケージで確認し直すまで献立に入れられません）'
-                                    : ''}
-                                {hasStaffChoice && (
-                                    <RadioGroup value={treatAsFlyerError ? 'error' : 'recheck'} onChange={(event) => setTreatAsFlyerError(event.target.value === 'error')}>
-                                        <FormControlLabel value="recheck" control={<Radio size="small" />} label="確認し直す（チラシの表記を記録する）" />
-                                        <FormControlLabel value="error" control={<Radio size="small" />} label="チラシの誤りとして扱う" />
-                                    </RadioGroup>
-                                )}
-                            </Alert>
-                        )}
-
-                        <Box>
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
-                                <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
-                                    {fixFields.length > 0 ? 'ほかの項目：' : '読み取った内容：'}
-                                    {otherSummary}
-                                </Typography>
+                {otherFields.length > 0 && (
+                    <Box>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
+                                {fixFields.length > 0 ? 'ほかの項目：' : '読み取った内容：'}
+                                {otherSummary}
+                            </Typography>
+                            {!isConfirmed && (
                                 <Button size="small" onClick={() => setIsOtherFieldsOpen(!isOtherFieldsOpen)} aria-expanded={isOtherFieldsOpen} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
                                     {isOtherFieldsOpen ? 'ほかの項目を閉じる' : 'ほかの項目も直す'}
                                 </Button>
-                            </Stack>
-                            <Collapse in={isOtherFieldsOpen} unmountOnExit>
-                                <Stack spacing={2} sx={{ mt: 1.5 }}>
-                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                                        {otherFields.map((field) => (
-                                            <Box key={field.key} sx={{ display: 'grid' }}>
-                                                {field.node}
-                                            </Box>
-                                        ))}
-                                    </Box>
+                            )}
+                        </Stack>
+                        <Collapse in={isOtherFieldsOpen} unmountOnExit>
+                            <Stack spacing={2} sx={{ mt: 1.5 }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>{otherFields.map((field) => field.node)}</Box>
+                                {!usesMasterSnackType && (
                                     <Box>
                                         <FormLabel>キャラクターのタグ</FormLabel>
                                         <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', mt: 0.5 }} useFlexGap>
@@ -419,23 +647,34 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, closeLabel 
                                             ))}
                                         </Stack>
                                     </Box>
-                                </Stack>
-                            </Collapse>
-                        </Box>
-                    </>
+                                )}
+                            </Stack>
+                        </Collapse>
+                    </Box>
                 )}
-                {confirm.isError && (
-                    <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {errorMessageOf(confirm.error)}
-                    </Alert>
+
+                {isDirty && (isUsable || isNew) && (
+                    <Typography variant="body2" sx={{ color: 'warning.dark' }}>
+                        直した内容は、まだ送っていません。「直した内容で分類し直す」を押してから確定してください（直すと分類が変わることがあります）。
+                    </Typography>
                 )}
-                <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                    <Button onClick={onClose}>{closeLabel}</Button>
-                    <Button variant="contained" onClick={handleSubmit} disabled={confirm.isPending || (!isSkip && unresolved.length > 0) || (!isSkip && !name.trim())}>
-                        {submitLabel}
-                    </Button>
-                </Stack>
+                {hasUnresolvedTerms && (isUsable || isNew) && (
+                    <Typography variant="body2" sx={{ color: 'warning.dark' }}>
+                        品目の分からない語の品目を選ぶまで、確定できません。
+                    </Typography>
+                )}
+                {[updateItem, confirm].map(
+                    (mutation, index) =>
+                        mutation.isError && (
+                            <Alert key={index} severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
+                                {errorMessageOf(mutation.error)}
+                            </Alert>
+                        ),
+                )}
+                {actionsContainer === undefined && actions}
             </Stack>
+            {/* ダイアログでは、スクロールしなくても押せるようにフッターに出す */}
+            {actionsContainer && createPortal(actions, actionsContainer)}
             <ConfirmDialog
                 isOpen={removingAllergen !== null}
                 title={`「${removingAllergen ? allergenName(removingAllergen) : ''}」を外しますか？`}
@@ -447,7 +686,22 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, closeLabel 
                     setRemovingAllergen(null);
                 }}
             >
-                <Typography>チラシと見比べて、この品目が表記に書かれていないことを確かめましたか？外したことは記録に残ります。</Typography>
+                <Typography>
+                    チラシと見比べて、この品目が表記に書かれていないことを確かめましたか？外したことは記録に残ります。外したあと「直した内容で分類し直す」を押すと反映します。
+                </Typography>
+            </ConfirmDialog>
+            <ConfirmDialog
+                isOpen={isCancelOpen}
+                title={`「${read.name}」の確定を取り消しますか？`}
+                confirmLabel="取り消す"
+                isDanger
+                isPending={removeItem.isPending}
+                onClose={() => setIsCancelOpen(false)}
+                onConfirm={handleRemove}
+            >
+                <Typography>
+                    今週の商品から外し、一覧の下の「外した掲載品」に移します。新しく登録した商品は「使わない」にします。「戻す」で一覧に戻すと、もう一度確かめて確定できます。
+                </Typography>
             </ConfirmDialog>
         </Box>
     );

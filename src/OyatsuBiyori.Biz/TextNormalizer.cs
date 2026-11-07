@@ -8,6 +8,7 @@ namespace OyatsuBiyori.Biz;
 /// 文字列の正規化。保存するときと探すときで同じ関数を使う。
 /// - ForProductMatch：商品照合用（NFKC → ひらがな → 「CO・OP」「コープ」の除去 → 記号・空白の除去）
 /// - ForKeywordSearch：探す言葉の検索用（NFKC → ひらがな → 空白・改行・記号の除去。コープの除去はしない。03 §5）
+/// - ForLabelAbbreviation：チラシの略記の照合用（NFKC → 空白・改行・記号の除去。カタカナをひらがなにしない。FR-IMPORT-32）
 /// - ForVolume：内容量の比較用（NFKC → 空白の除去 → ×・x・＊と括弧の書き方をそろえる）
 /// どれも英字は小文字にそろえる（表記ゆれで見落とさないため）。
 /// </summary>
@@ -55,6 +56,21 @@ public static class TextNormalizer
         return Build(text, keepSymbols: false);
     }
 
+    /// <summary>
+    /// チラシの略記の照合用の正規化（NFKC → 英字を小文字に → 空白・改行・記号の除去。カタカナをひらがなにしない）。
+    /// 「か」（かに）と「カ」（カシューナッツ）を字で分けるため（D-100、FR-IMPORT-32）。半角の「ｶ」は NFKC で全角の「カ」になる。
+    /// 略記の保存（MasterSeed の NormalizedAbbreviation）と照合（FlyerAllergenPlanner）の両方でこの関数を使う
+    /// </summary>
+    public static string ForLabelAbbreviation(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        return Build(text, keepSymbols: false, toHiragana: false).Text;
+    }
+
     /// <summary>内容量の比較用の正規化</summary>
     public static string ForVolume(string? text)
     {
@@ -88,7 +104,7 @@ public static class TextNormalizer
     /// 元の文字列を「基になる文字 + 後ろに続く濁点・半濁点・結合文字」の単位に分けて正規化し、
     /// 正規化後の各文字に元の範囲を記録する。単位ごとに処理するので、全文と言葉で同じ結果になる。
     /// </summary>
-    private static NormalizedText Build(string text, bool keepSymbols)
+    private static NormalizedText Build(string text, bool keepSymbols, bool toHiragana = true)
     {
         var builder = new StringBuilder(text.Length);
         var starts = new List<int>(text.Length);
@@ -109,7 +125,8 @@ public static class TextNormalizer
 
             foreach (var c in segment)
             {
-                var converted = ToHiragana(char.ToLowerInvariant(c));
+                var lower = char.ToLowerInvariant(c);
+                var converted = toHiragana ? ToHiragana(lower) : lower;
 
                 // かなの直後の、長音に似た文字（全角ハイフン・ダッシュ・漢数字の「一」など）は「ー」にそろえる
                 // （「ヘ－ゼル」「ヘ一ゼル」と読み取られても「へーぜる」に当たるように。確認する側に倒す）。

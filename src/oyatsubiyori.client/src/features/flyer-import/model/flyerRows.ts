@@ -1,66 +1,157 @@
-import type { FlyerChoice, FlyerDiscrepancy, FlyerItem } from '../../../entities/flyer';
-import { verdictLabel } from './labels';
+import { FLYER_ITEM_FIELD, FLYER_ITEM_STATUS, FLYER_REASON_CODE } from '../../../entities/flyer';
+import type { FlyerConfirmResult, FlyerItem, FlyerItemReason, FlyerItemStatus, FlyerSession } from '../../../entities/flyer';
+
+/*
+ * 読み取り結果の一覧の表示だけを受け持つ（09 の 6）。
+ * 分類・理由・まとめの可否はサーバー（Biz）が決めて返すので、ここでは判定しない。行の状態（status）・件数・並びもサーバーの値をそのまま使う。
+ */
 
 /**
- * 読み取り結果の一覧の、行の状態（画面の並べ方と絞り込みのためだけに使う。確定できるかどうかはサーバーが決める）
- * - 警告あり：パッケージでの確認との食い違い・説明文の避ける品目の言葉・品目に当てはめられない語・読み取りの検証の指摘がある
- * - 要確認：同じ商品かどうかが決まっていない（似ている商品・AI の判定がある、判定ができなかった）か、アレルゲンの表記が「表記なし」と読まれた
- * - 未確定：それ以外で、まだ確定していない
- * - 確定済み：確定した（選び直せる。D-53）
+ * 取り込みの分類のチップの名前。アレルゲンの3つの表示（🔴🟡🟢）とは別のもので、取り込みの画面の中だけで使う（09 の 3.1）
  */
-export const FLYER_ROW_STATUS = {
-    WARNING: 'Warning',
-    NEEDS_CHECK: 'NeedsCheck',
-    UNCONFIRMED: 'Unconfirmed',
-    CONFIRMED: 'Confirmed',
-} as const;
-export type FlyerRowStatus = (typeof FLYER_ROW_STATUS)[keyof typeof FLYER_ROW_STATUS];
-
-/** 並べる順（小さいほど上。確定済みは必ず下） */
-const STATUS_RANK: Record<FlyerRowStatus, number> = {
-    Warning: 0,
-    NeedsCheck: 1,
-    Unconfirmed: 2,
-    Confirmed: 3,
-};
-
-export const FLYER_ROW_STATUS_LABEL: Record<FlyerRowStatus, string> = {
-    Warning: '警告あり',
-    NeedsCheck: '要確認',
-    Unconfirmed: '未確定',
+export const FLYER_STATUS_LABEL: Record<FlyerItemStatus, string> = {
+    NeedsInput: '再入力',
+    New: '要確認',
+    Usable: '使える',
+    Unusable: '使えない',
     Confirmed: '確定済み',
 };
 
-/** 状態のバッジの色（テーマの palette から取る） */
-export const FLYER_ROW_STATUS_COLOR: Record<FlyerRowStatus, 'warning' | 'info' | 'default' | 'success'> = {
-    Warning: 'warning',
-    NeedsCheck: 'info',
-    Unconfirmed: 'default',
-    Confirmed: 'success',
+/**
+ * 取り込みの分類のチップの色（使えない＝赤・再入力＝橙・要確認＝青・使える＝緑）。
+ * 要確認を黄にしないのは、アレルゲンの 🟡 要確認と見分けるため（09 の 3.1）
+ */
+export const FLYER_STATUS_COLOR: Record<FlyerItemStatus, 'error' | 'warning' | 'info' | 'success' | 'default'> = {
+    NeedsInput: 'warning',
+    New: 'info',
+    Usable: 'success',
+    Unusable: 'error',
+    Confirmed: 'default',
 };
 
-/** 表の上のタブ（「すべて」と各状態） */
+/** 表の上のタブ（「すべて」と各状態。並びは一覧の並びと同じ：再入力 → 要確認 → 使える → 使えない → 確定済み） */
 export const FLYER_ROW_TAB = {
     ALL: 'All',
-    ...FLYER_ROW_STATUS,
+    ...FLYER_ITEM_STATUS,
 } as const;
 export type FlyerRowTab = (typeof FLYER_ROW_TAB)[keyof typeof FLYER_ROW_TAB];
 
-/**
- * チラシにアレルゲンの表記がない（「表記なし」と読まれた）。読み落としのこともあるので、チラシと見比べてもらう（FR-FLYER-04a）。
- * 「なし」「－」のように、文字はあっても品目が1つも出ない表記も、確認する側に倒して「表記なし」として示す（表示だけ。記録はサーバーが決める）
- */
-export const isLabelAbsent = (item: FlyerItem) =>
-    item.read.allergenLabelAbsent || !item.read.allergenLabelText?.trim() || (item.labelAllergens.length === 0 && item.unmappedTerms.length === 0);
+export const FLYER_ROW_TABS: FlyerRowTab[] = [
+    FLYER_ROW_TAB.ALL,
+    FLYER_ROW_TAB.NEEDS_INPUT,
+    FLYER_ROW_TAB.NEW,
+    FLYER_ROW_TAB.USABLE,
+    FLYER_ROW_TAB.UNUSABLE,
+    FLYER_ROW_TAB.CONFIRMED,
+];
+
+export const flyerTabLabel = (tab: FlyerRowTab) => (tab === FLYER_ROW_TAB.ALL ? 'すべて' : FLYER_STATUS_LABEL[tab]);
+
+/** タブの件数（サーバーの counts をそのまま出す） */
+export const flyerTabCount = (session: FlyerSession, tab: FlyerRowTab): number => {
+    switch (tab) {
+        case FLYER_ROW_TAB.ALL:
+            return session.items.length;
+        case FLYER_ROW_TAB.NEEDS_INPUT:
+            return session.counts.needsInput;
+        case FLYER_ROW_TAB.NEW:
+            return session.counts.new;
+        case FLYER_ROW_TAB.USABLE:
+            return session.counts.usable;
+        case FLYER_ROW_TAB.UNUSABLE:
+            return session.counts.unusable;
+        case FLYER_ROW_TAB.CONFIRMED:
+            return session.counts.confirmed;
+    }
+};
+
+/** タブで絞り込む（並びはサーバーが返したまま） */
+export const filterItems = (items: FlyerItem[], tab: FlyerRowTab): FlyerItem[] => (tab === FLYER_ROW_TAB.ALL ? items : items.filter((item) => item.status === tab));
+
+/** 行を開いて確かめる対象（確定できる・直せる行）。使えない・確定済みは確定しないので、確定のあとに次の行として開かない */
+export const isOpenableNext = (item: FlyerItem) =>
+    item.status === FLYER_ITEM_STATUS.NEEDS_INPUT || item.status === FLYER_ITEM_STATUS.NEW || item.status === FLYER_ITEM_STATUS.USABLE;
+
+/** 「未確定を1件ずつ確かめる」の対象（再入力と要確認。09 の 6） */
+export const isReviewTarget = (item: FlyerItem) => item.status === FLYER_ITEM_STATUS.NEEDS_INPUT || item.status === FLYER_ITEM_STATUS.NEW;
 
 /**
- * パッケージでの確認とチラシの表記の食い違い。勧める商品との食い違い（discrepancies）に加えて、
- * 「同じ商品」の候補ごとの食い違い（plansByProduct）も拾う（どの候補を選んでも見落とさないように。SR-20）
+ * 確定したあとに開く行：今の行より下にある、確かめる対象の行。なければ上から探す。どれもなければ null（閉じる）
+ * items は確定する前の並び（確定した行は、このあと一番下へ移る）
  */
-export const discrepanciesOf = (item: FlyerItem): FlyerDiscrepancy[] => {
-    const all = [...item.discrepancies, ...Object.values(item.plansByProduct).flatMap((plan) => plan.discrepancies)];
-    return all.filter((d, index) => all.findIndex((x) => x.allergen.id === d.allergen.id) === index);
+export const nextOpenableItemId = (items: FlyerItem[], currentId: string): string | null => {
+    const index = items.findIndex((item) => item.id === currentId);
+    const isTarget = (item: FlyerItem) => item.id !== currentId && isOpenableNext(item);
+    return items.slice(index + 1).find(isTarget)?.id ?? items.find(isTarget)?.id ?? null;
 };
+
+/** 項目の表示名（理由の field・二重の読み取りの食い違いに使う） */
+export const FIELD_LABEL: Record<string, string> = {
+    [FLYER_ITEM_FIELD.NAME]: '商品名',
+    [FLYER_ITEM_FIELD.MAKER]: 'メーカー',
+    [FLYER_ITEM_FIELD.VOLUME]: '内容量',
+    [FLYER_ITEM_FIELD.PRICE_INCLUDING_TAX]: '税込価格',
+    [FLYER_ITEM_FIELD.PRICE_EXCLUDING_TAX]: '税抜価格',
+    [FLYER_ITEM_FIELD.ORDER_NO]: '注文番号',
+    [FLYER_ITEM_FIELD.PIECES_PER_PACK]: '入数',
+    [FLYER_ITEM_FIELD.ALLERGEN_LABEL]: 'アレルゲン表記',
+};
+
+/** 鍵の「種類:値」の値の部分（品目の分からない語・食い違いの項目） */
+const keyValueOf = (key: string) => key.slice(key.indexOf(':') + 1);
+
+/** 文の、最初の「（」より前（「卵を含みます（チラシの表記）」→「卵を含みます」） */
+const beforeParen = (message: string) => message.split('（')[0];
+
+/**
+ * 理由の短い表示（表の分類のチップの下に出す）。文はサーバーの理由から作り、条件の判定はしない。
+ * 詳しい文は、行を開いた先の確定のフォームに出す
+ */
+export const shortReasonOf = (reason: FlyerItemReason): string => {
+    switch (reason.code) {
+        case FLYER_REASON_CODE.PIECES_UNKNOWN:
+            return '入数が分からない';
+        case FLYER_REASON_CODE.AVOIDED_IN_LABEL:
+        case FLYER_REASON_CODE.AVOIDED_IN_DESCRIPTION:
+        case FLYER_REASON_CODE.AVOIDED_IN_NAME:
+        case FLYER_REASON_CODE.AVOIDED_IN_MASTER:
+            return beforeParen(reason.message);
+        case FLYER_REASON_CODE.DISABLED:
+            return '「使わない」の商品';
+        case FLYER_REASON_CODE.UNMAPPED_TERM:
+            return `「${keyValueOf(reason.key)}」の品目が分からない`;
+        case FLYER_REASON_CODE.LABEL_ABSENT_BUT_MASTER_CONTAINS:
+            return '表記なしだが記録と違う';
+        case FLYER_REASON_CODE.REVIEW_NOTE:
+            return `${reason.field ?? '読み取り'}を確認`;
+        case FLYER_REASON_CODE.MISSING_NAME:
+            return '商品名が読めない';
+        case FLYER_REASON_CODE.MISSING_MAKER:
+            return 'メーカーが読めない';
+        case FLYER_REASON_CODE.MISSING_PRICE:
+            return '税込価格が読めない';
+        case FLYER_REASON_CODE.TAX_MISMATCH:
+            return '税込と税抜が合わない';
+        case FLYER_REASON_CODE.MISSING_VOLUME:
+            return '内容量が読めない';
+        case FLYER_REASON_CODE.PIECES_MISMATCH:
+            return '入数が内容量と合わない';
+        case FLYER_REASON_CODE.MISSING_ORDER_NO:
+            return '注文番号が読めない';
+        case FLYER_REASON_CODE.MASTER_VOLUME_OR_PIECES_CHANGED:
+            return '内容量・入数が商品一覧と違う';
+        case FLYER_REASON_CODE.DUPLICATE_CONFLICT:
+            return `${FIELD_LABEL[keyValueOf(reason.key)] ?? '読んだ値'}が食い違い`;
+        default:
+            return beforeParen(reason.message);
+    }
+};
+
+/** 短い理由を並べる（サーバーの並び＝アレルゲンに関わるものが先。同じ文は1つにまとめる） */
+export const shortReasonsOf = (item: FlyerItem): string[] => Array.from(new Set(item.reasons.map(shortReasonOf)));
+
+/** 入数が分からない（使えない）の行（行に入数の欄を出す。FR-IMPORT-11） */
+export const isPiecesUnknown = (item: FlyerItem) => item.reasons.some((reason) => reason.code === FLYER_REASON_CODE.PIECES_UNKNOWN);
 
 /** 表の「アレルゲン表記」の列に並べるチップ */
 export interface AllergenChip {
@@ -72,219 +163,94 @@ export interface AllergenChip {
 }
 
 /**
- * 行を開かなくても見落とさないように、表記の品目に加えて、表記なし・品目に当てはめられない語・説明文の避ける品目の言葉・
- * パッケージでの確認との食い違い（避ける品目なら error）もチップにする
+ * 行を開かなくても見落とさないように、表記の品目（略記から当てた品目は「麦→小麦」）に加えて、表記なし・品目の分からない語・
+ * 職員が選んだ語・説明文の避ける品目の言葉・パッケージでの確認との食い違い（避ける品目なら error）もチップにする
  */
-export const allergenChipsOf = (item: FlyerItem): AllergenChip[] => [
-    ...(isLabelAbsent(item) ? [{ key: 'absent', label: '表記なし', color: 'warning', variant: 'outlined', isDashed: true } as const] : []),
-    ...item.labelAllergens.map((allergen) => ({ key: `label-${allergen.id}`, label: allergen.name, color: 'default', variant: 'filled', isDashed: false }) as const),
-    ...item.unmappedTerms.map((term) => ({ key: `unmapped-${term}`, label: `「${term}」品目不明`, color: 'warning', variant: 'outlined', isDashed: false }) as const),
-    ...item.descriptionHitWords.map((word) => ({ key: `hit-${word}`, label: `説明文：${word}`, color: 'warning', variant: 'outlined', isDashed: false }) as const),
-    ...(discrepanciesOf(item).length > 0
-        ? [
-              {
-                  key: 'discrepancy',
-                  label: `パッケージでの確認と違う：${discrepanciesOf(item).map((d) => d.allergen.name).join('・')}`,
-                  color: discrepanciesOf(item).some((d) => d.isAvoided) ? 'error' : 'warning',
-                  variant: 'outlined',
-                  isDashed: false,
-              } as const,
-          ]
-        : []),
-];
+export const allergenChipsOf = (item: FlyerItem): AllergenChip[] => {
+    const termsOf = (allergenId: string) =>
+        Array.from(new Set(item.abbreviationHits.filter((hit) => hit.allergen.id === allergenId).map((hit) => hit.term)));
+    const chips: AllergenChip[] = [];
+    if (item.isLabelAbsent) {
+        chips.push({ key: 'absent', label: '表記なし', color: 'warning', variant: 'outlined', isDashed: true });
+    }
+    item.labelAllergens.forEach((allergen) => {
+        const terms = termsOf(allergen.id);
+        chips.push({
+            key: `label-${allergen.id}`,
+            label: terms.length > 0 ? `${terms.join('・')}→${allergen.name}` : allergen.name,
+            color: 'default',
+            variant: 'filled',
+            isDashed: false,
+        });
+    });
+    item.resolvedTerms.forEach((resolved) =>
+        chips.push({
+            key: `resolved-${resolved.term}`,
+            label: `「${resolved.term}」→${resolved.allergens.length > 0 ? resolved.allergens.map((a) => a.name).join('・') : '品目なし'}`,
+            color: 'default',
+            variant: 'outlined',
+            isDashed: false,
+        }),
+    );
+    item.unresolvedTerms.forEach((term) =>
+        chips.push({ key: `unmapped-${term}`, label: `「${term}」品目不明`, color: 'warning', variant: 'outlined', isDashed: false }),
+    );
+    item.descriptionHitWords.forEach((word) =>
+        chips.push({ key: `hit-${word}`, label: `説明文：${word}`, color: 'warning', variant: 'outlined', isDashed: false }),
+    );
+    if (item.discrepancies.length > 0) {
+        chips.push({
+            key: 'discrepancy',
+            label: `パッケージでの確認と食い違い：${item.discrepancies.map((d) => d.allergen.name).join('・')}`,
+            color: item.discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning',
+            variant: 'outlined',
+            isDashed: false,
+        });
+    }
+    return chips;
+};
 
-export const flyerRowStatusOf = (item: FlyerItem): FlyerRowStatus => {
+/** 表の上の「表記なしの見比べ」に並べる商品（サーバーが決めた canMarkLabelAbsentCompared。D-97） */
+export const labelAbsentCompareItemsOf = (items: FlyerItem[]): FlyerItem[] => items.filter((item) => item.canMarkLabelAbsentCompared);
+
+/** 「一致した商品」の列の2行（1行目：結果、2行目：補足） */
+export const matchSummaryOf = (item: FlyerItem): { title: string; detail: string } => {
     if (item.confirmation) {
-        return FLYER_ROW_STATUS.CONFIRMED;
+        return item.confirmation.kind === 'CreatedNew'
+            ? { title: '新しい商品として登録しました', detail: item.confirmation.productName }
+            : { title: '登録済みの商品に確定しました', detail: item.confirmation.productName };
     }
-    if (discrepanciesOf(item).length > 0 || item.descriptionHitWords.length > 0 || item.unmappedTerms.length > 0 || item.issues.length > 0) {
-        return FLYER_ROW_STATUS.WARNING;
-    }
-    const isMatchUndecided =
-        !item.canBulkConfirm && (item.judgement !== null || item.judgementSkipped || item.candidates.length > 0 || item.volumeVariants.length > 0);
-    if (isMatchUndecided || isLabelAbsent(item)) {
-        return FLYER_ROW_STATUS.NEEDS_CHECK;
-    }
-    return FLYER_ROW_STATUS.UNCONFIRMED;
-};
-
-export interface FlyerItemRow {
-    id: string;
-    item: FlyerItem;
-    status: FlyerRowStatus;
-}
-
-/** 状態の順に並べる（同じ状態の中では読み取った順のまま） */
-export const toSortedRows = (items: FlyerItem[]): FlyerItemRow[] =>
-    items
-        .map((item, index) => ({ row: { id: item.id, item, status: flyerRowStatusOf(item) }, index }))
-        .sort((a, b) => STATUS_RANK[a.row.status] - STATUS_RANK[b.row.status] || a.index - b.index)
-        .map(({ row }) => row);
-
-export const filterRows = (rows: FlyerItemRow[], tab: FlyerRowTab): FlyerItemRow[] =>
-    tab === FLYER_ROW_TAB.ALL ? rows : rows.filter((row) => row.status === tab);
-
-/**
- * 確定したあとに開く行：今の行より下にある未確定の行。なければ上から探す。どれもなければ null（閉じる）
- * rows は確定する前の並び（確定した行は、このあと一番下へ移る）
- */
-export const nextUnconfirmedRowId = (rows: FlyerItemRow[], currentId: string): string | null => {
-    const index = rows.findIndex((row) => row.id === currentId);
-    const isOpenable = (row: FlyerItemRow) => row.id !== currentId && row.status !== FLYER_ROW_STATUS.CONFIRMED;
-    return rows.slice(index + 1).find(isOpenable)?.id ?? rows.find(isOpenable)?.id ?? null;
-};
-
-export const CHOICE_LABEL: Record<FlyerChoice, string> = {
-    Same: '登録済みの商品と同じ',
-    Variant: '味違い・内容量違いとして登録',
-    New: '新しい商品として登録',
-    Skip: '取り込まない',
-};
-
-/** 「同じ商品か」の列の2行（1行目：結果、2行目：相手の商品など） */
-export const sameProductSummary = (item: FlyerItem): { title: string; detail: string } => {
-    const confirmation = item.confirmation;
-    if (confirmation) {
+    if (item.matchedProduct) {
         return {
-            title: CHOICE_LABEL[confirmation.choice],
-            detail:
-                confirmation.choice === 'Same'
-                    ? (confirmation.productName ?? '')
-                    : confirmation.choice === 'Skip'
-                      ? 'おやつに使わない'
-                      : '別の商品として登録',
+            title: item.matchedProduct.name,
+            detail: item.otherMatchCount > 0 ? `ほかに同じ名前の商品が ${item.otherMatchCount}件あります` : '登録済みの商品と同じ',
         };
     }
-    const same = item.sameProducts[0];
-    if (same) {
-        return { title: `登録済みの商品と同じ${same.makerCompared ? '' : '（メーカー未確認）'}`, detail: same.name };
+    if (item.notMatchableReason === 'MissingMaker') {
+        return { title: 'まだ分かりません', detail: 'メーカーを入れると、登録済みの商品と同じか調べます' };
     }
-    const variant = item.volumeVariants[0];
-    if (variant) {
-        return { title: '内容量違い', detail: variant.name };
+    if (item.notMatchableReason === 'MissingName') {
+        return { title: 'まだ分かりません', detail: '商品名を入れると、登録済みの商品と同じか調べます' };
     }
-    if (item.judgement) {
-        return { title: `AI の判定：${verdictLabel(item.judgement.verdict)}`, detail: item.judgement.productName ?? '' };
-    }
-    if (item.candidates.length > 0) {
-        return { title: '似ている商品があります', detail: item.candidates.map((c) => c.name).join('・') };
-    }
-    return { title: '新しい商品', detail: '似ている商品はありません' };
+    return { title: '新しい商品', detail: '登録済みの商品に、同じ名前とメーカーの商品はありません' };
 };
 
-/** 読み取りの検証の指摘を出す先（入力欄）。どれにも当たらない指摘は other */
-export type IssueTarget = 'name' | 'maker' | 'volume' | 'orderNo' | 'price' | 'priceExcluding' | 'pieces' | 'snackType' | 'allergens' | 'other';
-
-/** 指摘の項目名（サーバーの field）に含まれる言葉から、入力欄を決める。「アレルゲン」をいちばん先に、「税抜価格」が「価格」より先に当たるように並べる */
-const ISSUE_TARGET_WORDS: [string, IssueTarget][] = [
-    ['アレルゲン', 'allergens'],
-    ['入数', 'pieces'],
-    ['内容量', 'volume'],
-    ['税抜', 'priceExcluding'],
-    ['価格', 'price'],
-    ['商品名', 'name'],
-    ['メーカー', 'maker'],
-    ['注文番号', 'orderNo'],
-    ['分類', 'snackType'],
+/** 確定の結果の通知（確定した件数・確定しなかった件数・パッケージでの確認との食い違いで記録を足した商品） */
+export const confirmResultMessages = (
+    result: FlyerConfirmResult,
+    confirmedText: string,
+): { message: string; variant: 'success' | 'warning' | 'info' }[] => [
+    { message: confirmedText, variant: 'success' },
+    ...(result.skippedCount > 0
+        ? [
+              {
+                  message: `${result.skippedCount}件は、まとめて確定できる条件から外れたため確定していません。表の行を開いて1件ずつ確かめてください`,
+                  variant: 'warning' as const,
+              },
+          ]
+        : []),
+    ...result.recordedProducts.map((product) => ({
+        message: `「${product.productName}」は、チラシの表記がパッケージでの確認と食い違っていたため、チラシの表記を記録しました（${product.allergens.map((a) => a.name).join('・')}）。届いたらパッケージで確かめてください`,
+        variant: 'info' as const,
+    })),
 ];
-export const issueTargetOf = (field: string): IssueTarget => ISSUE_TARGET_WORDS.find(([word]) => field.includes(word))?.[1] ?? 'other';
-
-/** 確かめること（表の状態の列には short、詳細欄には guide を出す） */
-export interface CheckPoint {
-    key: string;
-    /** 状態のチップの下に出す短い理由 */
-    short: string;
-    /** 詳細欄に出す、どこを見て何をすればよいか */
-    guide: string;
-}
-
-/**
- * その商品で職員に確かめてほしいこと（状態が「警告あり」「要確認」になる理由と、することの案内）。
- * 並びは、アレルゲンに関わる理由を先にする（食い違い・説明文・品目の分からない語・表記の読み落とし・表記なし → 読み取りの指摘 → 同じ商品か）
- */
-export const checkPointsOf = (item: FlyerItem): CheckPoint[] => {
-    const points: CheckPoint[] = [];
-    const discrepancies = discrepanciesOf(item);
-    if (discrepancies.length > 0) {
-        points.push({
-            key: 'discrepancy',
-            short: 'パッケージの確認と違う',
-            guide: `パッケージで確認した内容と、チラシのアレルゲン表記が違います（${discrepancies.map((d) => d.allergen.name).join('・')}）。チラシの表記を見直してください。同じ商品なら、「登録済みの商品と同じ」を選んだときに出る説明に沿って扱いを選んでください。`,
-        });
-    }
-    if (item.descriptionHitWords.length > 0) {
-        points.push({
-            key: 'hit-words',
-            short: '説明文に避ける品目',
-            guide: `商品名・説明文に、避ける品目の言葉（${item.descriptionHitWords.join('・')}）があります。含むとして記録します。チラシで、この商品の説明を確かめてください。`,
-        });
-    }
-    if (item.unmappedTerms.length > 0) {
-        points.push({
-            key: 'unmapped',
-            short: '品目の分からない語',
-            guide: `アレルゲン表記の「${item.unmappedTerms.join('」「')}」が、どの品目か分かりませんでした。下の「品目に当てはめられなかった表記の語」で品目を選ぶか、「対応する品目なし」を選んでください（選ぶまで確定できません）。`,
-        });
-    }
-    if (item.issues.some((issue) => issueTargetOf(issue.field) === 'allergens')) {
-        points.push({
-            key: 'allergen-issues',
-            short: '表記の読み落とし',
-            guide: 'アレルゲン表記を読み落としているかもしれません。下の「チラシのアレルゲン表記」の指摘を読み、チラシと見比べて、足りない品目があれば「品目を足す」で足してください。',
-        });
-    }
-    if (isLabelAbsent(item)) {
-        points.push({
-            key: 'label-absent',
-            short: '表記なし',
-            guide: 'チラシにアレルゲンの表記がないと読みました。読み落としのことがあるので、チラシでこの商品のアレルゲン表記を探してください。表記があれば、下の「品目を足す」で足してください。なければ、そのままで構いません（献立に使う前に、パッケージでの確認が必要です）。',
-        });
-    }
-    const fieldIssueCount = new Set(item.issues.map((issue) => issueTargetOf(issue.field)).filter((target) => target !== 'other' && target !== 'allergens')).size;
-    if (fieldIssueCount > 0) {
-        points.push({
-            key: 'field-issues',
-            short: '読み取りを確認',
-            guide: `読み取りが合っているか確かめてほしい欄が ${fieldIssueCount}か所あります（黄色の枠の欄）。チラシと見比べて、違っていれば直してください。合っていれば、そのままで構いません。`,
-        });
-    }
-    item.issues
-        .filter((issue) => issueTargetOf(issue.field) === 'other')
-        .forEach((issue, index) =>
-            points.push({
-                key: `other-${index}`,
-                short: '読み取りを確認',
-                guide: `${issue.field}：${issue.message}（チラシと見比べて、違っていれば下の欄で直してください）`,
-            }),
-        );
-    if (!item.canBulkConfirm) {
-        const similar = [...item.sameProducts, ...item.volumeVariants, ...item.candidates].map((p) => p.name);
-        const similarText = similar.length > 0 ? `（${Array.from(new Set(similar)).join('・')}）` : '';
-        if (item.judgementSkipped) {
-            points.push({
-                key: 'match',
-                short: '同じ商品か選ぶ',
-                guide: `似ている登録済みの商品${similarText}がありますが、同じ商品かどうかを自動で判定できませんでした。見比べて、同じなら「登録済みの商品と同じ」、違えば「新しい商品として登録」を選んでください。`,
-            });
-        } else if (item.judgement) {
-            points.push({
-                key: 'match',
-                short: '同じ商品か選ぶ',
-                guide: `AI は「${verdictLabel(item.judgement.verdict)}」と判定しました（理由は「同じ商品かどうか」の下）。合っているか確かめて、同じ商品かどうかを選んでください。`,
-            });
-        } else if (item.volumeVariants.length > 0) {
-            points.push({
-                key: 'match',
-                short: '同じ商品か選ぶ',
-                guide: `内容量が違う登録済みの商品${similarText}があります。別の商品として登録するので、「味違い・内容量違いとして登録」を選んでください（アレルゲンの確認は引き継ぎません）。`,
-            });
-        } else if (item.candidates.length > 0) {
-            points.push({
-                key: 'match',
-                short: '同じ商品か選ぶ',
-                guide: `似ている登録済みの商品${similarText}があります。同じ商品かどうかを選んでください。`,
-            });
-        }
-    }
-    return points;
-};

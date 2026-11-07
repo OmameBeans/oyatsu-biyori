@@ -16,13 +16,6 @@ namespace OyatsuBiyori.Server.DemoData;
 /// </summary>
 public static class ReadingMeasurement
 {
-    /// <summary>1回の読み取りで送る画像の組（チラシの PDF は画面で画像にしてから送るので、ここでは測らない）</summary>
-    private static readonly string[][] FlyerImageSets =
-    [
-        ["flyer-01.png"],
-        ["flyer-01-photo-top.png", "flyer-01-photo-bottom.png"],
-    ];
-
     /// <summary>測って、結果の Markdown を返す</summary>
     public static async Task<string> MeasureReadingAsync(this IServiceProvider services, IHostEnvironment environment, IConfiguration configuration, CancellationToken cancellationToken)
     {
@@ -60,16 +53,35 @@ public static class ReadingMeasurement
 
     private static async Task MeasureFlyersAsync(IServiceProvider provider, string directory, IReadOnlyList<Allergen> allergens, StringBuilder report, CancellationToken cancellationToken)
     {
+        report.AppendLine("## チラシ");
+        report.AppendLine();
+        foreach (var path in FlyerExpectedFiles(directory))
+        {
+            await MeasureFlyerAsync(provider, directory, path, allergens, report, cancellationToken);
+        }
+    }
+
+    /// <summary>架空のチラシの正解データ（flyer-*.expected.json）を名前の順に返す</summary>
+    private static IEnumerable<string> FlyerExpectedFiles(string directory) =>
+        Directory.GetFiles(directory, "flyer-*.expected.json").Order(StringComparer.Ordinal);
+
+    /// <summary>
+    /// 1枚のチラシを、正解データの readingSets（1回の読み取りで送る画像の組。build.py が作る）ごとに読み取って比べる。
+    /// チラシの PDF は画面で画像にしてから送るので、ここでは測らない
+    /// </summary>
+    private static async Task MeasureFlyerAsync(IServiceProvider provider, string directory, string expectedPath, IReadOnlyList<Allergen> allergens, StringBuilder report, CancellationToken cancellationToken)
+    {
         var reader = provider.GetRequiredService<IFlyerReader>();
         var reviewer = provider.GetRequiredService<IFlyerReviewer>();
-        using var expected = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "flyer-01.expected.json"), cancellationToken));
+        using var expected = JsonDocument.Parse(await File.ReadAllTextAsync(expectedPath, cancellationToken));
         var items = expected.RootElement.GetProperty("items").EnumerateArray().ToDictionary(i => i.GetProperty("code").GetString()!);
         var codesByImage = expected.RootElement.GetProperty("images").EnumerateObject()
             .ToDictionary(p => p.Name, p => p.Value.EnumerateArray().Select(c => c.GetString()!).ToList());
+        var imageSets = expected.RootElement.GetProperty("readingSets").EnumerateArray()
+            .Select(s => s.EnumerateArray().Select(f => f.GetString()!).ToArray())
+            .ToList();
 
-        report.AppendLine("## チラシ");
-        report.AppendLine();
-        foreach (var set in FlyerImageSets)
+        foreach (var set in imageSets)
         {
             var images = new List<ClaudeImage>();
             foreach (var file in set)
@@ -153,10 +165,16 @@ public static class ReadingMeasurement
         var extractor = provider.GetRequiredService<IAllergenExtractor>();
         var directory = Path.Combine(samples, "packages");
 
-        // 本番と同じく、商品名を添えて読み取らせる（商品名はチラシの正解データから取る）
-        using var flyer = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(samples, "flyers", "flyer-01.expected.json"), cancellationToken));
-        var namesByCode = flyer.RootElement.GetProperty("items").EnumerateArray()
-            .ToDictionary(i => i.GetProperty("code").GetString()!, i => i.GetProperty("name").GetString()!);
+        // 本番と同じく、商品名を添えて読み取らせる（商品名はチラシの正解データから取る。注文番号はチラシをまたいで重ならない）
+        var namesByCode = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var flyerPath in FlyerExpectedFiles(Path.Combine(samples, "flyers")))
+        {
+            using var flyer = JsonDocument.Parse(await File.ReadAllTextAsync(flyerPath, cancellationToken));
+            foreach (var item in flyer.RootElement.GetProperty("items").EnumerateArray())
+            {
+                namesByCode[item.GetProperty("code").GetString()!] = item.GetProperty("name").GetString()!;
+            }
+        }
         report.AppendLine("## パッケージ（原材料表示）");
         report.AppendLine();
         report.AppendLine("| パッケージ | 全文の一致（正規化後の Dice 係数） | アレルゲン表示（不足がないか） | 表示より多く拾った品目 | 全文で探す言葉が当たったか |");
@@ -182,7 +200,7 @@ public static class ReadingMeasurement
             }
 
             var extraction = result.Value!;
-            var dice = ProductMatcher.DiceCoefficient(
+            var dice = DiceCoefficient(
                 TextNormalizer.ForKeywordSearch(extraction.RawIngredients),
                 TextNormalizer.ForKeywordSearch(root.GetProperty("ingredientsText").GetString()));
             var expectedCodes = NamesToCodes(root.GetProperty("labelAllergens").EnumerateArray().Select(e => e.GetString()!), allergens, out var unmapped);
@@ -224,7 +242,7 @@ public static class ReadingMeasurement
     private static Dictionary<string, FlyerReadProduct> MatchByName(IReadOnlyList<JsonElement> expected, IReadOnlyList<FlyerReadProduct> read)
     {
         var candidates = expected
-            .SelectMany(e => read.Select(r => (Expected: e, Read: r, Score: ProductMatcher.DiceCoefficient(
+            .SelectMany(e => read.Select(r => (Expected: e, Read: r, Score: DiceCoefficient(
                 TextNormalizer.ForProductMatch(e.GetProperty("name").GetString()), TextNormalizer.ForProductMatch(r.Name)))))
             .Where(c => c.Score >= 0.5)
             .OrderByDescending(c => c.Score);
@@ -274,6 +292,59 @@ public static class ReadingMeasurement
 
     private static int? IntOrNull(JsonElement item, string name) =>
         item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetInt32() : null;
+
+    /// <summary>
+    /// 文字バイグラム（重複を数える）の Dice 係数。読み取りの精度を測るためだけに使う（D-100 で照合からはなくした）。
+    /// 2 × 共通のバイグラム数 ÷ (A のバイグラム数 + B のバイグラム数)。1文字の文字列は、その1文字を1つの単位として比べる。どちらかが空なら 0
+    /// </summary>
+    private static double DiceCoefficient(string a, string b)
+    {
+        if (a.Length == 0 || b.Length == 0)
+        {
+            return 0;
+        }
+
+        if (a == b)
+        {
+            return 1;
+        }
+
+        var gramsA = Bigrams(a);
+        var gramsB = Bigrams(b);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var gram in gramsA)
+        {
+            counts[gram] = counts.GetValueOrDefault(gram) + 1;
+        }
+
+        var common = 0;
+        foreach (var gram in gramsB)
+        {
+            if (counts.TryGetValue(gram, out var count) && count > 0)
+            {
+                counts[gram] = count - 1;
+                common++;
+            }
+        }
+
+        return 2.0 * common / (gramsA.Count + gramsB.Count);
+    }
+
+    private static List<string> Bigrams(string text)
+    {
+        if (text.Length < 2)
+        {
+            return [text];
+        }
+
+        var grams = new List<string>(text.Length - 1);
+        for (var i = 0; i < text.Length - 1; i++)
+        {
+            grams.Add(text.Substring(i, 2));
+        }
+
+        return grams;
+    }
 
     private static string Mark(bool isOk, string? read) => isOk ? "✅" : $"❌ {read}";
 
