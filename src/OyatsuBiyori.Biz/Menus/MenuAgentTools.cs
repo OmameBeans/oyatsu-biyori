@@ -223,7 +223,7 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
             text.AppendLine("# 今の献立");
             foreach (var day in _menu.Days.OrderBy(d => d.Date))
             {
-                var names = day.Items.Select(i => $"{_context.FindProduct(i.ProductId)?.Name ?? "不明"}（{i.ProductId}・{i.PackCount}パック）");
+                var names = day.Items.Select(i => $"{_context.FindProduct(i.ProductId)?.Name ?? "不明"}（{i.ProductId}・1人{i.PerChildCount}個・{i.PackCount}パック{ServingNote(i, day)}）");
                 text.AppendLine($"- {day.Date:yyyy-MM-dd}：{(day.Items.Count == 0 ? "なし" : string.Join("、", names))}");
             }
         }
@@ -261,6 +261,23 @@ public sealed class MenuAgentTools(Menu menu, MenuContext context, MenuAgentMode
         }
 
         return text.Length == 0 ? null : text.ToString();
+    }
+
+    /// <summary>
+    /// 今の献立の商品が全員分に足りないとき、何人分か（パック数 × 入数 ÷ 1人あたりの個数。切り捨て）を書く
+    /// （在庫で補うために数を減らした商品を、次の組み直しで黙って戻させないため）
+    /// </summary>
+    private string ServingNote(MenuItem item, MenuDay day)
+    {
+        if (_context.PiecesPerPack(item.ProductId) is not int pieces || pieces < 1 || item.PerChildCount < 1
+            || !MenuAmountCalculator.IsPackShort(item.PackCount, day.ChildrenCount, item.PerChildCount, pieces))
+        {
+            return string.Empty;
+        }
+
+        var servings = (long)item.PackCount * pieces / item.PerChildCount;
+        // パック数から求めるので、頼まれた人数より多めに出ることがある（40人分 ÷ 入数12 → 4パック → 48人分まで）
+        return $"・{servings}人分まで（全員分より少ない）";
     }
 
     private static string DayTypeLabel(DayType dayType) => dayType switch

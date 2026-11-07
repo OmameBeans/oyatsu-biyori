@@ -26,7 +26,11 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
     /// 投入する（商品がすでにあれば何もしない）。
     /// </summary>
     /// <param name="includeE2EDraft">E2E 用に、掲載品の写しを持つ下書き（再来週）と、いちごゼリーを置いた下書き（3週先。献立一覧の注意を曜日に関係なく出すため）も作る</param>
-    public async Task SeedAsync(bool includeE2EDraft)
+    /// <param name="includeRegisteredChocolate">
+    /// デモ動画用に、flyer-02 の「ことりのさくさくショコラ」を、前にパッケージで確認した商品として足す（原材料にヘーゼルナッツペースト）。
+    /// E2E は「未登録のショコラを取り込み、パッケージで初めて見つかる」流れ（flow-hazelnut.spec.ts）を確かめるので、足さない
+    /// </param>
+    public async Task SeedAsync(bool includeE2EDraft, bool includeRegisteredChocolate = false)
     {
         if (await _context.Products.AnyAsync())
         {
@@ -34,11 +38,7 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
             return;
         }
 
-        _today = JapanDate.Today(_timeProvider);
-        _allergens = await _context.Allergens.Include(a => a.Keywords).OrderBy(a => a.SortOrder).ToListAsync();
-        var user = await _context.Users.OrderBy(u => u.Id).FirstOrDefaultAsync();
-        _checker = user?.UserName ?? "staff";
-        _userId = user?.Id;
+        await LoadContextAsync();
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         // 条件設定：50人・既定の週の予算 20,000円・ナッツ類（すべて）を避ける
@@ -56,7 +56,78 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
 
         var products = CreateProducts();
         _context.Products.AddRange(products.Values);
+        AddMenus(products, includeE2EDraft, now);
+        var count = products.Count;
 
+        if (includeRegisteredChocolate)
+        {
+            _context.Products.Add(CreateRegisteredChocolate());
+            count++;
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("ダミーデータを入れました（商品 {Count}件）", count);
+    }
+
+    /// <summary>
+    /// デモ動画の山場用：前にパッケージで確認した「ことりのさくさくショコラ」（flyer-02 の 8104・package-8104 と同じ商品）。
+    /// アレルゲン表示は「小麦・乳・大豆」だけで、職員はヘーゼルナッツを「含まない」で確定している。原材料の全文に
+    /// 「ヘーゼルナッツペースト」があるため、探す言葉で「含む可能性あり」（🔴）になる（SR-14）。
+    /// チラシの表記は「乳・小麦」だけでも、取り込むと「使えない」に分かれ、献立にも入れられない。
+    /// </summary>
+    private Product CreateRegisteredChocolate()
+    {
+        var chocolate = Product("ことりのさくさくショコラ", "ことり堂", "8個", 8, SnackType.Sweet, 321, "8104", flavor: "焼き菓子");
+        Confirmed(chocolate, 20,
+            "小麦粉（国内製造）、砂糖、植物油脂、ショートニング、ココアパウダー、ヘーゼルナッツペースト、全粉乳、乳糖、食塩／膨張剤、乳化剤、香料、（一部に小麦・乳成分・大豆を含む）",
+            ["wheat", "milk", "soybean"]);
+        return chocolate;
+    }
+
+    /// <summary>
+    /// 献立だけをダミーに戻す（`--reset-menus`）：下書き・確定済みの献立をすべて消し、ダミーの確定献立（2週前・先週・今週）を入れ直す。
+    /// 商品・確認の記録・条件設定・アカウントはそのまま。ダミーの商品は名前＋メーカーで探す（見つからなければ何も変えずに止める）。
+    /// </summary>
+    public async Task ResetMenusAsync()
+    {
+        await LoadContextAsync();
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // ダミーの商品の定義を作り（DB には足さない）、同じ名前＋メーカーの商品を DB から探す
+        var existing = await _context.Products.OrderBy(p => p.Id).ToListAsync();
+        var products = new Dictionary<string, Product>(StringComparer.Ordinal);
+        foreach (var (key, seed) in CreateProducts())
+        {
+            var found = existing.FirstOrDefault(p => p.Name == seed.Name && p.Maker == seed.Maker);
+            if (found is null)
+            {
+                throw new InvalidOperationException($"ダミーの商品「{seed.Name}」が見つかりません。--reset-demo で作り直してください");
+            }
+
+            products[key] = found;
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        // 日・品・チャットは外部キーの CASCADE で一緒に消える
+        var deleted = await _context.Menus.ExecuteDeleteAsync();
+        AddMenus(products, includeE2EDraft: false, now);
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+        _logger.LogInformation("献立を {Deleted}件消し、ダミーの確定献立を入れ直しました", deleted);
+    }
+
+    private async Task LoadContextAsync()
+    {
+        _today = JapanDate.Today(_timeProvider);
+        _allergens = await _context.Allergens.Include(a => a.Keywords).OrderBy(a => a.SortOrder).ToListAsync();
+        var user = await _context.Users.OrderBy(u => u.Id).FirstOrDefaultAsync();
+        _checker = user?.UserName ?? "staff";
+        _userId = user?.Id;
+    }
+
+    /// <summary>ダミーの献立（確定献立：2週前・先週・今週。E2E では下書き2件も）</summary>
+    private void AddMenus(Dictionary<string, Product> products, bool includeE2EDraft, DateTime now)
+    {
         var weekStart = JapanDate.WeekStart(_today);
         _context.Menus.Add(ConfirmedMenu(weekStart.AddDays(-14), products, [
             ["yasai-senbei", "ichigo-jelly"],
@@ -103,9 +174,6 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
             later.ConfirmedBy = null;
             _context.Menus.Add(later);
         }
-
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("ダミーデータを入れました（商品 {Count}件）", products.Count);
     }
 
     /// <summary>商品（キーは投入の中だけで使う名前）</summary>
@@ -291,7 +359,14 @@ public sealed class DemoDataSeeder(OyatsuBiyoriDbContext context, TimeProvider t
             UpdateUserId = _userId,
         };
         var keys = new[] { "yasai-senbei", "usushio", "sakusaku-cookie", "ichigo-jelly", "kozakana", "milk-biscuit", "okome-snack", "yogurt-jelly", "mushipan", "umi-senbei", "kokutou-fugashi", "mikan-jelly-old", "coconut-sable", "almond-cookie", "star-ramune", "kanten", "mugicha" };
-        menu.ListedProducts = keys.Select(k => new ListedProduct(products[k].Id, products[k].Price, products[k].OrderNo)).ToList();
+        // 今週のチラシの表記の原文（D-101。献立の確定のチェックで見比べる表記。🟡 の商品に、ダミーの記録と食い違わない値を入れる。ほかの商品は D-101 より前の写しと同じ null）
+        var labelTexts = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["kozakana"] = "表記なし",
+            ["star-ramune"] = "表記なし",
+            ["kanten"] = "もも",
+        };
+        menu.ListedProducts = keys.Select(k => new ListedProduct(products[k].Id, products[k].Price, products[k].OrderNo, labelTexts.GetValueOrDefault(k))).ToList();
         for (var i = 0; i < 5; i++)
         {
             menu.Days.Add(new MenuDay

@@ -9,10 +9,10 @@
     "./agents/oyatsu-menu-planner/agent.md": {
       "kind": "agent",
       "id": "agent_01HZT6vto5kvR1cVDGNqjNTK",
-      "version": "1",
-      "hash": "5a01a44f693740e67ad332441c33c313",
-      "remote_hash": "d8265542f310030010d05030d171e708",
-      "stamp": "1"
+      "version": "4",
+      "hash": "e2f8cf5714040a91c384f3326b1855ec",
+      "remote_hash": "d3f0a21802ff56364ad1d37fb943187e",
+      "stamp": "4"
     },
     "./agents/oyatsu-menu-planner/environment.yaml": {
       "kind": "environment",

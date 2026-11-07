@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using OyatsuBiyori.Biz.Entities;
 using OyatsuBiyori.Biz.Interfaces;
@@ -95,7 +96,7 @@ internal static class MenuAgentToolDispatcher
     {
         try
         {
-            var json = JsonSerializer.Serialize(input);
+            var json = WithDefaultServings(JsonSerializer.Serialize(input));
             switch (name)
             {
                 case "search_products":
@@ -122,14 +123,43 @@ internal static class MenuAgentToolDispatcher
         }
     }
 
+    /// <summary>
+    /// 日ごとの商品に servings がなければ空を足す（servings は後から足した項目。ant apply する前のエージェントの定義や、
+    /// 書き忘れた入力でも、ほかの項目は今までどおり厳しく読むため。servings 以外の抜けはエラーのまま）
+    /// </summary>
+    private static string WithDefaultServings(string json)
+    {
+        // 読み取りは名前の大小を区別しない（Web 既定）ので、days も servings も区別せずに探す
+        if (JsonNode.Parse(json) is not JsonObject root
+            || root.FirstOrDefault(p => string.Equals(p.Key, "days", StringComparison.OrdinalIgnoreCase)).Value is not JsonArray days)
+        {
+            return json;
+        }
+
+        // "Servings" で来た指定を、空の servings で上書きしないため
+        foreach (var day in days.OfType<JsonObject>().Where(d => !d.Any(p => string.Equals(p.Key, "servings", StringComparison.OrdinalIgnoreCase))))
+        {
+            day["servings"] = new JsonArray();
+        }
+
+        return root.ToJsonString();
+    }
+
     /// <summary>道具の名前・説明・入力の型</summary>
     public sealed record ToolSpec(string Name, string Description, Type InputType, bool Strict);
 
     /// <summary>search_products の入力</summary>
     internal sealed record SearchInput(string? Keyword, SnackType? SnackType);
 
-    /// <summary>日ごとの商品</summary>
-    internal sealed record DayInput(DateOnly Date, List<string> ProductIds, string Reason);
+    /// <summary>日ごとの商品。servings は、その日の人数と違う数を買う商品だけ（在庫で補うときなど。なければ空）</summary>
+    internal sealed record DayInput(DateOnly Date, List<string> ProductIds, string Reason, List<ServingInput> Servings)
+    {
+        public MenuAgentProposalDay ToProposalDay() => new(
+            Date, ProductIds, Reason, Servings.Select(s => new MenuAgentServing(s.ProductId, s.ChildrenCount)).ToList());
+    }
+
+    /// <summary>商品を何人分買うか（パック数はアプリが計算する）</summary>
+    internal sealed record ServingInput(string ProductId, int ChildrenCount);
 
     /// <summary>日ごとの値（人数・日の種類・見出し。変えないものは null）</summary>
     internal sealed record DayValueInput(DateOnly Date, int? ChildrenCount, DayType? DayType, string? Label);
@@ -138,7 +168,7 @@ internal static class MenuAgentToolDispatcher
     internal sealed record ProposalInput(List<DayInput> Days, List<DayValueInput> DayValues)
     {
         public MenuAgentProposal ToProposal() => new(
-            Days.Select(d => new MenuAgentProposalDay(d.Date, d.ProductIds, d.Reason)).ToList(),
+            Days.Select(d => d.ToProposalDay()).ToList(),
             DayValues.Select(v => new InterpretedDay(v.Date, v.ChildrenCount, v.DayType, v.Label)).ToList());
     }
 
@@ -159,7 +189,7 @@ internal static class MenuAgentToolDispatcher
         bool IsBudgetFitRequest)
     {
         public MenuAgentSubmission ToSubmission() => new(
-            new MenuAgentProposal(Days.Select(d => new MenuAgentProposalDay(d.Date, d.ProductIds, d.Reason)).ToList(), []),
+            new MenuAgentProposal(Days.Select(d => d.ToProposalDay()).ToList(), []),
             new InterpretedRequests
             {
                 Days = DayValues.Select(v => new InterpretedDay(v.Date, v.ChildrenCount, v.DayType, v.Label)).ToList(),

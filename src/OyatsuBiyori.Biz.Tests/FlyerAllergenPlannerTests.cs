@@ -495,4 +495,34 @@ public class FlyerAllergenPlannerTests
 
         Assert.Throws<ArgumentException>(() => FlyerAllergenPlanner.Plan(input, AllAllergens, [], []));
     }
+
+    // ---- 掲載品の写しの表記の原文（D-101・決めたこと F） ----
+
+    [Theory]
+    [InlineData("乳・小麦", "乳・小麦")]
+    [InlineData(" 乳・小麦 ", "乳・小麦")]
+    [InlineData(null, "表記なし")]
+    [InlineData("", "表記なし")]
+    [InlineData("なし", "表記なし")]
+    [InlineData("－", "表記なし")]
+    public void 写しの表記は原文のままで_表記がなければ表記なし(string? labelText, string expected)
+    {
+        Assert.Equal(expected, FlyerAllergenPlanner.ListingLabelText(labelText, [], null));
+    }
+
+    [Fact]
+    public void 写しの表記には_読み取りの検証で見つけた表記をつなぐ()
+    {
+        Assert.Equal("小麦／乳", FlyerAllergenPlanner.ListingLabelText("小麦", ["乳"], null));
+        Assert.Equal("乳", FlyerAllergenPlanner.ListingLabelText(null, ["乳"], null));
+        Assert.Equal("小麦", FlyerAllergenPlanner.ListingLabelText("小麦", ["小麦"], null));
+    }
+
+    [Fact]
+    public void 職員が品目を直したら_写しの表記に直した品目を書き添える()
+    {
+        Assert.Equal("卵・乳（品目を直しました：乳）", FlyerAllergenPlanner.ListingLabelText("卵・乳", [], ["乳"]));
+        Assert.Equal("表記なし（品目を入れました：小麦・乳）", FlyerAllergenPlanner.ListingLabelText(null, [], ["小麦", "乳"]));
+        Assert.Equal("乳（品目なし）", FlyerAllergenPlanner.ListingLabelText("乳", [], []));
+    }
 }

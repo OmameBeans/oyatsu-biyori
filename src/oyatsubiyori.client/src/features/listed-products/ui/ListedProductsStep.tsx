@@ -65,6 +65,10 @@ export const ListedProductsStep = ({ menuId, onBackToFlyer, onNext }: ListedProd
                                 今週使わない商品：{data.excludedCount}件
                             </Typography>
                         )}
+                        {/* この手順で職員にしてほしいこと（ここで全部の商品を確認しなくてよいことも伝える） */}
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            今週の献立に使わない商品があれば、「今週使う」をオフにしてください。そのままでよければ「要望の入力へ」に進んでください。アレルゲンの確認は、献立の確定とパッケージが届いたときに行います。
+                        </Typography>
                     </Box>
                     <Stack direction="row" spacing={1}>
                         <Button onClick={onBackToFlyer}>戻る</Button>

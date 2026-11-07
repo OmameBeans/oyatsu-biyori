@@ -17,6 +17,7 @@ import { useSnackbar } from 'notistack';
 import {
     useAddManualFlyerItem,
     useDiscardFlyerImport,
+    useFinishFlyerImport,
     useFlyerImport,
     useRefreshFlyerImport,
     useStartFlyerReading,
@@ -27,12 +28,12 @@ import type { PreparedImage } from '../../../shared/lib';
 import { JOB_STATE, SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
 import { ClaudeText, JobProgress } from '../../../shared/ui';
-import type { FlyerBulkExclusionCount, FlyerSession } from '../../../entities/flyer';
-import { FlyerBulkNewDialog } from './FlyerBulkNewDialog';
-import { FlyerBulkUsableDialog } from './FlyerBulkUsableDialog';
+import type { FlyerFinishResult, FlyerSession } from '../../../entities/flyer';
+import { finishResultMessages } from '../model/flyerRows';
+import type { PendingFlyerEdit } from '../model/flyerRows';
 import { FlyerImagePicker } from './FlyerImagePicker';
 import { FlyerItemGrid } from './FlyerItemGrid';
-import { FlyerRemovedCard } from './FlyerRemovedCard';
+import { FlyerRemovedDialog } from './FlyerRemovedDialog';
 
 interface FlyerImportStepProps {
     menuId: string;
@@ -48,7 +49,8 @@ interface FlyerImportStepProps {
 }
 
 /**
- * SC-09 手順1 チラシ取り込み（T3-10）。撮影・ファイル → 読み取り（バックグラウンド。画面を閉じても続く）→ 結果の表で確定（行の下の詳細欄）。
+ * SC-09 手順1 チラシ取り込み（T3-10）。撮影・ファイル → 読み取り（バックグラウンド。画面を閉じても続く）→ 結果の表で再入力を直し、
+ * 「取り込みを終える」1回で取り込めるの商品をまとめて取り込む（新しい商品は登録し、登録済みの商品は上書きする。D-101）。
  * 取り込み済みなら飛ばせる。読み取りに失敗しても、選んだ画像は残して「もう一度試す」と手入力ができる。
  */
 export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputChange, pickerInset }: FlyerImportStepProps) => {
@@ -56,15 +58,23 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
     const startReading = useStartFlyerReading(menuId);
     const discard = useDiscardFlyerImport(menuId);
     const refresh = useRefreshFlyerImport(menuId);
+    const finish = useFinishFlyerImport(menuId);
     const { enqueueSnackbar } = useSnackbar();
     const [images, setImages] = useState<PreparedImage[]>([]);
     const [startedJobId, setStartedJobId] = useState<string | null>(null);
     const [manualName, setManualName] = useState<string | null>(null);
     const [isPreparingImages, setIsPreparingImages] = useState(false);
-    const [isBulkNewOpen, setIsBulkNewOpen] = useState(false);
-    const [isBulkUsableOpen, setIsBulkUsableOpen] = useState(false);
-    // 表で開いている（確定のフォームで直している途中の）行。まとめて確定・登録から外す（直した内容を捨てて、読み取ったままで確定しないように）
-    const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+    // 表で開いている行のフォームで、直した内容をまだ送っていない状態（「取り込みを終える」の前に、反映するか捨てるかを聞く。09 の 5.1）
+    const [pendingEdit, setPendingEdit] = useState<PendingFlyerEdit | null>(null);
+    const [isPendingEditDialogOpen, setIsPendingEditDialogOpen] = useState(false);
+    const [isApplyingPendingEdit, setIsApplyingPendingEdit] = useState(false);
+    // 変えると、開いている行のフォームを作り直す（直した内容を捨てる）
+    const [formResetKey, setFormResetKey] = useState(0);
+    // 取り込みを終えた結果（一覧の上に出す。どの取り込みの結果かも持つ）
+    const [finishResult, setFinishResult] = useState<{ sessionId: string; result: FlyerFinishResult } | null>(null);
+    // 表の下に置くと画面全体がスクロールしてしまうので、外した掲載品と読み落としの指摘はダイアログで出す
+    const [isRemovedOpen, setIsRemovedOpen] = useState(false);
+    const [isMissedOpen, setIsMissedOpen] = useState(false);
 
     const runningJob = flyerImport.job && !isJobFinished(flyerImport.job) ? flyerImport.job.id : null;
     const jobId = startedJobId ?? runningJob;
@@ -123,16 +133,61 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
     const showPicker = !isReading && !session;
 
     const showResult = !!session && !isReading;
-    // まとめての確定・登録に並べる商品（サーバーが決めた bulkUsable・bulkNew。09 の 5.2）。
-    // 表で開いて直している途中の行は入れない（確定の API にも editingItemIds として伝え、サーバーでも外す）
-    const editingItemIds = expandedItemId ? [expandedItemId] : [];
-    const bulkItemsOf = (ids: string[]) => session?.items.filter((item) => ids.includes(item.id) && item.id !== expandedItemId) ?? [];
-    const bulkUsableItems = bulkItemsOf(session?.bulkUsable.itemIds ?? []);
-    const bulkNewItems = bulkItemsOf(session?.bulkNew.itemIds ?? []);
-    // 開いている行が、まとめての対象から外れているか（外れていることを文言で示す）
-    const expandedItem = session?.items.find((item) => item.id === expandedItemId);
-    const isExpandedExcluded =
-        !!expandedItem && !!session && (session.bulkUsable.itemIds.includes(expandedItem.id) || session.bulkNew.itemIds.includes(expandedItem.id));
+    const shownFinishResult = session && finishResult?.sessionId === session.id ? finishResult.result : null;
+
+    /** 取り込みを終える（どれを取り込むかはサーバーが分類し直して決める。使えない・再入力は取り込まない） */
+    const runFinish = () => {
+        if (!session) {
+            return;
+        }
+        const sessionId = session.id;
+        finish.mutate(undefined, {
+            onSuccess: (result) => {
+                setFinishResult({ sessionId, result });
+                finishResultMessages(result).forEach(({ message, variant }) => enqueueSnackbar(message, { variant }));
+                // 取り込んだ商品があれば、次の手順（今週の商品）へ進む。1件も取り込まなかったときは、結果を見られるようこの画面に残る
+                if (result.createdCount + result.updatedCount > 0) {
+                    onNext();
+                }
+            },
+            onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
+        });
+    };
+
+    const handleFinishClick = () => {
+        if (pendingEdit) {
+            setIsPendingEditDialogOpen(true);
+            return;
+        }
+        runFinish();
+    };
+
+    /** 直している途中の内容を反映してから終える（反映に失敗したら終えない） */
+    const handleApplyAndFinish = async () => {
+        if (!pendingEdit) {
+            setIsPendingEditDialogOpen(false);
+            runFinish();
+            return;
+        }
+        setIsApplyingPendingEdit(true);
+        try {
+            await pendingEdit.apply();
+            setIsPendingEditDialogOpen(false);
+            runFinish();
+        } catch (error) {
+            enqueueSnackbar(`直した内容を反映できませんでした。取り込みは終えていません。${errorMessageOf(error)}`, { variant: 'error' });
+        } finally {
+            setIsApplyingPendingEdit(false);
+        }
+    };
+
+    /** 直している途中の内容を捨ててから終える */
+    const handleDiscardAndFinish = () => {
+        setIsPendingEditDialogOpen(false);
+        setPendingEdit(null);
+        setFormResetKey((key) => key + 1);
+        runFinish();
+    };
 
     return (
         <Stack
@@ -148,7 +203,8 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                           pr: { md: `${pickerInset?.right ?? 0}px` },
                       }
                     : showResult
-                      ? // 表の上の案内が多いと表の枠が入りきらないので、そのときは手順1の枠の中をスクロールする
+                      ? // PC では表が残りの高さを埋め、表の中だけをスクロールする（表の上下は固定）。
+                        // 表の最低の高さも入らないほど低い画面のときだけ、手順1の枠の中をスクロールする
                         { height: { md: '100%' }, overflowY: { md: 'auto' } }
                       : undefined
             }
@@ -169,7 +225,7 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                         </Button>
                     }
                 >
-                    この週はチラシを取り込み済みです（{listedCount}件）。取り込み直すときは、下でチラシを撮ってください（最初に確定したときに、前の取り込みと入れ替わります）。
+                    この週はチラシを取り込み済みです（{listedCount}件）。取り込み直すときは、下でチラシを撮ってください（取り込みを終えたときに、前の取り込みと入れ替わります）。
                 </Alert>
             )}
 
@@ -236,47 +292,54 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                                 <Typography variant="body2" sx={{ color: session.notListed.total > 0 ? 'warning.dark' : 'success.main', fontWeight: 600 }}>
                                     {notListedText(session)}
                                 </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {finishSummaryText(session)}
+                                </Typography>
                             </Box>
                             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                                <Button variant="outlined" disabled={bulkUsableItems.length === 0} onClick={() => setIsBulkUsableOpen(true)}>
-                                    使える商品をまとめて確定（{bulkUsableItems.length}件）
+                                <Button variant="contained" onClick={handleFinishClick} disabled={finish.isPending || isApplyingPendingEdit}>
+                                    {finish.isPending ? '取り込んでいます…' : `取り込みを終える（取り込める ${session.finish.readyCount}件）`}
                                 </Button>
-                                <Button variant="outlined" disabled={bulkNewItems.length === 0} onClick={() => setIsBulkNewOpen(true)}>
-                                    新しい商品をまとめて登録（{bulkNewItems.length}件）
-                                </Button>
-                                <Button variant="contained" onClick={onNext} disabled={listedCount === 0}>
-                                    今週の商品へ
-                                </Button>
+                                {!shownFinishResult && (
+                                    <Button variant="outlined" onClick={onNext} disabled={listedCount === 0}>
+                                        今週の商品へ
+                                    </Button>
+                                )}
                             </Stack>
-                            <BulkExclusionSummary session={session} expandedItemName={isExpandedExcluded && expandedItem ? expandedItem.read.name : null} />
                         </CardContent>
                     </Card>
-                    {session.reviewFailed && (
-                        <Alert severity="info" sx={{ flexShrink: 0 }}>
-                            読み取りの検証ができませんでした。読み取った内容を、チラシと見比べて確かめてください。この取り込みの商品は、まとめての確定・登録に入りません（1件ずつ確定してください）。
+                    {shownFinishResult && (
+                        <Alert
+                            severity="success"
+                            sx={{ flexShrink: 0 }}
+                            action={
+                                <Button variant="contained" onClick={onNext} disabled={listedCount === 0} sx={{ whiteSpace: 'nowrap' }}>
+                                    今週の商品へ
+                                </Button>
+                            }
+                        >
+                            取り込みを終えました（新しく登録 {shownFinishResult.createdCount}件・登録済みの商品を上書き {shownFinishResult.updatedCount}件）。
+                            {shownFinishResult.notListedUnusableCount + shownFinishResult.notListedNeedsInputCount > 0 &&
+                                ` 使えない ${shownFinishResult.notListedUnusableCount}件・再入力 ${shownFinishResult.notListedNeedsInputCount}件は今週の商品に入りません。`}
                         </Alert>
                     )}
-                    <FlyerItemGrid key={session.id} menuId={menuId} session={session} onExpandedIdChange={setExpandedItemId} />
-                    {session.removedItems.length > 0 && <FlyerRemovedCard menuId={menuId} items={session.removedItems} />}
-                    {session.missedProducts.length > 0 && (
-                        <Card sx={{ flexShrink: 0 }}>
-                            <CardContent>
-                                <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
-                                    読み落としているかもしれない商品
-                                </Typography>
-                                {session.missedProducts.map((missed) => (
-                                    <Stack key={missed.name} direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography>{missed.name}</Typography>
-                                            <ClaudeText text={missed.reason} color="text.secondary" />
-                                        </Box>
-                                        <Button onClick={() => setManualName(missed.name)}>手で入力する</Button>
-                                    </Stack>
-                                ))}
-                            </CardContent>
-                        </Card>
+                    {session.reviewFailed && (
+                        <Alert severity="info" sx={{ flexShrink: 0 }}>
+                            読み取りの検証ができませんでした。献立の確定のときに、チラシの表記と見比べてください。
+                        </Alert>
                     )}
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ flexShrink: 0 }}>
+                    <FlyerItemGrid key={session.id} menuId={menuId} session={session} onPendingEditChange={setPendingEdit} formResetKey={formResetKey} />
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap sx={{ flexWrap: 'wrap', flexShrink: 0 }}>
+                        {session.removedItems.length > 0 && (
+                            <Button variant="outlined" onClick={() => setIsRemovedOpen(true)}>
+                                外した掲載品（{session.removedItems.length}件）
+                            </Button>
+                        )}
+                        {session.missedProducts.length > 0 && (
+                            <Button variant="outlined" color="warning" onClick={() => setIsMissedOpen(true)}>
+                                読み落としているかもしれない商品（{session.missedProducts.length}件）
+                            </Button>
+                        )}
                         <Button onClick={() => setManualName('')}>商品を手で入力する</Button>
                         <Button
                             color="inherit"
@@ -288,10 +351,55 @@ export const FlyerImportStep = ({ menuId, listedCount, onNext, onUnsavedInputCha
                 </>
             )}
 
-            {isBulkUsableOpen && (
-                <FlyerBulkUsableDialog menuId={menuId} items={bulkUsableItems} editingItemIds={editingItemIds} isOpen onClose={() => setIsBulkUsableOpen(false)} />
+            <Dialog open={isPendingEditDialogOpen} onClose={() => !isApplyingPendingEdit && setIsPendingEditDialogOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>「{pendingEdit?.itemName ?? ''}」を直している途中です</DialogTitle>
+                <DialogContent>
+                    <Typography>直した内容をまだ送っていません。反映してから取り込みを終えるか、直した内容を捨てて終えるかを選んでください。</Typography>
+                </DialogContent>
+                <DialogActions sx={{ flexWrap: 'wrap', gap: 1, '& > :not(style) ~ :not(style)': { ml: 0 } }}>
+                    <Button onClick={() => setIsPendingEditDialogOpen(false)} disabled={isApplyingPendingEdit}>
+                        やめる
+                    </Button>
+                    <Button color="inherit" onClick={handleDiscardAndFinish} disabled={isApplyingPendingEdit}>
+                        直した内容を捨てて終える
+                    </Button>
+                    <Button variant="contained" onClick={() => void handleApplyAndFinish()} disabled={isApplyingPendingEdit}>
+                        直した内容を反映して終える
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {session && (
+                <FlyerRemovedDialog
+                    menuId={menuId}
+                    items={session.removedItems}
+                    isOpen={isRemovedOpen && session.removedItems.length > 0}
+                    onClose={() => setIsRemovedOpen(false)}
+                />
             )}
-            {isBulkNewOpen && <FlyerBulkNewDialog menuId={menuId} items={bulkNewItems} editingItemIds={editingItemIds} isOpen onClose={() => setIsBulkNewOpen(false)} />}
+            <Dialog open={isMissedOpen && !!session && session.missedProducts.length > 0} onClose={() => setIsMissedOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>読み落としているかもしれない商品</DialogTitle>
+                <DialogContent dividers>
+                    {session?.missedProducts.map((missed) => (
+                        <Stack key={missed.name} direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+                            <Box sx={{ flex: 1 }}>
+                                <Typography>{missed.name}</Typography>
+                                <ClaudeText text={missed.reason} color="text.secondary" />
+                            </Box>
+                            <Button
+                                onClick={() => {
+                                    setIsMissedOpen(false);
+                                    setManualName(missed.name);
+                                }}
+                            >
+                                手で入力する
+                            </Button>
+                        </Stack>
+                    ))}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setIsMissedOpen(false)}>閉じる</Button>
+                </DialogActions>
+            </Dialog>
             {manualName !== null && <ManualItemDialog menuId={menuId} initialName={manualName} onClose={() => setManualName(null)} />}
         </Stack>
     );
@@ -303,7 +411,7 @@ interface ManualItemDialogProps {
     onClose: () => void;
 }
 
-/** 手入力の商品（チラシと同じ扱いで、サーバーが分類してから一覧に並ぶ。まとめての確定・登録には入らない。U-36・09 の 5.2） */
+/** 手入力の商品（チラシと同じ扱いで、サーバーが分類してから一覧に並ぶ。取り込めるなら「取り込みを終える」でほかの商品と一緒に取り込む。U-36） */
 const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProps) => {
     const addManual = useAddManualFlyerItem(menuId);
     const { enqueueSnackbar } = useSnackbar();
@@ -369,7 +477,7 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
                             },
                             {
                                 onSuccess: () => {
-                                    enqueueSnackbar('一覧に足しました。手で入力した商品はまとめての確定に入らないので、行を開いて1件ずつ確定してください', { variant: 'success' });
+                                    enqueueSnackbar('一覧に足しました。取り込みを終えると、ほかの商品と一緒に取り込みます', { variant: 'success' });
                                     onClose();
                                 },
                             },
@@ -383,53 +491,20 @@ const ManualItemDialog = ({ menuId, initialName, onClose }: ManualItemDialogProp
     );
 };
 
-
-/** 「今週の商品に入らない N件（使えない a件・再入力 b件・まだ確定していない c件）」（FR-FLYER-06b・09 の 5.1。件数はサーバーの値） */
+/** 「今週の商品に入らない N件（使えない a件・再入力 b件）」（FR-FLYER-06b・09 の 5.1。件数はサーバーの値） */
 const notListedText = (session: FlyerSession) => {
     const notListed = session.notListed;
     if (notListed.total === 0) {
-        return session.counts.confirmed > 0 ? '確定した商品は、すべて今週の商品に入ります' : '今週の商品に入る商品はまだありません';
+        return session.counts.ready > 0 ? '取り込みを終えると、すべての商品が今週の商品に入ります' : session.counts.confirmed > 0 ? '取り込んだ商品は、すべて今週の商品に入ります' : '今週の商品に入る商品はまだありません';
     }
-    return `今週の商品に入らない ${notListed.total}件（使えない ${notListed.unusable}件・再入力 ${notListed.needsInput}件・まだ確定していない ${notListed.unconfirmed}件）`;
+    return `今週の商品に入らない ${notListed.total}件（使えない ${notListed.unusable}件・再入力 ${notListed.needsInput}件）`;
 };
 
-interface BulkExclusionSummaryProps {
-    session: FlyerSession;
-    /** 開いて直している途中で、まとめから外れた行の商品名 */
-    expandedItemName: string | null;
-}
-
-/** まとめての確定・登録に入らない商品の件数と理由（09 の 5.2。理由ごとの件数はサーバーの値。1件が複数の理由に数えられる） */
-const BulkExclusionSummary = ({ session, expandedItemName }: BulkExclusionSummaryProps) => {
-    const merged = [...session.bulkUsable.exclusions, ...session.bulkNew.exclusions].reduce<FlyerBulkExclusionCount[]>((acc, exclusion) => {
-        const found = acc.find((x) => x.exclusion === exclusion.exclusion);
-        return found ? acc.map((x) => (x === found ? { ...x, count: x.count + exclusion.count } : x)) : [...acc, exclusion];
-    }, []);
-    const excludedCount = session.bulkUsable.excludedCount + session.bulkNew.excludedCount;
-    if (excludedCount === 0 && !expandedItemName) {
-        return null;
+/** 「取り込みを終える」で取り込む内訳（「新しい商品 a件・登録済み b件」。件数はサーバーの値） */
+const finishSummaryText = (session: FlyerSession) => {
+    const finish = session.finish;
+    if (finish.readyCount === 0) {
+        return session.counts.confirmed > 0 ? `取り込み済み ${session.counts.confirmed}件。取り込める商品はもうありません` : '取り込める商品はまだありません';
     }
-    return (
-        <Box component="section" aria-label="まとめに入らない商品" sx={{ width: '100%' }}>
-            {excludedCount > 0 && (
-                <>
-                    <Typography variant="body2" color="text.secondary">
-                        まとめての確定・登録に入らない {excludedCount}件（行を開いて1件ずつ確定してください）：
-                    </Typography>
-                    <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
-                        {merged.map((exclusion) => (
-                            <Typography key={exclusion.exclusion} component="li" variant="body2" color="text.secondary">
-                                {exclusion.message} {exclusion.count}件
-                            </Typography>
-                        ))}
-                    </Box>
-                </>
-            )}
-            {expandedItemName && (
-                <Typography variant="body2" color="text.secondary">
-                    開いている「{expandedItemName}」は、直している途中のため、まとめての確定・登録に入りません。行のボタンで確定してください
-                </Typography>
-            )}
-        </Box>
-    );
+    return `取り込みを終えると今週の商品に入る：新しい商品 ${finish.newCount}件・登録済み ${finish.existingCount}件`;
 };

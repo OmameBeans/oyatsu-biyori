@@ -68,6 +68,14 @@ if (args.Contains("--reset-demo"))
     return;
 }
 
+// 献立だけをダミーに戻す（開発の環境だけ。商品・確認の記録・条件設定・アカウントはそのまま）
+if (args.Contains("--reset-menus"))
+{
+    await app.Services.ResetDemoMenusAsync(app.Environment, app.Configuration);
+    Console.WriteLine("献立をダミーに戻しました。");
+    return;
+}
+
 // E2E の環境では、DB を毎回作り直してダミーデータを入れる
 await app.Services.ResetE2EDatabaseIfNeededAsync(app.Environment, app.Configuration);
 

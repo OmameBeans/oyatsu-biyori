@@ -57,6 +57,9 @@ public enum MenuIssueKind
 
     /// <summary>パック数が全員分に足りない</summary>
     PackShort,
+
+    /// <summary>エージェントの「何人分買うか」の指定が使えない（その日にない商品・範囲外の人数）</summary>
+    InvalidServing,
 }
 
 /// <summary>

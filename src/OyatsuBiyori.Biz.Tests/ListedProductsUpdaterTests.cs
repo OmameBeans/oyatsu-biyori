@@ -139,4 +139,29 @@ public class ListedProductsUpdaterTests
         Assert.False(ListedProductsUpdater.ApplyManualPrice(product, WeekStart.AddDays(-7), 250));
         Assert.Equal(298, product.Price);
     }
+
+    [Fact]
+    public void 写しの表記の原文は_価格を入れても残り_取り込み直しで入れ替わる()
+    {
+        var menu = NewMenu(20000, 50);
+        ListedProductsUpdater.ApplyConfirmation(menu, new ListedProduct("a", null, "1111", "乳・小麦"), clearFirst: false);
+
+        Assert.False(ListedProductsUpdater.SetListedPrice(menu, "a", 298).HasError);
+        Assert.Equal(new ListedProduct("a", 298, "1111", "乳・小麦"), Assert.Single(menu.ListedProducts));
+
+        ListedProductsUpdater.ApplyConfirmation(menu, new ListedProduct("a", 278, "1111", "表記なし"), clearFirst: false);
+        Assert.Equal("表記なし", Assert.Single(menu.ListedProducts).LabelText);
+    }
+
+    [Fact]
+    public void D_101_より前の写しは表記の原文が_null_のまま読める()
+    {
+        var old = new ListedProduct("a", 298, "1111");
+
+        Assert.Null(old.LabelText);
+        // menus.listed_products の JSON 列と同じ書き方（camelCase）の、LabelText のない古い行
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var read = System.Text.Json.JsonSerializer.Deserialize<ListedProduct>("""{"productId":"a","price":298,"orderNo":"1111"}""", options);
+        Assert.Equal(old, read);
+    }
 }

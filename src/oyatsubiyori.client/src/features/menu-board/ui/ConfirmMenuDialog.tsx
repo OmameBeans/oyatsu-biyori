@@ -10,7 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine } from '../../../entities/allergen-judgement';
+import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine, FlyerLabelNote } from '../../../entities/allergen-judgement';
 import { useConfirmMenu, useMenuConfirmation } from '../../../entities/menu';
 import type { MenuDetail } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -25,7 +25,7 @@ interface ConfirmMenuDialogProps {
 
 /**
  * 確定のダイアログ（T4-11。FR-MENU-32・SR-04）。止めるエラーがあれば一覧を示し「確定する」を押せない。
- * 🟡 の商品は1件ずつ、理由と次にすることを含む1文にチェックを付ける。
+ * 🟡 の商品は1件ずつ、理由と次にすることを含む1文にチェックを付ける。今週のチラシの表記の原文があれば添える（チラシとの見比べはここで行う。D-101）。
  * 判定は開くたびにサーバーで求め直し、確定のときにももう一度確かめる。
  */
 export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmMenuDialogProps) => {
@@ -79,7 +79,14 @@ export const ConfirmMenuDialog = ({ menu, isOpen, onClose, onSuccess }: ConfirmM
                                                 }
                                             />
                                         }
-                                        label={`${a.productName}（${formatDateLabel(a.date)}）：${acknowledgementSentence(a.judgement)}`}
+                                        label={
+                                            <Stack sx={{ py: 0.5 }}>
+                                                <Typography>{`${a.productName}（${formatDateLabel(a.date)}）：${acknowledgementSentence(a.judgement)}`}</Typography>
+                                                {/* 今週のチラシの表記の原文（古い写しは null で出さない。D-101） */}
+                                                <FlyerLabelNote labelText={a.flyerLabelText} />
+                                            </Stack>
+                                        }
+                                        sx={{ alignItems: 'flex-start', '& .MuiCheckbox-root': { mt: -0.5 } }}
                                     />
                                 ))}
                             </Stack>

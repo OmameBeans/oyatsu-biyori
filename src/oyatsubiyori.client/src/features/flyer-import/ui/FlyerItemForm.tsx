@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import Alert from '@mui/material/Alert';
@@ -16,41 +16,33 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useSnackbar } from 'notistack';
 import { AllergenJudgementLine } from '../../../entities/allergen-judgement';
-import {
-    FLYER_ITEM_FIELD,
-    FLYER_ITEM_STATUS,
-    FLYER_REASON_CODE,
-    useAcceptFlyerReason,
-    useConfirmFlyerItem,
-    useRemoveFlyerItem,
-    useResolveFlyerTerm,
-    useUpdateFlyerItem,
-} from '../../../entities/flyer';
+import { FLYER_ITEM_FIELD, FLYER_ITEM_STATUS, FLYER_REASON_CODE, useRemoveFlyerItem, useResolveFlyerTerm, useUpdateFlyerItem } from '../../../entities/flyer';
 import type { FlyerItem, FlyerItemReason } from '../../../entities/flyer';
 import { useAllergenMaster } from '../../../entities/settings';
 import { errorMessageOf } from '../../../shared/api';
 import { SNACK_TYPE, SNACK_TYPE_LABEL } from '../../../shared/type';
 import type { SnackType } from '../../../shared/type';
 import { ClaudeText, ConfirmDialog } from '../../../shared/ui';
-import { confirmResultMessages, FIELD_LABEL, isPiecesUnknown } from '../model/flyerRows';
+import { FIELD_LABEL, isPiecesUnknown } from '../model/flyerRows';
+import type { PendingFlyerEdit } from '../model/flyerRows';
 
-interface FlyerConfirmFormProps {
+interface FlyerItemFormProps {
     menuId: string;
     item: FlyerItem;
     onClose: () => void;
-    /** 確定したとき */
-    onSuccess: () => void;
-    /** 外したとき（確定の取り消しも） */
+    /** 外したとき（取り込みの取り消しも） */
     onRemoved?: () => void;
-    /** 「閉じる」のボタンの文言（1件ずつ確かめるダイアログでは「表に戻る」） */
+    /** 「閉じる」のボタンの文言（1件ずつ直すダイアログでは「表に戻る」） */
     closeLabel?: string;
     /** ボタンを出す場所（ダイアログのフッター）。なければフォームの下に出す */
     actionsContainer?: HTMLElement | null;
+    /** 直した内容をまだ送っていない状態が変わったとき（送っていなければ null。「取り込みを終える」の前に聞くために使う） */
+    onPendingEditChange?: (pending: PendingFlyerEdit | null) => void;
 }
 
 /** 商品の基本の入力欄 */
 type FieldKey = 'name' | 'maker' | 'volume' | 'orderNo' | 'priceIncludingTax' | 'priceExcludingTax' | 'piecesPerPack' | 'snackType';
-/** 理由を出す場所（入力欄のそば・アレルゲン表記・品目の分からない語・上の一覧） */
+/** 理由・注意を出す場所（入力欄のそば・アレルゲン表記・品目の分からない語・上の一覧） */
 type ReasonTarget = FieldKey | 'allergenLabel' | 'terms' | 'top';
 
 const FIELD_KEYS: FieldKey[] = ['name', 'maker', 'volume', 'orderNo', 'priceIncludingTax', 'priceExcludingTax', 'piecesPerPack', 'snackType'];
@@ -70,7 +62,7 @@ const REVIEW_FIELD_WORDS: [string, ReasonTarget][] = [
 ];
 
 /**
- * 理由を出す場所（表示の振り分けだけ。分類はサーバーが決める）。
+ * 理由・注意を出す場所（表示の振り分けだけ。分類はサーバーが決める）。
  * 使えないの理由は、表記の品目（直せる）以外は上の一覧に出す（職員の操作では外せないため。SR-10・09 の 3.6）
  */
 const reasonTargetOf = (reason: FlyerItemReason): ReasonTarget => {
@@ -103,62 +95,54 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
 
 interface ReasonLinesProps {
     reasons: FlyerItemReason[];
-    onAccept?: (reason: FlyerItemReason) => void;
-    isAccepting: boolean;
 }
 
-/** 理由の文と「このままでよい」（読み取りの検証の指摘は Claude の文なので、テキストとしてだけ出す） */
-const ReasonLines = ({ reasons, onAccept, isAccepting }: ReasonLinesProps) => (
+/** 理由・注意の文（読み取りの検証の指摘は Claude の文なので、テキストとしてだけ出す）。注意は目立ちすぎない色で出す */
+const ReasonLines = ({ reasons }: ReasonLinesProps) => (
     <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-        {reasons.map((reason) => (
-            <Stack key={reason.key} direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.25, sm: 1 }} sx={{ alignItems: { sm: 'center' } }}>
-                <Box sx={{ flex: 1, minWidth: 0, color: reason.level === 'Unusable' ? 'error.main' : 'warning.dark' }}>
+        {reasons.map((reason) => {
+            const isNote = reason.level === 'Note';
+            const color = reason.level === 'Unusable' ? 'error.main' : isNote ? 'text.secondary' : 'warning.dark';
+            const mark = reason.level === 'Unusable' ? '● ' : isNote ? '注意：' : '⚠ ';
+            return (
+                <Box key={reason.key} sx={{ minWidth: 0, color }}>
                     {reason.code === FLYER_REASON_CODE.REVIEW_NOTE ? (
-                        <ClaudeText text={`⚠ ${reason.field ?? ''}：${reason.message}`} color="inherit" />
+                        <ClaudeText text={`${mark}${reason.field ?? ''}：${reason.message}`} color="inherit" />
                     ) : (
                         <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-                            {reason.level === 'Unusable' ? '● ' : '⚠ '}
+                            {mark}
                             {reason.message}
                         </Typography>
                     )}
                 </Box>
-                {reason.canAccept && onAccept && (
-                    <Button size="small" variant="outlined" color="inherit" disabled={isAccepting} onClick={() => onAccept(reason)} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
-                        このままでよい
-                    </Button>
-                )}
-            </Stack>
-        ))}
+            );
+        })}
     </Stack>
 );
 
 /**
- * 取り込みの1商品を確かめる（SC-09 手順1。読み取り結果の表の、行の下の詳細欄と「1件ずつ確かめる」に出す）。
- * することは取り込みの分類（サーバーが決める）で変わる（09 の 5）。
- * - 再入力：理由の欄だけを開き、理由をそばに出す。直して「直した内容で分類し直す」か「このままでよい」。確定はできない
- * - 要確認：「新しい商品として登録」／使える：「確定する」（一致した商品とアレルゲンの表示を並べる）
+ * 取り込みの1商品を確かめて直す（SC-09 手順1。読み取り結果の表の、行の下の詳細欄と「再入力を1件ずつ直す」に出す。D-101）。
+ * 取り込みは一覧の上の「取り込みを終える」でまとめて行うので、ここには取り込みのボタンはない。することは分類（サーバーが決める）で変わる（09 の 5）。
+ * - 再入力：理由の欄だけを開き、理由をそばに出す。直して「直した内容で分類し直す」
+ * - 取り込める：何もしなくてよい。注意があれば出す（分類は変えない）
  * - 使えない：今週の商品に入らない。読み違いのときは表記の品目だけ直せる
- * - 確定済み：「確定を取り消す」（外した掲載品に移る。「戻す」で一覧に戻して確定し直す）
- * 直した内容は、確定の前にサーバーに送って分類し直す（直したまま確定ボタンは押せない）
+ * - 確定済み（取り込み済み）：直すと取り込みがいったん取り消され、もう一度「取り込みを終える」で取り込み直す。「確定を取り消す」で外した掲載品に移す
  */
-export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, closeLabel = '閉じる', actionsContainer }: FlyerConfirmFormProps) => {
+export const FlyerItemForm = ({ menuId, item, onClose, onRemoved, closeLabel = '閉じる', actionsContainer, onPendingEditChange }: FlyerItemFormProps) => {
     const { data: master } = useAllergenMaster();
     const updateItem = useUpdateFlyerItem(menuId);
     const resolveTerm = useResolveFlyerTerm(menuId);
-    const acceptReason = useAcceptFlyerReason(menuId);
     const removeItem = useRemoveFlyerItem(menuId);
-    const confirm = useConfirmFlyerItem(menuId);
     const { enqueueSnackbar } = useSnackbar();
     const read = item.read;
     const isConfirmed = item.status === FLYER_ITEM_STATUS.CONFIRMED;
-    const isUsable = item.status === FLYER_ITEM_STATUS.USABLE;
-    const isNew = item.status === FLYER_ITEM_STATUS.NEW;
+    const isReady = item.status === FLYER_ITEM_STATUS.READY;
     const isUnusable = item.status === FLYER_ITEM_STATUS.UNUSABLE;
     const isNeedsInput = item.status === FLYER_ITEM_STATUS.NEEDS_INPUT;
     // 入数が分からない行は、表の行の入数の欄で入れる（入れ直した商品として扱うため、ここでは入数の欄を出さない）
     const isPiecesInRow = isPiecesUnknown(item);
-    // 使えるの確定では、おやつの分類・タグは商品一覧の値を使い、上書きしない（09 の 5.1）
-    const usesMasterSnackType = !!item.matchedProduct;
+    // 登録済みの商品を上書きするときは、おやつの分類・タグは商品一覧の値を使い、上書きしない（09 の 5.1）
+    const usesMasterSnackType = !item.isNew;
 
     const [name, setName] = useState(read.name);
     const [maker, setMaker] = useState(read.maker ?? '');
@@ -193,6 +177,15 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
         ...(item.piecesPerPack === null && !isPiecesInRow ? (['piecesPerPack'] as const) : []),
     ]);
     const openKeys = new Set<FieldKey>([...initialOpenKeys, ...fieldReasonKeys]);
+    // 注意（分類は変えない）は、開いている欄かアレルゲン表記の欄に当たればそのそばに、ほかは上の一覧に出す。
+    // 確認済みとの食い違いは目立つように上に出す
+    const discrepancyNotes = item.notes.filter((note) => note.code === FLYER_REASON_CODE.MASTER_DISCREPANCY);
+    const otherNotes = item.notes.filter((note) => note.code !== FLYER_REASON_CODE.MASTER_DISCREPANCY);
+    const noteTargetOf = (note: FlyerItemReason): ReasonTarget => {
+        const target = reasonTargetOf(note);
+        return target === 'allergenLabel' || (target !== 'terms' && target !== 'top' && openKeys.has(target)) ? target : 'top';
+    };
+    const notesAt = (target: ReasonTarget) => otherNotes.filter((note) => noteTargetOf(note) === target);
 
     const allergenName = (id: string) => master.allergens.find((a) => a.id === id)?.name ?? id;
     const abbreviationTermsOf = (id: string) => Array.from(new Set(item.abbreviationHits.filter((hit) => hit.allergen.id === id).map((hit) => hit.term)));
@@ -201,23 +194,16 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
     const isLabelChanged = !sameSet(labelIds, item.labelAllergens.map((a) => a.id));
     const isTagsChanged = !sameSet(characterTags, read.characterTags);
     const isDirty =
-        !isConfirmed &&
-        (name.trim() !== read.name.trim() ||
-            maker.trim() !== (read.maker ?? '').trim() ||
-            volume.trim() !== (read.volume ?? '').trim() ||
-            orderNo.trim() !== (read.orderNo ?? '').trim() ||
-            toNumber(price) !== read.priceIncludingTax ||
-            toNumber(priceExcluding) !== read.priceExcludingTax ||
-            (!isPiecesInRow && toNumber(pieces) !== read.piecesPerPackCandidate) ||
-            (snackType || null) !== read.snackType ||
-            isLabelChanged ||
-            isTagsChanged);
-
-    const handleAccept = (reason: FlyerItemReason) =>
-        acceptReason.mutate(
-            { itemId: item.id, reasonKey: reason.key },
-            { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
-        );
+        name.trim() !== read.name.trim() ||
+        maker.trim() !== (read.maker ?? '').trim() ||
+        volume.trim() !== (read.volume ?? '').trim() ||
+        orderNo.trim() !== (read.orderNo ?? '').trim() ||
+        toNumber(price) !== read.priceIncludingTax ||
+        toNumber(priceExcluding) !== read.priceExcludingTax ||
+        (!isPiecesInRow && toNumber(pieces) !== read.piecesPerPackCandidate) ||
+        (snackType || null) !== read.snackType ||
+        isLabelChanged ||
+        isTagsChanged;
 
     const handleResolveTerm = (term: string, value: string) =>
         resolveTerm.mutate(
@@ -225,36 +211,51 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             { onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }) },
         );
 
-    const handleUpdate = () =>
-        updateItem.mutate(
-            {
-                itemId: item.id,
-                name: name.trim(),
-                maker: maker.trim() || null,
-                volume: volume.trim() || null,
-                priceIncludingTax: toNumber(price),
-                priceExcludingTax: toNumber(priceExcluding),
-                orderNo: orderNo.trim() || null,
-                piecesPerPack: isPiecesInRow ? read.piecesPerPackCandidate : toNumber(pieces),
-                snackType: snackType || null,
-                targetAgeLabel: read.targetAgeLabel,
-                characterTags: isTagsChanged ? characterTags : null,
-                labelAllergenIds: isLabelChanged ? labelIds : null,
-            },
-            {
-                onSuccess: () => enqueueSnackbar(`「${name.trim() || read.name}」を直して、分類し直しました`, { variant: 'success' }),
-            },
-        );
-
-    const handleConfirm = () =>
-        confirm.mutate(item.id, {
-            onSuccess: (result) => {
-                confirmResultMessages(result, isNew ? `「${read.name}」を新しい商品として登録しました` : `「${read.name}」を確定しました`).forEach(({ message, variant }) =>
-                    enqueueSnackbar(message, { variant }),
-                );
-                onSuccess();
-            },
+    /** 直した内容を送って分類し直す（失敗したら reject する。エラーはフォームの下にも出す） */
+    const applyUpdate = async () => {
+        const wasConfirmed = isConfirmed;
+        await updateItem.mutateAsync({
+            itemId: item.id,
+            name: name.trim(),
+            maker: maker.trim() || null,
+            volume: volume.trim() || null,
+            priceIncludingTax: toNumber(price),
+            priceExcludingTax: toNumber(priceExcluding),
+            orderNo: orderNo.trim() || null,
+            piecesPerPack: isPiecesInRow ? read.piecesPerPackCandidate : toNumber(pieces),
+            snackType: snackType || null,
+            targetAgeLabel: read.targetAgeLabel,
+            characterTags: isTagsChanged ? characterTags : null,
+            labelAllergenIds: isLabelChanged ? labelIds : null,
         });
+        enqueueSnackbar(
+            wasConfirmed
+                ? `「${name.trim() || read.name}」を直しました。今週の商品からいったん外れたので、「取り込みを終える」を押して取り込み直してください`
+                : `「${name.trim() || read.name}」を直して、分類し直しました`,
+            { variant: 'success' },
+        );
+    };
+
+    const handleUpdate = () => {
+        // エラーはフォームの下に出す（updateItem.isError）
+        applyUpdate().catch(() => undefined);
+    };
+
+    // 直した内容をまだ送っていないことを親へ知らせる（「取り込みを終える」の前に、反映するか捨てるかを聞くため）。
+    // 送る処理と知らせる先は描画のたびに変わるので、ref から呼ぶ（知らせ直しの繰り返しにならないように）
+    const latestRef = useRef({ applyUpdate, onPendingEditChange });
+    useEffect(() => {
+        latestRef.current = { applyUpdate, onPendingEditChange };
+    });
+    const itemName = read.name;
+    useEffect(() => {
+        if (!isDirty) {
+            return;
+        }
+        const notify = latestRef.current.onPendingEditChange;
+        notify?.({ itemName, apply: () => latestRef.current.applyUpdate() });
+        return () => notify?.(null);
+    }, [isDirty, itemName]);
 
     const handleRemove = () =>
         removeItem.mutate(item.id, {
@@ -262,7 +263,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                 setIsCancelOpen(false);
                 enqueueSnackbar(
                     isConfirmed
-                        ? `「${read.name}」の確定を取り消し、外した掲載品に移しました。「戻す」で一覧に戻すと、確定し直せます`
+                        ? `「${read.name}」の取り込みを取り消し、外した掲載品に移しました。「戻す」で一覧に戻すと、もう一度取り込めます`
                         : `「${read.name}」を外しました。一覧の下の「外した掲載品」から戻せます`,
                     { variant: 'success' },
                 );
@@ -271,14 +272,14 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             onError: (error) => enqueueSnackbar(errorMessageOf(error), { variant: 'error' }),
         });
 
-    /** 入力欄と、そのそばの理由・二重に読んだ値 */
+    /** 入力欄と、そのそばの理由・注意・二重に読んだ値 */
     const fieldBlock = (key: FieldKey, node: ReactNode, setValue?: (value: string) => void) => {
-        const reasons = reasonsAt(key);
+        const reasons = [...reasonsAt(key), ...notesAt(key)];
         const conflict = conflictOf(key);
         return (
             <Box key={key} sx={{ display: 'grid', alignContent: 'start' }}>
                 {node}
-                {reasons.length > 0 && <ReasonLines reasons={reasons} onAccept={isConfirmed ? undefined : handleAccept} isAccepting={acceptReason.isPending} />}
+                {reasons.length > 0 && <ReasonLines reasons={reasons} />}
                 {conflict && setValue && (
                     <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -299,7 +300,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             key: 'name',
             label: '商品名',
             summary: name,
-            node: fieldBlock('name', <TextField label="商品名" value={name} onChange={(event) => setName(event.target.value)} sx={fieldSx('name')} disabled={isConfirmed} />, setName),
+            node: fieldBlock('name', <TextField label="商品名" value={name} onChange={(event) => setName(event.target.value)} sx={fieldSx('name')} />, setName),
         },
         {
             key: 'maker',
@@ -312,7 +313,6 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                     value={maker}
                     onChange={(event) => setMaker(event.target.value)}
                     sx={fieldSx('maker')}
-                    disabled={isConfirmed}
                     helperText="商品名とメーカーが同じ商品を、登録済みの商品と同じとみなします"
                 />,
                 setMaker,
@@ -322,13 +322,13 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             key: 'volume',
             label: '内容量',
             summary: volume,
-            node: fieldBlock('volume', <TextField label="内容量" value={volume} onChange={(event) => setVolume(event.target.value)} sx={fieldSx('volume')} disabled={isConfirmed} />, setVolume),
+            node: fieldBlock('volume', <TextField label="内容量" value={volume} onChange={(event) => setVolume(event.target.value)} sx={fieldSx('volume')} />, setVolume),
         },
         {
             key: 'orderNo',
             label: '注文番号',
             summary: orderNo,
-            node: fieldBlock('orderNo', <TextField label="注文番号" value={orderNo} onChange={(event) => setOrderNo(event.target.value)} sx={fieldSx('orderNo')} disabled={isConfirmed} />, setOrderNo),
+            node: fieldBlock('orderNo', <TextField label="注文番号" value={orderNo} onChange={(event) => setOrderNo(event.target.value)} sx={fieldSx('orderNo')} />, setOrderNo),
         },
         {
             key: 'priceIncludingTax',
@@ -336,7 +336,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             summary: price ? `${price}円` : '',
             node: fieldBlock(
                 'priceIncludingTax',
-                <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} sx={fieldSx('priceIncludingTax')} disabled={isConfirmed} />,
+                <TextField label="税込価格（円）" type="number" value={price} onChange={(event) => setPrice(event.target.value)} sx={fieldSx('priceIncludingTax')} />,
                 setPrice,
             ),
         },
@@ -346,14 +346,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             summary: priceExcluding ? `${priceExcluding}円` : '',
             node: fieldBlock(
                 'priceExcludingTax',
-                <TextField
-                    label="税抜価格（円）"
-                    type="number"
-                    value={priceExcluding}
-                    onChange={(event) => setPriceExcluding(event.target.value)}
-                    sx={fieldSx('priceExcludingTax')}
-                    disabled={isConfirmed}
-                />,
+                <TextField label="税抜価格（円）" type="number" value={priceExcluding} onChange={(event) => setPriceExcluding(event.target.value)} sx={fieldSx('priceExcludingTax')} />,
                 setPriceExcluding,
             ),
         },
@@ -372,7 +365,6 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                               value={pieces}
                               onChange={(event) => setPieces(event.target.value)}
                               sx={fieldSx('piecesPerPack')}
-                              disabled={isConfirmed}
                               helperText={
                                   read.piecesPerPackReason
                                       ? `候補の理由：${read.piecesPerPackReason}`
@@ -394,7 +386,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                       summary: snackType ? SNACK_TYPE_LABEL[snackType] : '',
                       node: fieldBlock(
                           'snackType',
-                          <FormControl size="small" sx={fieldSx('snackType')} disabled={isConfirmed}>
+                          <FormControl size="small" sx={fieldSx('snackType')}>
                               <InputLabel id={`snack-${item.id}`}>おやつの分類</InputLabel>
                               <Select labelId={`snack-${item.id}`} label="おやつの分類" value={snackType} onChange={(event) => setSnackType(event.target.value as SnackType)}>
                                   {Object.values(SNACK_TYPE).map((type) => (
@@ -417,11 +409,12 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
     ].join('・');
 
     const topReasons = reasonsAt('top');
-    const allergenReasons = reasonsAt('allergenLabel');
+    const topNotes = notesAt('top');
+    const allergenReasons = [...reasonsAt('allergenLabel'), ...notesAt('allergenLabel')];
     const termReasons = reasonsAt('terms');
-    const hasUnresolvedTerms = item.unresolvedTerms.length > 0;
-    const confirmLabel = isNew ? '新しい商品として登録' : '確定する';
-    const canConfirm = (isUsable || isNew) && !isDirty && !hasUnresolvedTerms && !confirm.isPending && !updateItem.isPending;
+    // 表記なしと読んだのに、商品一覧の記録で特定原材料を含む（記録の品目を表記の品目に足すボタンを出す。送るのは「分類し直す」）
+    const masterContainsReason = item.reasons.find((reason) => reason.code === FLYER_REASON_CODE.LABEL_ABSENT_BUT_MASTER_CONTAINS);
+    const masterAllergensToAdd = masterContainsReason?.allergens.filter((a) => !labelIds.includes(a.id)) ?? [];
 
     const actions = (
         <Stack direction="row" spacing={1} useFlexGap sx={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -436,16 +429,9 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             )}
             <Box sx={{ flex: 1 }} />
             <Button onClick={onClose}>{closeLabel}</Button>
-            {!isConfirmed && (
-                <Button variant={isDirty || !(isUsable || isNew) ? 'contained' : 'outlined'} onClick={handleUpdate} disabled={!isDirty || updateItem.isPending}>
-                    直した内容で分類し直す
-                </Button>
-            )}
-            {(isUsable || isNew) && (
-                <Button variant="contained" onClick={handleConfirm} disabled={!canConfirm}>
-                    {confirmLabel}
-                </Button>
-            )}
+            <Button variant={isDirty ? 'contained' : 'outlined'} onClick={handleUpdate} disabled={!isDirty || updateItem.isPending}>
+                直した内容で分類し直す
+            </Button>
         </Stack>
     );
 
@@ -455,54 +441,53 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                 {/* 何をすればよいか（分類ごと） */}
                 {isNeedsInput && (
                     <Alert severity="warning" aria-label="確かめること">
-                        読み取りに足りないところか、おかしいところがあります。理由の出ている欄をチラシと見比べて直し、「直した内容で分類し直す」を押してください。合っていれば「このままでよい」を押してください。直すまで確定できません。
-                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} onAccept={handleAccept} isAccepting={acceptReason.isPending} />}
+                        読み取りに足りないところがあります。理由の出ている欄をチラシと見比べて直し、「直した内容で分類し直す」を押してください。直すまで今週の商品に入りません。
+                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} />}
                     </Alert>
                 )}
                 {isUnusable && (
                     <Alert severity="error" aria-label="今週の商品に入らない理由">
                         この商品は今週の商品に入りません。何もしなくて構いません。
-                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} isAccepting={false} />}
+                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} />}
                         {isPiecesInRow && <Typography variant="body2">個包装の数が分かれば、表の行の「入数」に入れて「分類し直す」を押してください。</Typography>}
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
                             チラシの表記の読み違いのときは、下の「チラシのアレルゲン表記」の品目を直せます。説明文・商品名・商品一覧の記録で当たったものは、ここでは外せません（商品一覧のパッケージでの確認で直します）。
                         </Typography>
                     </Alert>
                 )}
-                {isNew && (
+                {isReady && (
                     <Alert severity="info" icon={false}>
-                        登録済みの商品に、同じ名前とメーカーの商品はありません。チラシと見比べて、合っていれば「{confirmLabel}」を押してください（アレルゲンはチラシの表記として記録します）。
+                        この商品は、取り込みを終えると今週の商品に入ります（{item.isNew ? '新しい商品として登録します' : '登録済みの商品の価格などを上書きします'}）。何もしなくて構いません。
+                        {topReasons.length > 0 && <ReasonLines reasons={topReasons} />}
                     </Alert>
                 )}
-                {isUsable && <Typography variant="body2">登録済みの商品と同じです。チラシと見比べて、合っていれば「{confirmLabel}」を押してください。</Typography>}
                 {isConfirmed && item.confirmation && (
                     <Alert severity="success" icon={false}>
                         {item.confirmation.kind === 'CreatedNew'
-                            ? `新しい商品「${item.confirmation.productName}」として登録しました。`
-                            : `登録済みの商品「${item.confirmation.productName}」に確定しました。`}
+                            ? `新しい商品「${item.confirmation.productName}」として取り込みました。`
+                            : `登録済みの商品「${item.confirmation.productName}」を上書きして取り込みました。`}
                         {item.recordedDiscrepancyAllergens.length > 0 &&
                             ` チラシの表記がパッケージでの確認と食い違っていたため、チラシの表記を記録しました（${item.recordedDiscrepancyAllergens.map((a) => a.name).join('・')}）。`}
                         <Typography variant="body2" sx={{ mt: 0.5 }}>
-                            選び直すときは「確定を取り消す」を押し、一覧の下の「外した掲載品」から「戻す」で戻して、もう一度確かめてください。
+                            直すと今週の商品からいったん外れ、もう一度「取り込みを終える」を押すと取り込み直します。
                         </Typography>
                     </Alert>
                 )}
-                {(isUsable || isNew) && topReasons.length > 0 && <ReasonLines reasons={topReasons} onAccept={handleAccept} isAccepting={acceptReason.isPending} />}
-                {item.notices.map((notice) => (
-                    <Alert key={notice.key} severity={item.discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning'}>
-                        {notice.message}
+                {discrepancyNotes.map((note) => (
+                    <Alert key={note.key} severity={item.discrepancies.some((d) => d.isAvoided) ? 'error' : 'warning'}>
+                        {note.message}
                     </Alert>
                 ))}
-                {(isUsable || isNew) && item.bulkExclusions.length > 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                        この商品は、まとめての確定・登録に入りません（1件ずつ確定してください）。
-                    </Typography>
+                {topNotes.length > 0 && (
+                    <Box aria-label="注意">
+                        <ReasonLines reasons={topNotes} />
+                    </Box>
                 )}
 
                 {/* 一致した商品（名前＋メーカーが同じ登録済みの商品）と、商品一覧でのアレルゲンの表示 */}
                 {item.matchedProduct && (
                     <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
-                        <FormLabel sx={{ display: 'block', mb: 0.5 }}>{isConfirmed ? '確定した商品' : '登録済みの同じ商品'}</FormLabel>
+                        <FormLabel sx={{ display: 'block', mb: 0.5 }}>{isConfirmed ? '取り込んだ商品' : '登録済みの同じ商品'}</FormLabel>
                         <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{item.matchedProduct.name}</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                             {[
@@ -533,16 +518,24 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                 <Box>
                     <FormLabel>チラシのアレルゲン表記</FormLabel>
                     <Typography sx={{ my: 0.5, overflowWrap: 'anywhere' }}>
-                        {read.allergenLabelText?.trim() ? `「${read.allergenLabelText}」` : '表記なし（読み落としの可能性があります。チラシと見比べてください）'}
+                        {read.allergenLabelText?.trim() ? `「${read.allergenLabelText}」` : '表記なし（読み落としの可能性があります）'}
                     </Typography>
                     {item.isLabelAbsent && (
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            {item.canMarkLabelAbsentCompared
-                                ? `表の上の「表記なしの商品をチラシと見比べる」で、ほかの表記なしの商品とまとめて見比べられます${item.isLabelAbsentCompared ? '（見比べ済み）' : '（見比べるまで、まとめての確定に入りません）'}。表記があれば、下の「品目を足す」で足してください。`
-                                : 'チラシでこの商品のアレルゲン表記を探し、表記があれば下の「品目を足す」で足してください。'}
+                            チラシで表記が見つかれば、下の「品目を足す」で足してください。表記なしのまま取り込むと、献立の確定のときにチラシと見比べる確認が出ます。
                         </Typography>
                     )}
-                    {allergenReasons.length > 0 && <ReasonLines reasons={allergenReasons} onAccept={isConfirmed ? undefined : handleAccept} isAccepting={acceptReason.isPending} />}
+                    {allergenReasons.length > 0 && <ReasonLines reasons={allergenReasons} />}
+                    {masterAllergensToAdd.length > 0 && (
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setLabelIds([...labelIds, ...masterAllergensToAdd.map((a) => a.id)])}
+                            sx={{ mt: 1, alignSelf: 'flex-start' }}
+                        >
+                            商品一覧の記録の品目（{masterAllergensToAdd.map((a) => a.name).join('・')}）を表記に入れる
+                        </Button>
+                    )}
                     <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', my: 1 }} useFlexGap>
                         {labelIds.length === 0 && (
                             <Typography variant="body2" color="text.secondary">
@@ -552,43 +545,45 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                         {labelIds.map((id) => {
                             const terms = abbreviationTermsOf(id);
                             const label = terms.length > 0 ? `${terms.join('・')}→${allergenName(id)}` : allergenName(id);
-                            return <Chip key={id} label={label} onDelete={isConfirmed ? undefined : () => setRemovingAllergen(id)} />;
+                            return <Chip key={id} label={label} onDelete={() => setRemovingAllergen(id)} />;
                         })}
                     </Stack>
-                    {!isConfirmed && (
-                        <Stack direction="row" spacing={1}>
-                            <Select size="small" value={addingAllergen} displayEmpty onChange={(event) => setAddingAllergen(event.target.value)} sx={{ minWidth: 180, maxWidth: '100%' }} aria-label="品目を足す">
-                                <MenuItem value="">品目を足す</MenuItem>
-                                {master.allergens
-                                    .filter((a) => !labelIds.includes(a.id))
-                                    .map((a) => (
-                                        <MenuItem key={a.id} value={a.id}>
-                                            {a.name}
-                                        </MenuItem>
-                                    ))}
-                            </Select>
-                            <Button
-                                disabled={!addingAllergen}
-                                onClick={() => {
-                                    setLabelIds([...labelIds, addingAllergen]);
-                                    setAddingAllergen('');
-                                }}
-                            >
-                                足す
-                            </Button>
-                        </Stack>
-                    )}
+                    <Stack direction="row" spacing={1}>
+                        <Select size="small" value={addingAllergen} displayEmpty onChange={(event) => setAddingAllergen(event.target.value)} sx={{ minWidth: 180, maxWidth: '100%' }} aria-label="品目を足す">
+                            <MenuItem value="">品目を足す</MenuItem>
+                            {master.allergens
+                                .filter((a) => !labelIds.includes(a.id))
+                                .map((a) => (
+                                    <MenuItem key={a.id} value={a.id}>
+                                        {a.name}
+                                    </MenuItem>
+                                ))}
+                        </Select>
+                        <Button
+                            disabled={!addingAllergen}
+                            onClick={() => {
+                                setLabelIds([...labelIds, addingAllergen]);
+                                setAddingAllergen('');
+                            }}
+                        >
+                            足す
+                        </Button>
+                    </Stack>
                     {item.descriptionHitWords.length > 0 && (
                         <Typography variant="body2" sx={{ mt: 1, color: 'warning.dark' }}>
                             チラシの説明文に、避ける品目の言葉があります：{item.descriptionHitWords.join('・')}（ここでは外せません）
                         </Typography>
                     )}
+                    {/* 取り込みを終えると掲載品の写しに入り、献立の確定の確認で出す表記（Claude が読んだ文なので、テキストとしてだけ出す） */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, overflowWrap: 'anywhere' }}>
+                        献立の確定で見比べる表記：{item.listingLabelText}
+                    </Typography>
                 </Box>
 
                 {item.unmappedTerms.length > 0 && (
                     <Box>
                         <FormLabel>品目の分からない表記の語（品目を選ぶか「対応する品目なし」を選んでください）</FormLabel>
-                        {termReasons.length > 0 && <ReasonLines reasons={termReasons} isAccepting={false} />}
+                        {termReasons.length > 0 && <ReasonLines reasons={termReasons} />}
                         {item.unmappedTerms.map((term) => {
                             const resolved = item.resolvedTerms.find((r) => r.term === term);
                             const value = resolved ? (resolved.allergens[0]?.id ?? NONE) : '';
@@ -625,11 +620,9 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                                 {fixFields.length > 0 ? 'ほかの項目：' : '読み取った内容：'}
                                 {otherSummary}
                             </Typography>
-                            {!isConfirmed && (
-                                <Button size="small" onClick={() => setIsOtherFieldsOpen(!isOtherFieldsOpen)} aria-expanded={isOtherFieldsOpen} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
-                                    {isOtherFieldsOpen ? 'ほかの項目を閉じる' : 'ほかの項目も直す'}
-                                </Button>
-                            )}
+                            <Button size="small" onClick={() => setIsOtherFieldsOpen(!isOtherFieldsOpen)} aria-expanded={isOtherFieldsOpen} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+                                {isOtherFieldsOpen ? 'ほかの項目を閉じる' : 'ほかの項目も直す'}
+                            </Button>
                         </Stack>
                         <Collapse in={isOtherFieldsOpen} unmountOnExit>
                             <Stack spacing={2} sx={{ mt: 1.5 }}>
@@ -653,23 +646,16 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                     </Box>
                 )}
 
-                {isDirty && (isUsable || isNew) && (
+                {isDirty && (
                     <Typography variant="body2" sx={{ color: 'warning.dark' }}>
-                        直した内容は、まだ送っていません。「直した内容で分類し直す」を押してから確定してください（直すと分類が変わることがあります）。
+                        直した内容は、まだ送っていません。「直した内容で分類し直す」を押すと反映します（直すと分類が変わることがあります）。
+                        {isConfirmed && '送ると、この商品は今週の商品からいったん外れます。'}
                     </Typography>
                 )}
-                {hasUnresolvedTerms && (isUsable || isNew) && (
-                    <Typography variant="body2" sx={{ color: 'warning.dark' }}>
-                        品目の分からない語の品目を選ぶまで、確定できません。
-                    </Typography>
-                )}
-                {[updateItem, confirm].map(
-                    (mutation, index) =>
-                        mutation.isError && (
-                            <Alert key={index} severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
-                                {errorMessageOf(mutation.error)}
-                            </Alert>
-                        ),
+                {updateItem.isError && (
+                    <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {errorMessageOf(updateItem.error)}
+                    </Alert>
                 )}
                 {actionsContainer === undefined && actions}
             </Stack>
@@ -692,7 +678,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
             </ConfirmDialog>
             <ConfirmDialog
                 isOpen={isCancelOpen}
-                title={`「${read.name}」の確定を取り消しますか？`}
+                title={`「${read.name}」の取り込みを取り消しますか？`}
                 confirmLabel="取り消す"
                 isDanger
                 isPending={removeItem.isPending}
@@ -700,7 +686,7 @@ export const FlyerConfirmForm = ({ menuId, item, onClose, onSuccess, onRemoved, 
                 onConfirm={handleRemove}
             >
                 <Typography>
-                    今週の商品から外し、一覧の下の「外した掲載品」に移します。新しく登録した商品は「使わない」にします。「戻す」で一覧に戻すと、もう一度確かめて確定できます。
+                    今週の商品から外し、一覧の下の「外した掲載品」に移します。新しく登録した商品は「使わない」にします。「戻す」で一覧に戻すと、もう一度取り込めます。
                 </Typography>
             </ConfirmDialog>
         </Box>

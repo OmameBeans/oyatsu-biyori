@@ -1,15 +1,11 @@
 export * from './model/types';
 export {
     flyerKeys,
-    useAcceptFlyerReason,
     useAddManualFlyerItem,
-    useConfirmFlyerItem,
-    useConfirmNewFlyerItems,
-    useConfirmUsableFlyerItems,
     useDiscardFlyerImport,
     useEnterFlyerPieces,
+    useFinishFlyerImport,
     useFlyerImport,
-    useMarkLabelAbsentCompared,
     useRefreshFlyerImport,
     useRemoveFlyerItem,
     useResolveFlyerTerm,
@@ -17,4 +13,3 @@ export {
     useStartFlyerReading,
     useUpdateFlyerItem,
 } from './api/queries';
-export type { FlyerBulkConfirmInput } from './api/queries';

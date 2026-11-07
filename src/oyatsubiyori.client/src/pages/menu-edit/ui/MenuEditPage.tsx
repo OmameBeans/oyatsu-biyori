@@ -122,9 +122,9 @@ export const MenuEditPage = () => {
 
     const hasItems = menu.days.some((day) => day.items.length > 0);
     const isReading = !!flyerImport.job && !isJobFinished(flyerImport.job);
-    // 確定できる・直せる行（再入力・要確認・使えるの未確定）が残っていれば手順1から。使えないの行は確定しないので数えない（件数はサーバーの値）
+    // 取り込める・直せる行（再入力・取り込める）が残っていれば手順1から。使えないの行は取り込まないので数えない（件数はサーバーの値）
     const flyerCounts = flyerImport.session?.counts;
-    const hasUnconfirmed = !!flyerCounts && flyerCounts.needsInput + flyerCounts.new + flyerCounts.usable > 0;
+    const hasUnconfirmed = !!flyerCounts && flyerCounts.needsInput + flyerCounts.ready > 0;
     const defaultStep = isReading || hasUnconfirmed || menu.listedCount === 0 ? 1 : hasItems || menu.requestText ? 4 : 2;
     const step = Number(params.get('step')) || defaultStep;
     const goStep = (next: number) => setParams({ step: String(next) }, { replace: false });

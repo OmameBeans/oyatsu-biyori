@@ -16,7 +16,7 @@ interface FlyerPiecesInputProps {
 
 /**
  * 使えない（入数が分からない）の行の入数の欄（FR-IMPORT-11）。入れると、読み取った内容のままサーバーが分類し直す
- * （入れ直した商品は、まとめての確定・登録に入らない）。表のセルの中に置くので、キー・クリックは表に渡さない
+ * （取り込めるになれば、「取り込みを終える」で取り込む）。表のセルの中に置くので、キー・クリックは表に渡さない
  */
 export const FlyerPiecesInput = ({ menuId, item }: FlyerPiecesInputProps) => {
     const enterPieces = useEnterFlyerPieces(menuId);
@@ -32,7 +32,7 @@ export const FlyerPiecesInput = ({ menuId, item }: FlyerPiecesInputProps) => {
             {
                 onSuccess: () => {
                     setPieces('');
-                    enqueueSnackbar(`「${item.read.name}」の入数を入れて、分類し直しました。行を開いて1件ずつ確定してください`, { variant: 'success' });
+                    enqueueSnackbar(`「${item.read.name}」の入数を入れて、分類し直しました`, { variant: 'success' });
                 },
             },
         );

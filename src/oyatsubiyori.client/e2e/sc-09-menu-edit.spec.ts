@@ -14,14 +14,11 @@ import {
     flyerTabCount,
     listedProductItem,
     openFlyerItemDetail,
-    removedListings,
+    openRemovedListings,
 } from './helpers';
 
 const FLYER_IMAGE = path.resolve(process.cwd(), '../../samples/flyers/flyer-02.png');
 const FLYER_PDF = path.resolve(process.cwd(), '../../samples/flyers/flyer-02.pdf');
-
-/** 文字列を、正規表現の中でそのままの文字として使えるようにする */
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** 献立一覧から、指定した週（今週・来週・再来週）の献立を開く */
 const openWeek = async (page: Page, label: '来週' | '再来週') => {
@@ -192,11 +189,12 @@ test.describe('SC-09 献立作成 手順1 の配置', () => {
 
 test.describe.serial('SC-09 献立作成', () => {
     /*
-     * 手順1 チラシ取り込みの分類（D-100・09 の 11）。偽の Claude は flyer-02 の20商品を返す（e2e/README.md の表）：
+     * 手順1 チラシ取り込みの分類（D-101・09 の 11）。偽の Claude は flyer-02 の20商品を返す（e2e/README.md の表）：
      * 食品以外の1件（キッチン スポンジ）は外した掲載品になり、一覧は19件。ダミーデータはナッツ類を避けている。
-     * PC のあとにスマホが同じ DB で走るので、PC で登録した商品はスマホでは「使える」になる（件数を決め打ちしない）
+     * PC では先に flow-hazelnut.spec.ts が同じ週で「取り込みを終える」ので、取り込めるの商品は登録済みになっている。
+     * PC のあとにスマホが同じ DB で走るので、PC で登録した商品はスマホでも登録済みになる（件数を決め打ちしない）
      */
-    test('FR-IMPORT-01・FR-FLYER-01 チラシを読み取ると、取り込みの分類のタブに件数が出て、再入力 → 要確認 → 使える → 使えない → 確定済みの順に並ぶ', async ({ page }, testInfo) => {
+    test('FR-IMPORT-01・FR-FLYER-01 チラシを読み取ると、取り込みの分類のタブに件数が出て、再入力 → 取り込める → 使えない → 確定済みの順に並ぶ', async ({ page }, testInfo) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         await page.getByText(/1ページを半分ずつ|取り込み済みです|読み取った商品/).first().waitFor();
@@ -224,20 +222,30 @@ test.describe.serial('SC-09 献立作成', () => {
         // flyer-02 の20商品のうち、食品以外の1件は外した掲載品になる（FR-IMPORT-20）。入数が分からない大袋も一覧に入る（FR-IMPORT-10）
         await expect(page.getByText('読み取った商品 19件')).toBeVisible({ timeout: 30_000 });
         expect(await page.evaluate(() => (window as unknown as { flyerFlash: { pickerAfterReading: boolean } }).flyerFlash.pickerAfterReading)).toBe(false);
-        // 今週の商品に入らない件数（FR-FLYER-06b・09 の 5.1）
-        await expect(page.getByText(/^今週の商品に入らない \d+件（使えない \d+件・再入力 \d+件・まだ確定していない \d+件）$/)).toBeVisible();
+        // 今週の商品に入らない件数（FR-FLYER-06b・09 の 5.1）と、「取り込みを終える」で取り込む内訳
+        await expect(page.getByText(/^今週の商品に入らない \d+件（使えない \d+件・再入力 \d+件）$/)).toBeVisible();
+        await expect(page.getByText(/^取り込みを終えると今週の商品に入る：新しい商品 \d+件・登録済み \d+件$/)).toBeVisible();
 
-        // タブに分類ごとの件数が出て、合計が一覧の件数になる。まだ何も確定していない
+        // タブに分類ごとの件数が出て、合計が一覧の件数になる。まだ何も取り込んでいない
         await expect(page.getByRole('heading', { name: /^取り込みの分類/ })).toBeVisible();
         expect(await flyerTabCount(page, 'すべて')).toBe(19);
         const counts = await Promise.all(FLYER_CATEGORIES.map((label) => flyerTabCount(page, label)));
         expect(counts.reduce((a, b) => a + b, 0)).toBe(19);
         expect(await flyerTabCount(page, '確定済み')).toBe(0);
-        for (const label of ['再入力', '要確認', '使える', '使えない'] as const) {
+        for (const label of ['再入力', '取り込める', '使えない'] as const) {
             expect(await flyerTabCount(page, label)).toBeGreaterThan(0);
         }
+        // 「取り込みを終える」の件数は、取り込めるのタブの件数と同じ
+        const ready = await flyerTabCount(page, '取り込める');
+        await expect(page.getByRole('button', { name: `取り込みを終える（取り込める ${ready}件）` })).toBeEnabled();
 
-        // 並びは 再入力 → 要確認 → 使える → 使えない → 確定済み
+        // D-101 でなくした操作は出ない（要確認・使えるの区別、まとめての確定・登録、表記なしの見比べ、このままでよい）
+        for (const name of [/まとめて確定/, /まとめて登録/, /表記なしの商品をチラシと見比べる/, /このままでよい/]) {
+            await expect(page.getByRole('button', { name })).toHaveCount(0);
+        }
+        await expect(page.getByRole('tab', { name: /^(要確認|使える) \d+$/ })).toHaveCount(0);
+
+        // 並びは 再入力 → 取り込める → 使えない → 確定済み
         const categories = await flyerCategoriesInOrder(page);
         expect(categories).toHaveLength(19);
         const rank = (category: string) => FLYER_CATEGORIES.indexOf(category as (typeof FLYER_CATEGORIES)[number]);
@@ -245,19 +253,28 @@ test.describe.serial('SC-09 献立作成', () => {
         expect(categories.every((category) => rank(category) >= 0)).toBe(true);
 
         // 各分類に当たる商品（ダミーのチラシに入れた商品）
-        await expect(flyerCategoryChip(flyerRow(page, 'うすしお ポテトチップス 大袋'))).toHaveText('使えない');
-        await expect(flyerRow(page, 'うすしお ポテトチップス 大袋').getByText('入数が分からない')).toBeVisible();
         await expect(flyerCategoryChip(flyerRow(page, 'こつぶ しお豆スナック'))).toHaveText('使えない');
         await expect(flyerCategoryChip(flyerRow(page, 'ふんわり 抹茶ロール'))).toHaveText('再入力');
         await expect(flyerRow(page, 'ふんわり 抹茶ロール').getByText('税込価格が読めない')).toBeVisible();
         await expect(flyerCategoryChip(flyerRow(page, 'にこにこ ミニドーナツ'))).toHaveText('再入力');
         await expect(flyerRow(page, 'にこにこ ミニドーナツ').getByText('メーカーが読めない')).toBeVisible();
-        await expect(flyerCategoryChip(flyerRow(page, 'くまのポッケ ミルクビスケット'))).toHaveText('使える');
+        await expect(flyerCategoryChip(flyerRow(page, 'くまのポッケ ミルクビスケット'))).toHaveText('取り込める');
         await expect(flyerRow(page, 'くまのポッケ ミルクビスケット').getByText('登録済みの商品と同じ')).toBeVisible();
+        // 読み取りの検証の指摘は再入力にせず、行に注意として出すだけ（09 の 3.8）
+        const stick = flyerRow(page, 'チーズ味 ひねりスティック');
+        await expect(flyerCategoryChip(stick)).toHaveText('取り込める');
+        await expect(stick.getByText(/^注意：.*検証の指摘/)).toBeVisible();
+        // 入数の候補が内容量の表記と合わない商品も、候補を使って取り込める（注意だけ）
+        const stickPotato = flyerRow(page, 'コンソメ ポテトスティック');
+        await expect(flyerCategoryChip(stickPotato)).toHaveText('取り込める');
+        await expect(stickPotato.getByText(/^注意：.*入数の候補が合わない/)).toBeVisible();
         if (testInfo.project.name === 'pc') {
-            // 一致する商品がない新しい商品は要確認（スマホでは、PC で登録したので使える）
-            await expect(flyerCategoryChip(flyerRow(page, 'いちごチョコがけ ライスパフ'))).toHaveText('要確認');
-            await expect(flyerCategoryChip(flyerRow(page, 'CO・OP さくさくクッキー'))).toHaveText('再入力');
+            // 入数が分からない大袋は使えない（スマホは、PC で入数を入れて登録したので、商品一覧の入数で取り込める）
+            await expect(flyerCategoryChip(flyerRow(page, 'うすしお ポテトチップス 大袋'))).toHaveText('使えない');
+            await expect(flyerRow(page, 'うすしお ポテトチップス 大袋').getByText('入数が分からない')).toBeVisible();
+            // ほかの商品は、先に flow-hazelnut.spec.ts で取り込んだので登録済み。ショコラはパッケージでヘーゼルナッツが見つかって使えない
+            await expect(flyerCategoryChip(flyerRow(page, 'ことりのさくさくショコラ'))).toHaveText('使えない');
+            await expect(flyerCategoryChip(flyerRow(page, 'いちごチョコがけ ライスパフ'))).toHaveText('取り込める');
         }
 
         // タブで絞り込むと、その分類の行だけが出る
@@ -265,13 +282,23 @@ test.describe.serial('SC-09 献立作成', () => {
         expect(new Set(await flyerCategoriesInOrder(page))).toEqual(new Set(['使えない']));
         await flyerTab(page, 'すべて').click();
         expect(await flyerCategoriesInOrder(page)).toHaveLength(19);
+        // 初めはどの行も開いていない（FR-FLYER-06c）
+        await expect(flyerGrid(page).getByRole('button', { name: /の詳細を閉じる$/ })).toHaveCount(0);
 
-        // 食品以外の掲載品は、黙って消さずに理由つきで一覧の下に出る（FR-IMPORT-20）
-        const removed = removedListings(page);
+        // 表の中だけをスクロールし、画面（手順1の枠）はスクロールしない（PC。表の下のボタンも画面の中に見えている）
+        if (testInfo.project.name !== 'mobile') {
+            // 19行は画面に入りきらないが、表の下のボタンはスクロールせずに見えている
+            await expect(page.getByRole('button', { name: 'チラシを取り込み直す' })).toBeInViewport();
+            await expect(page.getByRole('button', { name: /^取り込みを終える/ })).toBeInViewport();
+        }
+        await captureScreen(page, testInfo, 'sc-09-step1-flyer');
+
+        // 食品以外の掲載品は、黙って消さずに理由つきで「外した掲載品」に出る（FR-IMPORT-20。表の下のボタンから開く）
+        const removed = await openRemovedListings(page);
         await expect(removed.getByText('キッチン スポンジ 3個', { exact: true })).toBeVisible();
         await expect(removed.getByText('食品以外：台所用品のため')).toBeVisible();
+        await removed.getByRole('button', { name: '閉じる' }).click();
         await expect(flyerRow(page, 'キッチン スポンジ 3個')).toHaveCount(0);
-        await captureScreen(page, testInfo, 'sc-09-step1-flyer');
     });
 
     test('FR-IMPORT-30〜32 略記の表記（「（乳・麦）」「（乳・カ）」）の商品は、補正した品目で表示され、「カ」はカシューナッツになる', async ({ page }) => {
@@ -293,65 +320,79 @@ test.describe.serial('SC-09 献立作成', () => {
         await expect(cashew.getByText('カシューナッツを含みます', { exact: true })).toBeVisible();
         await expect(cashew.getByText('かに', { exact: false })).toHaveCount(0);
 
-        // 使えないの行を開くと、今週の商品に入らない理由が出て、確定のボタンはない
+        // 使えないの行を開くと、今週の商品に入らない理由が出る
         const detail = await openFlyerItemDetail(page, 'こつぶ しお豆スナック');
         await expect(detail.getByRole('alert', { name: '今週の商品に入らない理由' })).toBeVisible();
         // 理由は、チラシのアレルゲン表記の欄のそばに出る
         await expect(detail.getByText('カシューナッツを含みます（チラシの表記）', { exact: false })).toBeVisible();
-        await expect(detail.getByRole('button', { name: /^(確定する|新しい商品として登録)$/ })).toHaveCount(0);
+        // 取り込みを終えると写しに入る表記（献立の確定で見比べる表記）を出す
+        await expect(detail.getByText('献立の確定で見比べる表記：乳・カ', { exact: false })).toBeVisible();
     });
 
-    test('FR-IMPORT-12 登録済みの商品と名前・メーカーが同じで内容量が違うと再入力になり、「このままでよい」で使えるになる', async ({ page }, testInfo) => {
+    test('FR-IMPORT-12 登録済みの商品と名前・メーカーが同じで内容量が違っても取り込めるで、取り込みを終えるとチラシの値で商品一覧を上書きする', async ({ page }) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         const row = flyerRow(page, 'CO・OP さくさくクッキー');
         await expect(row).toBeVisible();
-        // スマホは、PC で確定して登録済みの内容量が5袋入になったので、再入力にならない
-        test.skip((await flyerCategoryChip(row).innerText()) !== '再入力', 'PC で内容量を確かめて確定済み');
-
-        await expect(row.getByText('内容量・入数が商品一覧と違う')).toBeVisible();
+        // 内容量が違っても再入力にしない（D-101。注意を出して自動で進める）
+        await expect(flyerCategoryChip(row)).toHaveText('取り込める');
         const detail = await openFlyerItemDetail(page, 'CO・OP さくさくクッキー');
-        await expect(detail.getByText('商品一覧は10袋入・10個、チラシは5袋入・5個です', { exact: false })).toBeVisible();
-        await expect(detail.getByText('届いたらパッケージの原材料も見てください', { exact: false })).toBeVisible();
-        await expect(detail.getByRole('button', { name: /^(確定する|新しい商品として登録)$/ })).toHaveCount(0);
-        await captureScreen(page, testInfo, 'sc-09-step1-reinput');
-        await detail.getByRole('button', { name: 'このままでよい' }).first().click();
-        await expect(flyerCategoryChip(row)).toHaveText('使える');
+        await expect(detail.getByText('この商品は、取り込みを終えると今週の商品に入ります', { exact: false })).toBeVisible();
+        if ((await row.getByText(/^注意：.*内容量が変わった/).count()) > 0) {
+            // まだ商品一覧が10袋入のまま（このファイルだけを走らせたとき）：注意に「原材料も見てください」を添える
+            await expect(detail.getByText(/^注意：内容量が変わりました（商品一覧 .+ → チラシ 5袋入・5個）。チラシの値で商品一覧を上書きします。届いたらパッケージの原材料も見てください$/)).toBeVisible();
+        } else {
+            // 先に flow-hazelnut.spec.ts で取り込みを終えたので、商品一覧はチラシの値（5袋入・5個）に上書きされ、注意は出ない
+            await expect(detail.getByText(/5袋入・入数 5$/)).toBeVisible();
+        }
+        await flyerGrid(page).getByRole('button', { name: '「CO・OP さくさくクッキー」の詳細を閉じる' }).click();
     });
 
-    test('FR-IMPORT-02・FR-FLYER-07 「使える商品をまとめて確定」で確定でき、今週の商品に入る。使えない・再入力の商品は今週の商品に入らない', async ({ page }, testInfo) => {
+    test('FR-FLYER-06・09 の 6 再入力の商品を1件ずつ直せ、外すと次の商品へ進む', async ({ page }, testInfo) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         await expect(flyerGrid(page)).toBeVisible();
-
-        const open = page.getByRole('button', { name: /^使える商品をまとめて確定（\d+件）$/ });
-        await expect(open).toBeEnabled();
-        const total = Number((await open.innerText()).match(/（(\d+)件）/)![1]);
-        expect(total).toBeGreaterThanOrEqual(1);
-        await open.click();
-
-        // 確かめのダイアログに、商品名・一致した商品・税込価格・注文番号が並ぶ
-        const dialog = page.getByRole('dialog', { name: '使える商品をまとめて確定' });
-        const list = dialog.getByRole('list', { name: 'まとめて確定する商品' });
-        await expect(list.getByRole('checkbox')).toHaveCount(total);
-        await expect(list.getByText('登録済みの商品：くまのポッケ ミルクビスケット')).toBeVisible();
-        await expect(list.getByText(/税込 \d+円・注文番号 8103/)).toBeVisible();
-        await captureScreen(page, testInfo, 'sc-09-step1-bulk-usable');
-        await dialog.getByRole('button', { name: `確定する（${total}件）` }).click();
-        await expect(page.getByText(`使える商品 ${total}件を確定しました`)).toBeVisible();
-        await expect(dialog).toBeHidden();
-        await expect(flyerCategoryChip(flyerRow(page, 'くまのポッケ ミルクビスケット'))).toHaveText('確定済み');
-        await expect(flyerRow(page, 'くまのポッケ ミルクビスケット').getByText('登録済みの商品に確定しました')).toBeVisible();
-
-        // 確定した商品は今週の商品に入り、使えない・再入力の商品は入らない
-        await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        await expect(listedProductItem(page, 'くまのポッケ ミルクビスケット')).toBeVisible();
-        for (const name of ['こつぶ しお豆スナック', 'うすしお ポテトチップス 大袋', 'にこにこ ミニドーナツ', 'チーズ味 ひねりスティック']) {
-            await expect(listedProductItem(page, name)).toHaveCount(0);
+        const start = page.getByRole('button', { name: /^再入力を1件ずつ直す（\d+件）$/ });
+        test.skip((await start.count()) === 0, '再入力の商品が残っていない');
+        const total = Number((await start.innerText()).match(/（(\d+)件）/)![1]);
+        expect(total).toBe(await flyerTabCount(page, '再入力'));
+        await start.click();
+        const dialog = page.getByRole('dialog', { name: /再入力を1件ずつ直す/ });
+        await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
+        await expect(dialog.getByRole('button', { name: '前へ' })).toBeDisabled();
+        if (total >= 2) {
+            await dialog.getByRole('button', { name: 'あとで（次へ）' }).click();
+            await expect(dialog.getByText(`2 / ${total}件目`, { exact: false })).toBeVisible();
+            await dialog.getByRole('button', { name: '前へ' }).click();
+            await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
         }
+        // 出るのは再入力の商品だけ。取り込みのボタンはない（取り込みは「取り込みを終える」でまとめて行う）
+        await expect(dialog.getByLabel(/^取り込みの分類：/)).toHaveText('再入力');
+        await expect(dialog.getByRole('button', { name: /^(確定する|新しい商品として登録|このままでよい)$/ })).toHaveCount(0);
+        const firstName = (await dialog.getByRole('heading', { level: 3 }).innerText()).trim();
+        await captureScreen(page, testInfo, 'sc-09-step1-review');
+
+        // 「外す」と外した掲載品に移り、次の商品へ進む（「外す」「表に戻る」はダイアログのフッターにある）
+        await dialog.getByRole('button', { name: '外す', exact: true }).click();
+        await expect(page.getByText(`「${firstName}」を外しました`, { exact: false })).toBeVisible();
+        if (total >= 2) {
+            await expect(dialog.getByRole('heading', { level: 3 })).not.toHaveText(firstName);
+        } else {
+            await expect(dialog.getByText('すべて直しました')).toBeVisible();
+        }
+        await dialog.getByRole('button', { name: '表に戻る' }).first().click();
+        await expect(dialog).toHaveCount(0);
+
+        // 戻しておく（あとのテストの件数を変えないため）
+        const removed = await openRemovedListings(page);
+        await removed.getByRole('button', { name: `「${firstName}」を戻す` }).click();
+        await expect(removed.getByText(firstName, { exact: true })).toHaveCount(0);
+        // ダイアログが開いている間は後ろの表が読み上げから隠れるので、閉じてから表を見る
+        await removed.getByRole('button', { name: '閉じる' }).click();
+        await expect(flyerRow(page, firstName)).toBeVisible();
     });
 
-    test('FR-IMPORT-03・09 の 5.3 再入力の商品は、税込価格・メーカーを入れると分類し直される', async ({ page }, testInfo) => {
+    test('FR-IMPORT-03・09 の 5.3 再入力の商品は、税込価格・メーカーを入れると分類し直され、取り込めるになる', async ({ page }, testInfo) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         await expect(flyerGrid(page)).toBeVisible();
@@ -364,8 +405,12 @@ test.describe.serial('SC-09 献立作成', () => {
         await rollDetail.getByLabel('税込価格（円）').fill('375');
         await rollDetail.getByRole('button', { name: '直した内容で分類し直す' }).click();
         await expect(page.getByText('「ふんわり 抹茶ロール」を直して、分類し直しました')).toBeVisible();
-        // 一致する商品がなければ要確認（スマホは PC で登録したので使える）
-        await expect(flyerCategoryChip(roll)).toHaveText(testInfo.project.name === 'pc' ? '要確認' : /^(要確認|使える)$/);
+        await expect(flyerCategoryChip(roll)).toHaveText('取り込める');
+        if (testInfo.project.name === 'pc') {
+            // 一致する商品がないので「新しい商品」の印が付く（スマホは PC で登録したので付かない）
+            await expect(roll.getByText('新しい商品', { exact: true }).first()).toBeVisible();
+            await expect(rollDetail.getByText('この商品は、取り込みを終えると今週の商品に入ります（新しい商品として登録します）', { exact: false })).toBeVisible();
+        }
 
         // メーカーが読めない商品：メーカーを入れると、登録済みの商品と照合して分類し直す（FR-IMPORT-03）
         const donut = flyerRow(page, 'にこにこ ミニドーナツ');
@@ -375,26 +420,28 @@ test.describe.serial('SC-09 献立作成', () => {
         await donutDetail.getByLabel('メーカー').fill('にこにこフーズ');
         await donutDetail.getByRole('button', { name: '直した内容で分類し直す' }).click();
         await expect(page.getByText('「にこにこ ミニドーナツ」を直して、分類し直しました')).toBeVisible();
-        await expect(flyerCategoryChip(donut)).toHaveText(/^(要確認|使える)$/);
+        await expect(flyerCategoryChip(donut)).toHaveText('取り込める');
         await flyerGrid(page).getByRole('button', { name: '「にこにこ ミニドーナツ」の詳細を閉じる' }).click();
     });
 
-    test('FR-IMPORT-10・11 入数が分からない大袋は使えないで、入数を入れると分類し直され、まとめての確定・登録に入らない', async ({ page }) => {
+    test('FR-IMPORT-10・11 入数が分からない大袋は使えないで、入数を入れると分類し直され、取り込めるになって注意が出る', async ({ page }) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         const row = flyerRow(page, 'うすしお ポテトチップス 大袋');
-        await expect(flyerCategoryChip(row)).toHaveText('使えない');
+        await expect(row).toBeVisible();
+        // スマホは、PC で入数を入れて登録したので、商品一覧の入数で取り込めるになる
+        test.skip((await flyerCategoryChip(row).innerText()) !== '使えない', 'PC で入数を入れて登録済み');
         await row.getByLabel('「うすしお ポテトチップス 大袋」の入数').fill('10');
         await row.getByRole('button', { name: '分類し直す' }).click();
         await expect(page.getByText('「うすしお ポテトチップス 大袋」の入数を入れて、分類し直しました', { exact: false })).toBeVisible();
-        await expect(flyerCategoryChip(row)).toHaveText('要確認');
+        await expect(flyerCategoryChip(row)).toHaveText('取り込める');
         await expect(row.getByLabel('「うすしお ポテトチップス 大袋」の入数')).toHaveCount(0);
 
-        // 入れ直した商品は読み取りの検証を通っていないので、1件ずつ確定する
+        // 入れた入数は読み取りの検証を通っていないので、注意として出す（分類は変えない）
+        await expect(row.getByText(/^注意：.*検証を通っていない/)).toBeVisible();
         const detail = await openFlyerItemDetail(page, 'うすしお ポテトチップス 大袋');
-        await expect(detail.getByText('この商品は、まとめての確定・登録に入りません', { exact: false })).toBeVisible();
+        await expect(detail.getByText('入数は職員が入れました。読み取りの検証を通っていません', { exact: false })).toBeVisible();
         await flyerGrid(page).getByRole('button', { name: '「うすしお ポテトチップス 大袋」の詳細を閉じる' }).click();
-        await expect(page.getByText(/入数を入れて戻した商品（読み取りの検証を通っていません） \d+件/)).toBeVisible();
     });
 
     test('FR-IMPORT-21・22 「外す」で外した掲載品に移り、「戻す」で同じ分類に戻る', async ({ page }, testInfo) => {
@@ -409,7 +456,7 @@ test.describe.serial('SC-09 献立作成', () => {
         await detail.getByRole('button', { name: '外す', exact: true }).click();
         await expect(page.getByText(`「${name}」を外しました`, { exact: false })).toBeVisible();
         await expect(row).toHaveCount(0);
-        const removed = removedListings(page);
+        const removed = await openRemovedListings(page);
         await expect(removed.getByText(name, { exact: true })).toBeVisible();
         await expect(removed.getByText('職員が外しました')).toBeVisible();
         await expect(page.getByText('読み取った商品 18件')).toBeVisible();
@@ -417,209 +464,76 @@ test.describe.serial('SC-09 献立作成', () => {
 
         await removed.getByRole('button', { name: `「${name}」を戻す` }).click();
         await expect(page.getByText(`「${name}」を一覧に戻しました`)).toBeVisible();
-        await expect(flyerCategoryChip(row)).toHaveText(before);
         await expect(removed.getByText(name, { exact: true })).toHaveCount(0);
+        await removed.getByRole('button', { name: '閉じる' }).click();
+        await expect(flyerCategoryChip(row)).toHaveText(before);
         await expect(page.getByText('読み取った商品 19件')).toBeVisible();
     });
 
-    test('FR-FLYER-04a・D-97 表記なしの商品は、表の上のまとめての見比べで「チラシで見比べました」を残せる', async ({ page }, testInfo) => {
-        await openWeek(page, '来週');
-        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
-        await expect(flyerGrid(page)).toBeVisible();
-
-        // 表記なしの商品は「表記なし」のチップを出す。一致する商品がなければ要確認（スマホは PC で登録したので使える）
-        const row = flyerRow(page, 'ことりのピピ ラムネ');
-        await expect(row.getByText('表記なし', { exact: true }).first()).toBeVisible();
-        await expect(flyerCategoryChip(row)).toHaveText(testInfo.project.name === 'pc' ? '要確認' : /^(要確認|使える)$/);
-
-        // 表の上に、表記なしと読んだ商品のまとめが出る
-        const summary = page.getByRole('region', { name: /^アレルゲンの表記がないと読んだ \d+件$/ });
-        await expect(summary).toBeVisible();
-        await expect(summary.getByText(/まだチラシと見比べていない \d+件は、まとめて確定に入りません/)).toBeVisible();
-        await summary.getByRole('button', { name: '表記なしの商品をチラシと見比べる' }).click();
-
-        // 商品名と表記の原文を全件並べ、見比べた商品に1件ずつ印を付ける（すべてに印を付ける近道はない）
-        const dialog = page.getByRole('dialog', { name: '表記なしの商品をチラシと見比べる' });
-        const pending = dialog.getByRole('list', { name: 'まだ見比べていない商品' });
-        await expect(pending.getByText('ことりのピピ ラムネ', { exact: true })).toBeVisible();
-        await expect(pending.getByText(/表記の読み取り：なし/).first()).toBeVisible();
-        await expect(dialog.getByRole('checkbox', { name: /すべて/ })).toHaveCount(0);
-        const submit = dialog.getByRole('button', { name: /^チラシで見比べました（\d+件）$/ });
-        await expect(submit).toBeDisabled();
-        await dialog.getByRole('checkbox', { name: /ことりのピピ ラムネ/ }).check();
-        await expect(dialog.getByRole('button', { name: 'チラシで見比べました（1件）' })).toBeEnabled();
-        await captureScreen(page, testInfo, 'sc-09-step1-label-absent');
-        await dialog.getByRole('button', { name: 'チラシで見比べました（1件）' }).click();
-        await expect(page.getByText('1件を「チラシで見比べた」にしました')).toBeVisible();
-        await expect(dialog).toBeHidden();
-
-        // 開き直すと、見比べ済みに移っている
-        await summary.getByRole('button', { name: '表記なしの商品をチラシと見比べる' }).click();
-        await expect(dialog.getByRole('list', { name: '見比べ済みの商品' }).getByText('ことりのピピ ラムネ', { exact: true })).toBeVisible();
-        await expect(dialog.getByRole('list', { name: 'まだ見比べていない商品' }).getByText('ことりのピピ ラムネ', { exact: true })).toHaveCount(0);
-        await dialog.getByRole('button', { name: '閉じる' }).click();
-    });
-
-    test('FR-FLYER-04a・SR-19 表記のない商品は「表記なし」と示し、新しい商品として登録すると今週の商品に 🟡 要確認 で入る', async ({ page }, testInfo) => {
-        await openWeek(page, '来週');
-        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
-        const row = flyerRow(page, 'ことりのピピ ラムネ');
-        await expect(row.getByText('表記なし', { exact: true }).first()).toBeVisible();
-        const detail = await openFlyerItemDetail(page, 'ことりのピピ ラムネ');
-        // 行を開くと、表記なしは読み落としの可能性があることが出る
-        await expect(detail.getByText('表記なし（読み落としの可能性があります', { exact: false })).toBeVisible();
-        await captureScreen(page, testInfo, 'sc-09-step1-confirm-detail');
-        // 要確認は「新しい商品として登録」、スマホ（PC で登録済みなので使える）は「確定する」
-        await detail.getByRole('button', { name: /^(新しい商品として登録|確定する)$/ }).click();
-        await expect(page.getByText(/^「ことりのピピ ラムネ」を(新しい商品として登録|確定)しました$/)).toBeVisible();
-        await expect(flyerCategoryChip(row)).toHaveText('確定済み');
-
-        await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
-        const listed = listedProductItem(page, 'ことりのピピ ラムネ');
-        await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
-        await expect(listed.getByTestId('allergen-icon-Warning')).toBeVisible();
-        await expect(listed.getByText('チラシにアレルゲンの表記がありません')).toBeVisible();
-        await captureScreen(page, testInfo, 'sc-09-step2-listed');
-    });
-
-    test('FR-FLYER-06c 読み取った商品は初めは閉じていて、確定すると確定済みは下へ移って次の行が開く', async ({ page }, testInfo) => {
-        await openWeek(page, '来週');
-        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
-        await expect(flyerGrid(page)).toBeVisible();
-        const rank = (category: string) => FLYER_CATEGORIES.indexOf(category as (typeof FLYER_CATEGORIES)[number]);
-        const expectSorted = async () => {
-            const categories = await flyerCategoriesInOrder(page);
-            expect(categories.map(rank)).toEqual([...categories.map(rank)].sort((a, b) => a - b));
-            return categories;
-        };
-        const before = await expectSorted();
-        expect(before).toHaveLength(19);
-
-        // 初めはどの行も開いていない
-        await expect(flyerGrid(page).getByRole('button', { name: /の詳細を閉じる$/ })).toHaveCount(0);
-
-        // 確定できる行（使えるがあれば使える、なければ要確認の最初の行）を開いて確定すると、次の行が開く
-        const target = before.includes('使える') ? '使える' : '要確認';
-        test.skip(!before.includes(target), '確定できる商品が残っていない');
-        await flyerTab(page, target).click();
-        const firstToggle = flyerGrid(page).getByRole('button', { name: /の詳細を開く$/ }).first();
-        const openedName = (await firstToggle.getAttribute('aria-label'))!.match(/^「(.+)」の詳細を開く$/)![1];
-        await flyerTab(page, 'すべて').click();
-        const detail = await openFlyerItemDetail(page, openedName);
-        await detail.getByRole('button', { name: target === '使える' ? '確定する' : '新しい商品として登録', exact: true }).click();
-        await expect(page.getByText(new RegExp(`^「${escapeRegExp(openedName)}」を(新しい商品として登録|確定)しました$`))).toBeVisible();
-        await expect(flyerCategoryChip(flyerRow(page, openedName))).toHaveText('確定済み');
-        const after = await expectSorted();
-        expect(after.filter((category) => category === '確定済み').length).toBe(before.filter((category) => category === '確定済み').length + 1);
-        const nextExpanded = flyerGrid(page).getByRole('button', { name: /の詳細を閉じる$/ });
-        await expect(nextExpanded).toHaveCount(1);
-        await expect(nextExpanded).not.toHaveAttribute('aria-label', `「${openedName}」の詳細を閉じる`);
-        await captureScreen(page, testInfo, 'sc-09-step1-next-opened');
-
-        // 確定済みのタブには確定済みの行だけが出る
-        await flyerTab(page, '確定済み').click();
-        expect(new Set(await flyerCategoriesInOrder(page))).toEqual(new Set(['確定済み']));
-        await flyerTab(page, 'すべて').click();
-        expect(await flyerCategoriesInOrder(page)).toHaveLength(19);
-    });
-
-    test('FR-FLYER-06・09 の 6 再入力・要確認の商品を1件ずつ確かめられ、外すと次の商品へ進む', async ({ page }, testInfo) => {
-        await openWeek(page, '来週');
-        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
-        await expect(flyerGrid(page)).toBeVisible();
-        const start = page.getByRole('button', { name: /^未確定を1件ずつ確かめる（再入力・要確認 \d+件）$/ });
-        test.skip((await start.count()) === 0, '再入力・要確認の商品が残っていない');
-        const total = Number((await start.innerText()).match(/ (\d+)件）/)![1]);
-        expect(total).toBe((await flyerTabCount(page, '再入力')) + (await flyerTabCount(page, '要確認')));
-        await start.click();
-        const dialog = page.getByRole('dialog', { name: /未確定の商品を1件ずつ確かめる/ });
-        await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
-        await expect(dialog.getByRole('button', { name: '前へ' })).toBeDisabled();
-        if (total >= 2) {
-            await dialog.getByRole('button', { name: 'あとで（次へ）' }).click();
-            await expect(dialog.getByText(`2 / ${total}件目`, { exact: false })).toBeVisible();
-            await dialog.getByRole('button', { name: '前へ' }).click();
-            await expect(dialog.getByText(`1 / ${total}件目`, { exact: false })).toBeVisible();
-        }
-        // 一覧の先頭は再入力（偽の Claude の読み取りの検証は、1件目に「入数」の指摘を返す）
-        await expect(dialog.getByLabel(/^取り込みの分類：/)).toHaveText('再入力');
-        const firstName = (await dialog.getByRole('heading', { level: 3 }).innerText()).trim();
-        await captureScreen(page, testInfo, 'sc-09-step1-review');
-
-        // 「外す」と外した掲載品に移り、次の商品へ進む（「外す」「表に戻る」はダイアログのフッターにある）
-        await dialog.getByRole('button', { name: '外す', exact: true }).click();
-        await expect(page.getByText(`「${firstName}」を外しました`, { exact: false })).toBeVisible();
-        if (total >= 2) {
-            await expect(dialog.getByRole('heading', { level: 3 })).not.toHaveText(firstName);
-        } else {
-            await expect(dialog.getByText('すべて確かめました')).toBeVisible();
-        }
-        await dialog.getByRole('button', { name: '表に戻る' }).first().click();
-        await expect(dialog).toHaveCount(0);
-
-        // 戻しておく（あとのテストの件数を変えないため）
-        await removedListings(page).getByRole('button', { name: `「${firstName}」を戻す` }).click();
-        await expect(flyerRow(page, firstName)).toBeVisible();
-    });
-
-    test('FR-FLYER-06a・D-98 要確認の商品は、表の上の「新しい商品をまとめて登録」で、印を外した商品を除いてまとめて登録できる', async ({ page }, testInfo) => {
+    test('FR-FLYER-07・D-101 「取り込みを終える」1回で取り込めるの商品が今週の商品に入り、直している途中の行は反映するか捨てるかを聞く。使えない商品は入らない', async ({ page }, testInfo) => {
         await openWeek(page, '来週');
         await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
         const grid = flyerGrid(page);
         await expect(grid).toBeVisible();
 
-        // 「使える商品をまとめて確定」の隣にある。件数はサーバーが決めた対象の数
-        const open = page.getByRole('button', { name: /^新しい商品をまとめて登録（\d+件）$/ });
-        await expect(open).toBeVisible();
-        const total = Number((await open.innerText()).match(/（(\d+)件）/)![1]);
-        // スマホのプロジェクトは PC のあとに同じ DB で走るので、PC で印を外して残した1件だけが残っている
-        expect(total).toBeGreaterThanOrEqual(1);
-        // 表記なしで見比べていない商品は、まとめに入らない（理由と件数が出る）
-        await expect(page.getByText(/アレルゲンの表記なしと読み、まだチラシと見比べていない商品 \d+件/)).toBeVisible();
-        await open.click();
+        // 行を開いて直している途中（まだ送っていない）
+        const biscuitName = 'くまのポッケ ミルクビスケット';
+        const detail = await openFlyerItemDetail(page, biscuitName);
+        await detail.getByRole('button', { name: 'ほかの項目も直す' }).click();
+        const orderNo = detail.getByLabel('注文番号');
+        const originalOrderNo = await orderNo.inputValue();
+        await orderNo.fill('9999');
+        await expect(detail.getByText('直した内容は、まだ送っていません', { exact: false })).toBeVisible();
 
-        // 対象を全件並べ、商品名・税込価格・内容量・入数・分類・表記の原文と対応づけた品目を出す。既定はすべてに印
-        const dialog = page.getByRole('dialog', { name: '新しい商品をまとめて登録' });
-        const list = dialog.getByRole('list', { name: 'まとめて登録する商品' });
-        const checkboxes = list.getByRole('checkbox');
-        await expect(checkboxes).toHaveCount(total);
-        for (const checkbox of await checkboxes.all()) {
-            await expect(checkbox).toBeChecked();
-        }
-        await expect(list.getByText(/^アレルゲン表記：/).first()).toBeVisible();
-        await expect(list.getByText(/税込 \d+円/).first()).toBeVisible();
-        // 使えない・再入力の商品は入らない
-        await expect(list.getByText('こつぶ しお豆スナック', { exact: true })).toHaveCount(0);
-        await expect(list.getByText('チーズ味 ひねりスティック', { exact: true })).toHaveCount(0);
-        await expect(dialog.getByRole('button', { name: `登録する（${total}件）` })).toBeEnabled();
-        await captureScreen(page, testInfo, 'sc-09-step1-bulk-new');
+        const finish = page.getByRole('button', { name: /^取り込みを終える（取り込める \d+件）$/ });
+        const ready = Number((await finish.innerText()).match(/ (\d+)件）/)![1]);
+        expect(ready).toBe(await flyerTabCount(page, '取り込める'));
+        await finish.click();
 
-        // 1件の印を外すと、その商品は登録しない
-        const keptName = (await checkboxes.first().getAttribute('aria-label'))!;
-        await checkboxes.first().uncheck();
-        if (total >= 2) {
-            await dialog.getByRole('button', { name: `登録する（${total - 1}件）` }).click();
-            await expect(page.getByText(`${total - 1}件を新しい商品として登録しました`)).toBeVisible();
-            await expect(dialog).toBeHidden();
+        // 直している途中の行があると、反映するか捨てるかを聞く（09 の 5.1）
+        const pendingDialog = page.getByRole('dialog', { name: `「${biscuitName}」を直している途中です` });
+        await expect(pendingDialog).toBeVisible();
+        await expect(pendingDialog.getByRole('button', { name: '直した内容を反映して終える' })).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step1-finish-pending');
+        await pendingDialog.getByRole('button', { name: '直した内容を捨てて終える' }).click();
+        await expect(pendingDialog).toBeHidden();
 
-            // 登録した商品は確定済みになり（「新しい商品として登録しました」）、印を外した商品は要確認のまま残る
-            await expect(grid.getByRole('row', { name: /確定済み .*新しい商品として登録しました/ }).first()).toBeVisible();
-        } else {
-            // 印がなければ登録できない
-            await expect(dialog.getByRole('button', { name: /^登録する/ })).toBeDisabled();
-            await dialog.getByRole('button', { name: '閉じる' }).click();
-            await expect(dialog).toBeHidden();
-        }
-        await expect(flyerCategoryChip(flyerRow(page, keptName))).toHaveText('要確認');
-        await expect(page.getByRole('button', { name: '新しい商品をまとめて登録（1件）' })).toBeVisible();
+        // 取り込める商品は、新しい商品も登録済みの商品も1回で取り込み、今週の商品（手順2）へ進む
+        await expect(page.getByText(/^取り込みを終えました（新しく登録 \d+件・登録済みの商品を上書き \d+件）/).first()).toBeVisible();
+        await expect(page.getByText('今週の献立に使わない商品があれば、「今週使う」をオフにしてください', { exact: false })).toBeVisible();
+        await expect(listedProductItem(page, biscuitName)).toBeVisible();
 
-        // 表で行を開いて直している途中の商品は、まとめて登録に入らない（直した内容を捨てて、読み取ったままで確定しないように）
-        await grid.getByRole('button', { name: `「${keptName}」の詳細を開く` }).click();
-        await expect(page.getByRole('region', { name: `「${keptName}」を確かめる` })).toBeVisible();
-        await expect(page.getByRole('button', { name: '新しい商品をまとめて登録（0件）' })).toBeDisabled();
-        await expect(page.getByText(`開いている「${keptName}」は、直している途中のため、まとめての確定・登録に入りません`, { exact: false })).toBeVisible();
-        await grid.getByRole('button', { name: `「${keptName}」の詳細を閉じる` }).click();
-        await expect(page.getByRole('button', { name: '新しい商品をまとめて登録（1件）' })).toBeVisible();
+        // 手順1に戻ると、取り込んだ行は確定済みになっている
+        await page.getByRole('tab', { name: 'チラシ取り込み', exact: true }).click();
+        await expect(page.getByRole('button', { name: '取り込みを終える（取り込める 0件）' })).toBeVisible();
+        expect(await flyerTabCount(page, '確定済み')).toBe(ready);
+        await expect(flyerCategoryChip(flyerRow(page, biscuitName))).toHaveText('確定済み');
+        await expect(flyerRow(page, biscuitName).getByText('登録済みの商品を上書きしました')).toBeVisible();
+        await expect(flyerCategoryChip(flyerRow(page, 'こつぶ しお豆スナック'))).toHaveText('使えない');
+        // 捨てた内容は送っていない（開き直すと読み取った注文番号のまま）
+        const reopened = await openFlyerItemDetail(page, biscuitName);
+        await expect(reopened.getByText('直すと今週の商品からいったん外れ', { exact: false })).toBeVisible();
+        await reopened.getByRole('button', { name: 'ほかの項目も直す' }).click();
+        await expect(reopened.getByLabel('注文番号')).toHaveValue(originalOrderNo);
+        await flyerGrid(page).getByRole('button', { name: `「${biscuitName}」の詳細を閉じる` }).click();
+
+        // 確定済みのタブには確定済みの行だけが出る
+        await flyerTab(page, '確定済み').click();
+        expect(new Set(await flyerCategoriesInOrder(page))).toEqual(new Set(['確定済み']));
+        await flyerTab(page, 'すべて').click();
+        await captureScreen(page, testInfo, 'sc-09-step1-finished');
+
+        // 取り込んだ商品は今週の商品に入り、使えない商品は入らない
+        await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
+        await expect(listedProductItem(page, biscuitName)).toBeVisible();
+        await expect(listedProductItem(page, 'ふんわり 抹茶ロール')).toBeVisible();
+        await expect(listedProductItem(page, 'こつぶ しお豆スナック')).toHaveCount(0);
+        // 表記のない商品は、参考（表記なし）の記録で 🟡 要確認 として入る（「含まない」にしない。SR-01・SR-19）
+        const ramune = listedProductItem(page, 'ことりのピピ ラムネ');
+        await expect(ramune.getByText('要確認', { exact: true })).toBeVisible();
+        await expect(ramune.getByTestId('allergen-icon-Warning')).toBeVisible();
+        await expect(ramune.getByText('チラシにアレルゲンの表記がありません')).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step2-listed');
     });
 
     test('FR-MENU-07a 「今週使う」は初めはオンで、切り替えるたびに保存される', async ({ page }) => {
@@ -1058,6 +972,16 @@ test.describe.serial('SC-09 献立作成', () => {
         }
         // 「メーカーへの確認が必要」は出さない（D-93。SR-06 は取り下げ）
         await expect(dialog.getByText('メーカーへの確認が必要', { exact: false })).toHaveCount(0);
+        // 🟡 の商品のチェックに、今週のチラシの表記の原文と、見比べて原材料を確かめる案内を添える（D-101。写しに原文がある商品だけ）
+        const flyerLabelLines = dialog.getByText(/^今週のチラシの表記：/);
+        const lineCount = await flyerLabelLines.count();
+        for (let i = 0; i < lineCount; i++) {
+            await expect(flyerLabelLines.nth(i)).toHaveText(/^今週のチラシの表記：(表記なし|「.+」)。チラシの表記と見比べて、パッケージが届いたら原材料を確かめてください$/);
+        }
+        // 小魚あられの写しには、ダミーデータで「表記なし」を入れてある（e2e/README.md）
+        if ((await dialog.getByRole('checkbox', { name: /小魚あられ/ }).count()) > 0) {
+            await expect(dialog.getByRole('checkbox', { name: /小魚あられ.*今週のチラシの表記：表記なし。チラシの表記と見比べて/ })).toBeVisible();
+        }
         await captureScreen(page, testInfo, 'sc-09-confirm-dialog');
         for (let i = 0; i < count; i++) {
             const checkbox = checkboxes.nth(i);

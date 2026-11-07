@@ -12,3 +12,4 @@ export type { JudgementText } from './model/text';
 export { AllergenBadge, AllergenJudgementLine, NoAvoidedAllergenNotice } from './ui/AllergenJudgementView';
 export { AllergenCategoryIcon, AllergenCategoryMark } from './ui/AllergenCategoryMark';
 export { AiAnswerAllergenNotice, BlockedInMenuNotice, KeywordHitNotice, NonPackageSourceNotice } from './ui/AllergenNotices';
+export { FlyerLabelNote } from './ui/FlyerLabelNote';

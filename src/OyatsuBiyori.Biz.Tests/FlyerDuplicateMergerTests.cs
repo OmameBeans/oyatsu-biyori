@@ -92,6 +92,32 @@ public class FlyerDuplicateMergerTests
     }
 
     [Fact]
+    public void 食い違った値は_先に読んだ値を使い_食い違いの値の先頭も先に読んだ値になる()
+    {
+        // D-101：食い違いは「注意」になり、先に読んだ値で進める（分類の注意の文は Values[0] を「使います」と出す）
+        var merged = Assert.Single(FlyerDuplicateMerger.Merge([
+            Read("もぐもぐクッキー", price: 270, excluding: 250, volume: "12袋入", orderNo: "8102", pieces: 12),
+            Read("もぐもぐクッキー", price: 216, excluding: 200, volume: "10袋入", orderNo: "8101", pieces: 10),
+        ]));
+
+        Assert.Equal(270, merged.Read.PriceIncludingTax);
+        Assert.Equal(250, merged.Read.PriceExcludingTax);
+        Assert.Equal("12袋入", merged.Read.Volume);
+        Assert.Equal("8102", merged.Read.OrderNo);
+        Assert.Equal(12, merged.Read.PiecesPerPackCandidate);
+        Assert.All(merged.Conflicts, c => Assert.Equal(
+            c.Field switch
+            {
+                FlyerItemField.PriceIncludingTax => "270",
+                FlyerItemField.PriceExcludingTax => "250",
+                FlyerItemField.Volume => "12袋入",
+                FlyerItemField.OrderNo => "8102",
+                _ => "12",
+            },
+            c.Values[0]));
+    }
+
+    [Fact]
     public void 片方だけ読めなかった値は食い違いにせず_読めた値を使う()
     {
         var merged = FlyerDuplicateMerger.Merge([Read("もぐもぐクッキー", price: null, orderNo: null), Read("もぐもぐクッキー", price: 216, orderNo: "8101")]);

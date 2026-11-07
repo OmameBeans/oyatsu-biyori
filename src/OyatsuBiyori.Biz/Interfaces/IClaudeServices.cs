@@ -209,7 +209,16 @@ public interface IMenuAgentTools
 public sealed record MenuAgentProposal(IReadOnlyList<MenuAgentProposalDay> Days, IReadOnlyList<InterpretedDay> DayValues);
 
 /// <summary>日ごとの案</summary>
-public sealed record MenuAgentProposalDay(DateOnly Date, IReadOnlyList<string> ProductIds, string? Reason);
+/// <param name="Date">日付</param>
+/// <param name="ProductIds">商品 ID</param>
+/// <param name="Reason">理由</param>
+/// <param name="Servings">商品ごとに何人分買うか（在庫で補うときなど、その日の人数と違う数にする商品だけ。パック数はアプリが計算する）</param>
+public sealed record MenuAgentProposalDay(DateOnly Date, IReadOnlyList<string> ProductIds, string? Reason, IReadOnlyList<MenuAgentServing>? Servings = null);
+
+/// <summary>商品を何人分買うか（エージェントの指定。パック数・金額はアプリが計算する）</summary>
+/// <param name="ProductId">商品 ID（その日の ProductIds に入っているもの）</param>
+/// <param name="ChildrenCount">何人分（1以上）</param>
+public sealed record MenuAgentServing(string ProductId, int ChildrenCount);
 
 /// <summary>
 /// submit_menu で出す内容。

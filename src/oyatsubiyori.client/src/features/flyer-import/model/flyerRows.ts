@@ -1,9 +1,9 @@
 import { FLYER_ITEM_FIELD, FLYER_ITEM_STATUS, FLYER_REASON_CODE } from '../../../entities/flyer';
-import type { FlyerConfirmResult, FlyerItem, FlyerItemReason, FlyerItemStatus, FlyerSession } from '../../../entities/flyer';
+import type { FlyerFinishResult, FlyerItem, FlyerItemReason, FlyerItemStatus, FlyerSession } from '../../../entities/flyer';
 
 /*
  * 読み取り結果の一覧の表示だけを受け持つ（09 の 6）。
- * 分類・理由・まとめの可否はサーバー（Biz）が決めて返すので、ここでは判定しない。行の状態（status）・件数・並びもサーバーの値をそのまま使う。
+ * 分類・理由・注意はサーバー（Biz）が決めて返すので、ここでは判定しない。行の状態（status）・件数・並びもサーバーの値をそのまま使う。
  */
 
 /**
@@ -11,25 +11,20 @@ import type { FlyerConfirmResult, FlyerItem, FlyerItemReason, FlyerItemStatus, F
  */
 export const FLYER_STATUS_LABEL: Record<FlyerItemStatus, string> = {
     NeedsInput: '再入力',
-    New: '要確認',
-    Usable: '使える',
+    Ready: '取り込める',
     Unusable: '使えない',
     Confirmed: '確定済み',
 };
 
-/**
- * 取り込みの分類のチップの色（使えない＝赤・再入力＝橙・要確認＝青・使える＝緑）。
- * 要確認を黄にしないのは、アレルゲンの 🟡 要確認と見分けるため（09 の 3.1）
- */
-export const FLYER_STATUS_COLOR: Record<FlyerItemStatus, 'error' | 'warning' | 'info' | 'success' | 'default'> = {
+/** 取り込みの分類のチップの色（使えない＝赤・再入力＝橙・取り込める＝緑。D-101） */
+export const FLYER_STATUS_COLOR: Record<FlyerItemStatus, 'error' | 'warning' | 'success' | 'default'> = {
     NeedsInput: 'warning',
-    New: 'info',
-    Usable: 'success',
+    Ready: 'success',
     Unusable: 'error',
     Confirmed: 'default',
 };
 
-/** 表の上のタブ（「すべて」と各状態。並びは一覧の並びと同じ：再入力 → 要確認 → 使える → 使えない → 確定済み） */
+/** 表の上のタブ（「すべて」と各状態。並びは一覧の並びと同じ：再入力 → 取り込める → 使えない → 確定済み） */
 export const FLYER_ROW_TAB = {
     ALL: 'All',
     ...FLYER_ITEM_STATUS,
@@ -39,8 +34,7 @@ export type FlyerRowTab = (typeof FLYER_ROW_TAB)[keyof typeof FLYER_ROW_TAB];
 export const FLYER_ROW_TABS: FlyerRowTab[] = [
     FLYER_ROW_TAB.ALL,
     FLYER_ROW_TAB.NEEDS_INPUT,
-    FLYER_ROW_TAB.NEW,
-    FLYER_ROW_TAB.USABLE,
+    FLYER_ROW_TAB.READY,
     FLYER_ROW_TAB.UNUSABLE,
     FLYER_ROW_TAB.CONFIRMED,
 ];
@@ -54,10 +48,8 @@ export const flyerTabCount = (session: FlyerSession, tab: FlyerRowTab): number =
             return session.items.length;
         case FLYER_ROW_TAB.NEEDS_INPUT:
             return session.counts.needsInput;
-        case FLYER_ROW_TAB.NEW:
-            return session.counts.new;
-        case FLYER_ROW_TAB.USABLE:
-            return session.counts.usable;
+        case FLYER_ROW_TAB.READY:
+            return session.counts.ready;
         case FLYER_ROW_TAB.UNUSABLE:
             return session.counts.unusable;
         case FLYER_ROW_TAB.CONFIRMED:
@@ -68,22 +60,12 @@ export const flyerTabCount = (session: FlyerSession, tab: FlyerRowTab): number =
 /** タブで絞り込む（並びはサーバーが返したまま） */
 export const filterItems = (items: FlyerItem[], tab: FlyerRowTab): FlyerItem[] => (tab === FLYER_ROW_TAB.ALL ? items : items.filter((item) => item.status === tab));
 
-/** 行を開いて確かめる対象（確定できる・直せる行）。使えない・確定済みは確定しないので、確定のあとに次の行として開かない */
-export const isOpenableNext = (item: FlyerItem) =>
-    item.status === FLYER_ITEM_STATUS.NEEDS_INPUT || item.status === FLYER_ITEM_STATUS.NEW || item.status === FLYER_ITEM_STATUS.USABLE;
+/** 行に「新しい商品」の印を付けるか（取り込みを終えると新しく登録する行だけ。照合できない行・使えない・確定済みには付けない。印の元はサーバーの isNew） */
+export const showsNewMark = (item: FlyerItem) =>
+    item.isNew && item.notMatchableReason === null && item.status !== FLYER_ITEM_STATUS.UNUSABLE && item.status !== FLYER_ITEM_STATUS.CONFIRMED;
 
-/** 「未確定を1件ずつ確かめる」の対象（再入力と要確認。09 の 6） */
-export const isReviewTarget = (item: FlyerItem) => item.status === FLYER_ITEM_STATUS.NEEDS_INPUT || item.status === FLYER_ITEM_STATUS.NEW;
-
-/**
- * 確定したあとに開く行：今の行より下にある、確かめる対象の行。なければ上から探す。どれもなければ null（閉じる）
- * items は確定する前の並び（確定した行は、このあと一番下へ移る）
- */
-export const nextOpenableItemId = (items: FlyerItem[], currentId: string): string | null => {
-    const index = items.findIndex((item) => item.id === currentId);
-    const isTarget = (item: FlyerItem) => item.id !== currentId && isOpenableNext(item);
-    return items.slice(index + 1).find(isTarget)?.id ?? items.find(isTarget)?.id ?? null;
-};
+/** 「再入力を1件ずつ直す」の対象（再入力だけ。09 の 6） */
+export const isReviewTarget = (item: FlyerItem) => item.status === FLYER_ITEM_STATUS.NEEDS_INPUT;
 
 /** 項目の表示名（理由の field・二重の読み取りの食い違いに使う） */
 export const FIELD_LABEL: Record<string, string> = {
@@ -95,6 +77,7 @@ export const FIELD_LABEL: Record<string, string> = {
     [FLYER_ITEM_FIELD.ORDER_NO]: '注文番号',
     [FLYER_ITEM_FIELD.PIECES_PER_PACK]: '入数',
     [FLYER_ITEM_FIELD.ALLERGEN_LABEL]: 'アレルゲン表記',
+    [FLYER_ITEM_FIELD.SNACK_TYPE]: 'おやつの分類',
 };
 
 /** 鍵の「種類:値」の値の部分（品目の分からない語・食い違いの項目） */
@@ -105,7 +88,7 @@ const beforeParen = (message: string) => message.split('（')[0];
 
 /**
  * 理由の短い表示（表の分類のチップの下に出す）。文はサーバーの理由から作り、条件の判定はしない。
- * 詳しい文は、行を開いた先の確定のフォームに出す
+ * 詳しい文は、行を開いた先のフォームに出す
  */
 export const shortReasonOf = (reason: FlyerItemReason): string => {
     switch (reason.code) {
@@ -122,26 +105,14 @@ export const shortReasonOf = (reason: FlyerItemReason): string => {
             return `「${keyValueOf(reason.key)}」の品目が分からない`;
         case FLYER_REASON_CODE.LABEL_ABSENT_BUT_MASTER_CONTAINS:
             return '表記なしだが記録と違う';
-        case FLYER_REASON_CODE.REVIEW_NOTE:
-            return `${reason.field ?? '読み取り'}を確認`;
         case FLYER_REASON_CODE.MISSING_NAME:
             return '商品名が読めない';
         case FLYER_REASON_CODE.MISSING_MAKER:
             return 'メーカーが読めない';
         case FLYER_REASON_CODE.MISSING_PRICE:
             return '税込価格が読めない';
-        case FLYER_REASON_CODE.TAX_MISMATCH:
-            return '税込と税抜が合わない';
-        case FLYER_REASON_CODE.MISSING_VOLUME:
-            return '内容量が読めない';
-        case FLYER_REASON_CODE.PIECES_MISMATCH:
-            return '入数が内容量と合わない';
-        case FLYER_REASON_CODE.MISSING_ORDER_NO:
-            return '注文番号が読めない';
-        case FLYER_REASON_CODE.MASTER_VOLUME_OR_PIECES_CHANGED:
-            return '内容量・入数が商品一覧と違う';
-        case FLYER_REASON_CODE.DUPLICATE_CONFLICT:
-            return `${FIELD_LABEL[keyValueOf(reason.key)] ?? '読んだ値'}が食い違い`;
+        case FLYER_REASON_CODE.MISSING_SNACK_TYPE:
+            return 'おやつの分類が分からない';
         default:
             return beforeParen(reason.message);
     }
@@ -149,6 +120,38 @@ export const shortReasonOf = (reason: FlyerItemReason): string => {
 
 /** 短い理由を並べる（サーバーの並び＝アレルゲンに関わるものが先。同じ文は1つにまとめる） */
 export const shortReasonsOf = (item: FlyerItem): string[] => Array.from(new Set(item.reasons.map(shortReasonOf)));
+
+/**
+ * 注意の短い表示（表の理由の下に、目立ちすぎない形で出す。09 の 6）。分類は変えない。
+ * 詳しい文は、行を開いた先のフォームに出す
+ */
+export const shortNoteOf = (note: FlyerItemReason): string => {
+    switch (note.code) {
+        case FLYER_REASON_CODE.MASTER_DISCREPANCY:
+            return 'パッケージの確認と食い違い';
+        case FLYER_REASON_CODE.REVIEW_NOTE:
+            return note.isAllergenRelated ? '検証の指摘（アレルゲン）' : '検証の指摘';
+        case FLYER_REASON_CODE.MASTER_VOLUME_OR_PIECES_CHANGED:
+            return note.field === FLYER_ITEM_FIELD.PIECES_PER_PACK ? '入数が変わった' : '内容量が変わった';
+        case FLYER_REASON_CODE.DUPLICATE_CONFLICT:
+            return `2回読んだ（${FIELD_LABEL[keyValueOf(note.key)] ?? '値'}が違う）`;
+        case FLYER_REASON_CODE.TAX_MISMATCH:
+            return '税込と税抜が合わない';
+        case FLYER_REASON_CODE.MISSING_VOLUME:
+            return '内容量が読めない';
+        case FLYER_REASON_CODE.MISSING_ORDER_NO:
+            return '注文番号が読めない';
+        case FLYER_REASON_CODE.PIECES_MISMATCH:
+            return '入数の候補が合わない';
+        case FLYER_REASON_CODE.NOT_REVIEWED:
+            return '検証を通っていない';
+        default:
+            return beforeParen(note.message);
+    }
+};
+
+/** 注意の短い表示を並べる（同じ文は1つにまとめる） */
+export const shortNotesOf = (item: FlyerItem): string[] => Array.from(new Set(item.notes.map(shortNoteOf)));
 
 /** 入数が分からない（使えない）の行（行に入数の欄を出す。FR-IMPORT-11） */
 export const isPiecesUnknown = (item: FlyerItem) => item.reasons.some((reason) => reason.code === FLYER_REASON_CODE.PIECES_UNKNOWN);
@@ -210,15 +213,12 @@ export const allergenChipsOf = (item: FlyerItem): AllergenChip[] => {
     return chips;
 };
 
-/** 表の上の「表記なしの見比べ」に並べる商品（サーバーが決めた canMarkLabelAbsentCompared。D-97） */
-export const labelAbsentCompareItemsOf = (items: FlyerItem[]): FlyerItem[] => items.filter((item) => item.canMarkLabelAbsentCompared);
-
 /** 「一致した商品」の列の2行（1行目：結果、2行目：補足） */
 export const matchSummaryOf = (item: FlyerItem): { title: string; detail: string } => {
     if (item.confirmation) {
         return item.confirmation.kind === 'CreatedNew'
             ? { title: '新しい商品として登録しました', detail: item.confirmation.productName }
-            : { title: '登録済みの商品に確定しました', detail: item.confirmation.productName };
+            : { title: '登録済みの商品を上書きしました', detail: item.confirmation.productName };
     }
     if (item.matchedProduct) {
         return {
@@ -232,25 +232,40 @@ export const matchSummaryOf = (item: FlyerItem): { title: string; detail: string
     if (item.notMatchableReason === 'MissingName') {
         return { title: 'まだ分かりません', detail: '商品名を入れると、登録済みの商品と同じか調べます' };
     }
-    return { title: '新しい商品', detail: '登録済みの商品に、同じ名前とメーカーの商品はありません' };
+    // 使えないの商品は取り込まないので、登録するとは書かない
+    return item.status === FLYER_ITEM_STATUS.UNUSABLE
+        ? { title: '新しい商品', detail: '登録済みの商品に、同じ名前とメーカーの商品はありません' }
+        : { title: '新しい商品', detail: '取り込みを終えると新しい商品として登録します' };
 };
 
-/** 確定の結果の通知（確定した件数・確定しなかった件数・パッケージでの確認との食い違いで記録を足した商品） */
-export const confirmResultMessages = (
-    result: FlyerConfirmResult,
-    confirmedText: string,
-): { message: string; variant: 'success' | 'warning' | 'info' }[] => [
-    { message: confirmedText, variant: 'success' },
-    ...(result.skippedCount > 0
-        ? [
-              {
-                  message: `${result.skippedCount}件は、まとめて確定できる条件から外れたため確定していません。表の行を開いて1件ずつ確かめてください`,
-                  variant: 'warning' as const,
-              },
-          ]
-        : []),
-    ...result.recordedProducts.map((product) => ({
-        message: `「${product.productName}」は、チラシの表記がパッケージでの確認と食い違っていたため、チラシの表記を記録しました（${product.allergens.map((a) => a.name).join('・')}）。届いたらパッケージで確かめてください`,
-        variant: 'info' as const,
-    })),
-];
+/** 取り込みを終えた結果の通知（取り込んだ件数・今週の商品に入らない件数・パッケージでの確認との食い違いで記録を足した商品） */
+export const finishResultMessages = (result: FlyerFinishResult): { message: string; variant: 'success' | 'warning' | 'info' }[] => {
+    const notListed = result.notListedUnusableCount + result.notListedNeedsInputCount;
+    return [
+        {
+            message: `取り込みを終えました（新しく登録 ${result.createdCount}件・登録済みの商品を上書き ${result.updatedCount}件）`,
+            variant: 'success',
+        },
+        ...(notListed > 0
+            ? [
+                  {
+                      message: `今週の商品に入らない商品が ${notListed}件あります（使えない ${result.notListedUnusableCount}件・再入力 ${result.notListedNeedsInputCount}件）`,
+                      variant: 'warning' as const,
+                  },
+              ]
+            : []),
+        ...result.recordedProducts.map((product) => ({
+            message: `「${product.productName}」は、チラシの表記がパッケージでの確認と食い違っていたため、チラシの表記を記録しました（${product.allergens.map((a) => a.name).join('・')}）。届いたらパッケージで確かめてください`,
+            variant: 'info' as const,
+        })),
+    ];
+};
+
+/**
+ * 行のフォームで直した内容を、まだ送っていない状態（「取り込みを終える」の前に、反映するか捨てるかを聞くために使う。09 の 5.1）。
+ * apply は直した内容を送って分類し直す（失敗したら reject する）
+ */
+export interface PendingFlyerEdit {
+    itemName: string;
+    apply: () => Promise<void>;
+}

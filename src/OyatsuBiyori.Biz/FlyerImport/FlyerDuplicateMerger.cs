@@ -6,7 +6,7 @@ namespace OyatsuBiyori.Biz.FlyerImport;
 /// 同じ取り込みの中で2回以上読んだ商品（半分ずつ撮った写真の重なりなど）を1件にまとめる（FR-IMPORT-06、TI-03）。
 /// まとめる鍵は、照合と同じ正規化をした「商品名＋メーカー」（ProductMatcher.KeyOf）。商品名かメーカーが空の行はまとめない（再入力で直してもらう）。
 /// アレルゲン表記の品目・品目の分からない語・説明文は和集合にする（確認する側に倒す）。
-/// 税込価格・税抜価格・内容量・注文番号が食い違えば、食い違った値を両方持つ（取り込みの分類で「再入力」になる）。値が全部同じならまとめるだけ。
+/// 税込価格・税抜価格・内容量・注文番号が食い違えば、先に読んだ値を使い、食い違った値を両方持つ（取り込みの分類で「注意」になる。D-101）。値が全部同じならまとめるだけ。
 /// </summary>
 public static class FlyerDuplicateMerger
 {
@@ -144,7 +144,7 @@ public sealed record FlyerMergedRead(FlyerReadProduct Read, IReadOnlyList<int> S
 }
 
 /// <summary>
-/// 二重の読み取りで食い違った項目（取り込みの分類で「再入力」の理由になる）。
+/// 二重の読み取りで食い違った項目（取り込みの分類で「注意」になる。先に読んだ値を使う）。
 /// </summary>
 /// <param name="Field">項目（FlyerItemField の値）</param>
 /// <param name="Values">食い違った値（読み取りの表記のまま。読めなかった行の値は入れない）</param>

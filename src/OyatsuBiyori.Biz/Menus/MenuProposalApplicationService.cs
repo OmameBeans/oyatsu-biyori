@@ -263,11 +263,14 @@ public sealed class MenuProposalApplicationService(
         var (applied, proposalIssues) = MenuSubmissionApplier.Apply(menu, submission.Proposal, submission.Interpreted, submission.ExplicitDates, mode, defaultChildren, latestContext);
         var validation = MenuValidator.Validate(menu, latestContext, proposalIssues);
         var removed = new List<string>();
+
+        // 当てなかった「何人分」の指定（D-102）は商品を外していないので、「外した商品」と分けて示す
+        var servingsNotApplied = validation.Errors.Where(i => i.Kind == MenuIssueKind.InvalidServing).Select(i => i.ToLine()).ToList();
         if (validation.HasError)
         {
             // 直しきれなかったエラーの商品は外して示す（FR-MENU-15）。作れなかった商品（存在しない ID など）も示す。
             // アレルゲンの理由の文言は画面の共通部品で出すため、ここでは「アレルゲンの判定」とだけ書く
-            removed.AddRange(validation.Errors.Select(RemovedLine));
+            removed.AddRange(validation.Errors.Where(i => i.Kind != MenuIssueKind.InvalidServing).Select(RemovedLine));
             MenuValidator.RemoveErrorItems(menu, validation);
         }
 
@@ -305,6 +308,15 @@ public sealed class MenuProposalApplicationService(
         {
             message.AppendLine().AppendLine().AppendLine("※ 次の商品は条件を満たさないため外しました（アプリの判定）：");
             foreach (var line in removed)
+            {
+                message.AppendLine("- " + line);
+            }
+        }
+
+        if (servingsNotApplied.Count > 0)
+        {
+            message.AppendLine().AppendLine().AppendLine("※ 次の数の指定は反映していません（パック数は、指定を当てる前の数（新しく入れた商品は全員分）のままです。「個数設定」で直せます）：");
+            foreach (var line in servingsNotApplied)
             {
                 message.AppendLine("- " + line);
             }

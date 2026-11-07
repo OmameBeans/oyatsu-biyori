@@ -71,21 +71,30 @@ test.describe.serial('T5-07 ヘーゼルナッツの場面', () => {
         test.skip(testInfo.project.name === 'mobile', 'PC だけで通す');
         // ダークの確認（PC とスマホ）を足したぶん、時間を長めにとる
         test.setTimeout(180_000);
-        // 1. 来週の献立でチラシを取り込み、「ことりのさくさくショコラ」を新しい商品として確定する
+        // 1. 来週の献立でチラシを取り込み、「取り込みを終える」で「ことりのさくさくショコラ」を新しい商品として登録する（D-101）
         await page.goto('/menus?view=list');
         await page.getByRole('region', { name: /^来週 / }).getByRole('button', { name: /献立を作る|開く/ }).click();
         await page.getByTestId('file-input').setInputFiles(FLYER_IMAGE);
         await page.getByRole('button', { name: '読み取る' }).click();
         // flyer-02 の20商品のうち、食品以外の1件は外した掲載品になる（D-100）
         await expect(page.getByText('読み取った商品 19件')).toBeVisible({ timeout: 30_000 });
-        // 登録済みの商品に同じ名前とメーカーの商品がなく、表記（乳・麦）に避ける品目もないので、取り込みの分類は要確認（09 の 3）
-        await expect(flyerCategoryChip(flyerRow(page, 'ことりのさくさくショコラ'))).toHaveText('要確認');
-        const chocolate = await openFlyerItemDetail(page, 'ことりのさくさくショコラ');
-        await chocolate.getByRole('button', { name: '新しい商品として登録', exact: true }).click();
-        await expect(page.getByText('「ことりのさくさくショコラ」を新しい商品として登録しました')).toBeVisible();
+        // 登録済みの商品に同じ名前とメーカーの商品がなく、表記（乳・麦）に避ける品目もないので、取り込みの分類は取り込めるで、新しい商品の印が付く（09 の 3）
+        const chocolateRow = flyerRow(page, 'ことりのさくさくショコラ');
+        await expect(flyerCategoryChip(chocolateRow)).toHaveText('取り込める');
+        await expect(chocolateRow.getByText('新しい商品', { exact: true }).first()).toBeVisible();
+        // FR-IMPORT-12 登録済みの商品と内容量が違っても取り込めるで、注意に「原材料も見てください」を添える（取り込みを終えるとチラシの値で上書きする）
+        const cookieRow = flyerRow(page, 'CO・OP さくさくクッキー');
+        await expect(flyerCategoryChip(cookieRow)).toHaveText('取り込める');
+        await expect(cookieRow.getByText(/^注意：.*内容量が変わった/)).toBeVisible();
+        const cookie = await openFlyerItemDetail(page, 'CO・OP さくさくクッキー');
+        await expect(cookie.getByText(/^注意：内容量が変わりました（商品一覧 .+ → チラシ 5袋入・5個）。チラシの値で商品一覧を上書きします。届いたらパッケージの原材料も見てください$/)).toBeVisible();
+        await captureScreen(page, testInfo, 'sc-09-step1-volume-changed');
+        // 取り込めるの商品をまとめて取り込む（新しい商品は登録し、登録済みの商品は上書きする）
+        await page.getByRole('button', { name: /^取り込みを終える（取り込める \d+件）$/ }).click();
+        await expect(page.getByText(/^取り込みを終えました（新しく登録 \d+件・登録済みの商品を上書き \d+件）/).first()).toBeVisible();
 
-        // 2. 今週の商品では 🟡 要確認（チラシの情報だけ）で、献立に入れられる
-        await page.getByRole('tab', { name: '今週の商品', exact: true }).click();
+        // 2. 取り込みを終えると今週の商品（手順2）へ進む。🟡 要確認（チラシの情報だけ）で、献立に入れられる
+        await expect(page.getByText('今週の献立に使わない商品があれば、「今週使う」をオフにしてください', { exact: false })).toBeVisible();
         const listed = listedProductItem(page, 'ことりのさくさくショコラ');
         await expect(listed.getByText('要確認', { exact: true })).toBeVisible();
 

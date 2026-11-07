@@ -1,11 +1,12 @@
-﻿using OyatsuBiyori.Biz.Interfaces;
+﻿using OyatsuBiyori.Biz.Entities;
+using OyatsuBiyori.Biz.Interfaces;
 
 namespace OyatsuBiyori.Biz.FlyerImport;
 
 /// <summary>
 /// チラシの取り込みの途中の状態（確定前の読み取り結果）。サーバーのメモリに献立と結びつけて24時間だけ持つ（FR-FLYER-10・D-36）。
 /// 説明文はここにだけ持ち、DB には保存しない（探す言葉を探すためだけに使う。FR-FLYER-03）。
-/// 分類（FlyerItemClassifier）は持たず、表示と確定のたびに、今の商品マスタ・避ける品目で求め直す（09 の 3.1・5.2）。
+/// 分類（FlyerItemClassifier）は持たず、表示と「取り込みを終える」のたびに、今の商品マスタ・避ける品目で求め直す（09 の 3.1・5.1）。
 /// </summary>
 public sealed class FlyerImportSession
 {
@@ -27,13 +28,13 @@ public sealed class FlyerImportSession
     /// <summary>作った日時（UTC）</summary>
     public DateTime CreatedAt { get; init; }
 
-    /// <summary>取り込みを始めたときに、献立に掲載品の写しがあったか（取り込み直し。最初の確定で写しを空にする。T1-18）</summary>
+    /// <summary>取り込みを始めたときに、献立に掲載品の写しがあったか（取り込み直し。最初に取り込みを終えたときに写しを空にする。T1-18）</summary>
     public bool IsReimport { get; init; }
 
-    /// <summary>この取り込みで、もう1件以上確定したか（取り込み直しで写しを空にしたか）</summary>
+    /// <summary>この取り込みで、もう1件以上取り込んだか（取り込み直しで写しを空にしたか）</summary>
     public bool HasConfirmedAny { get; set; }
 
-    /// <summary>読み取りの検証（Claude）ができなかったか（FR-FLYER 受け入れ条件。できなければ、この取り込みの商品はまとめに入れない。09 の 5.2）</summary>
+    /// <summary>読み取りの検証（Claude）ができなかったか（FR-FLYER 受け入れ条件。一覧の上に知らせるだけで、分類は変えない。D-101）</summary>
     public bool ReviewFailed { get; set; }
 
     /// <summary>読み取りの検証が指摘した、読み落とした商品（手入力の候補）</summary>
@@ -41,7 +42,27 @@ public sealed class FlyerImportSession
 
     /// <summary>商品（外した掲載品も含む。IsRemoved で分ける）</summary>
     public List<FlyerImportItem> Items { get; } = [];
+
+    /// <summary>
+    /// この取り込みで登録済みの商品に上書きした値（商品 ID → 最初に上書きする前の値と、最後に上書きした値）。
+    /// その商品で取り込んだ行がすべて取り消されたら、まだ上書きした値のままの項目だけ前の値に戻す（読み違いを商品一覧に残さないため）
+    /// </summary>
+    public Dictionary<string, FlyerProductOverwrite> ProductOverwrites { get; } = new(StringComparer.Ordinal);
 }
+
+/// <summary>取り込みで上書きする商品の値（価格・税抜・注文番号・最後に載った週・内容量・入数）</summary>
+public sealed record FlyerProductValues(int? Price, int? PriceExcludingTax, string? OrderNo, DateOnly? ListedWeekStart, string? Volume, int? PiecesPerPack)
+{
+    /// <summary>商品の今の値</summary>
+    public static FlyerProductValues Of(Product product)
+    {
+        ArgumentNullException.ThrowIfNull(product);
+        return new(product.Price, product.PriceExcludingTax, product.OrderNo, product.ListedWeekStart, product.Volume, product.PiecesPerPack);
+    }
+}
+
+/// <summary>取り込みで上書きする前の値（Before）と、上書きした値（After）</summary>
+public sealed record FlyerProductOverwrite(FlyerProductValues Before, FlyerProductValues After);
 
 /// <summary>
 /// 取り込みの1商品（二重に読んだ商品は1件にまとめたもの。FR-IMPORT-06）。
@@ -52,7 +73,7 @@ public sealed class FlyerImportItem
     /// <summary>ID</summary>
     public string Id { get; init; } = Guid.NewGuid().ToString();
 
-    /// <summary>手入力した商品か（チラシの読み取りと同じ扱い。まとめには入れない。D-73）</summary>
+    /// <summary>手入力した商品か（チラシの読み取りと同じ扱い。注意「読み取りの検証を通っていません」を出す。D-73）</summary>
     public bool IsManual { get; init; }
 
     /// <summary>Claude が読み取ったまま（二重の読み取りをまとめたあと）。説明文と商品名の探す言葉はここからも探す</summary>
@@ -64,7 +85,7 @@ public sealed class FlyerImportItem
     /// <summary>職員が直した項目（FlyerItemField の値。値が変わった項目だけ）</summary>
     public HashSet<string> EditedFields { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>「使えない（入数が分からない）」の行に、職員が入数を入れたか（読み取りの検証を通っていないので、まとめに入れない。FR-IMPORT-11）</summary>
+    /// <summary>「使えない（入数が分からない）」の行に、職員が入数を入れたか（読み取りの検証を通っていないので、注意を出す。FR-IMPORT-11）</summary>
     public bool IsPiecesEnteredByStaff { get; set; }
 
     /// <summary>まとめた元の読み取りの番号（0から。Claude が返した一覧の番号。手入力は空）</summary>
@@ -91,14 +112,11 @@ public sealed class FlyerImportItem
     /// <summary>読み取りの検証（FR-FLYER-03g）の指摘のうち、まだ直していないもの（Key は商品の中で一意。review:0 など）</summary>
     public List<FlyerReviewNoteInput> ReviewNotes { get; } = [];
 
-    /// <summary>再入力の理由のうち、職員が「このままでよい」を押したものの鍵（メモリにだけ持ち、記録には使わない。09 の 5.3）</summary>
-    public HashSet<string> AcceptedReasonKeys { get; } = new(StringComparer.Ordinal);
-
     /// <summary>
-    /// 「表記なし」と読んだ商品を、職員がチラシで見比べたか（まとめての見比べ。D-97）。このメモリにだけ持ち、
-    /// 記録（allergen_checks）や確定の内容には使わない。まとめて確定に入れてよいかの判断にだけ使う。表記を直したら消す
+    /// 読み取りの検証が見つけた、読み落としたアレルゲン表記の原文（品目は LabelAllergenIds に足してある）。
+    /// 掲載品の写しの表記の原文（ListedProduct.LabelText）に書き添える（決めたこと F）
     /// </summary>
-    public bool IsLabelAbsentCompared { get; set; }
+    public List<string> FoundLabelTexts { get; } = [];
 
     /// <summary>外した掲載品か（FR-IMPORT-20・21。分類せず、今週の商品にも商品マスタにも入れない）</summary>
     public bool IsRemoved { get; set; }
@@ -106,7 +124,7 @@ public sealed class FlyerImportItem
     /// <summary>外した理由（Claude が食品以外とした理由か、職員が外したこと）</summary>
     public string? RemovedReason { get; set; }
 
-    /// <summary>確定した内容（未確定なら null）</summary>
+    /// <summary>取り込んだ内容（未確定なら null。確定済みの行を直すと、直した時点で取り消して null に戻す。決めたこと B）</summary>
     public FlyerItemConfirmation? Confirmation { get; set; }
 
     /// <summary>
@@ -117,7 +135,7 @@ public sealed class FlyerImportItem
 
     /// <summary>
     /// 確認済みとの食い違い（09 の 3.5）で「参考」の記録を足した商品と品目の鍵（商品 ID｜品目 ID の並び）。
-    /// 同じ食い違いで2回足さないため。直して食い違いが変われば、次の確定でまた足す
+    /// 同じ食い違いで2回足さないため。直して食い違いが変われば、次に取り込みを終えたときにまた足す
     /// </summary>
     public HashSet<string> RecordedDiscrepancyKeys { get; } = new(StringComparer.Ordinal);
 
@@ -128,10 +146,10 @@ public sealed class FlyerImportItem
 /// <summary>確定の種類</summary>
 public enum FlyerConfirmationKind
 {
-    /// <summary>使える：一致した商品を更新した</summary>
+    /// <summary>登録済みの商品（一致した商品）を上書きした</summary>
     UpdatedExisting,
 
-    /// <summary>要確認：新しい商品として登録した</summary>
+    /// <summary>新しい商品として登録した</summary>
     CreatedNew,
 }
 

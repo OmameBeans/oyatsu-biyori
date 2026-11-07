@@ -12,25 +12,24 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import type { FlyerItem } from '../../../entities/flyer';
-import { matchSummaryOf } from '../model/flyerRows';
-import { FlyerConfirmForm } from './FlyerConfirmForm';
+import { isReviewTarget, matchSummaryOf } from '../model/flyerRows';
+import { FlyerItemForm } from './FlyerItemForm';
 import { FlyerAllergenChips, FlyerStatusCell } from './FlyerStatusChip';
 
 interface FlyerReviewDialogProps {
     menuId: string;
-    /** 読み取った商品（読み直すたびに新しくなる。確定したかどうかはここから見る） */
+    /** 読み取った商品（読み直すたびに新しくなる。まだ再入力かどうかはここから見る） */
     items: FlyerItem[];
-    /** 確かめる順（開いたときの再入力・要確認の商品。表と同じ並び） */
+    /** 直す順（開いたときの再入力の商品。表と同じ並び） */
     queue: string[];
     isOpen: boolean;
     onClose: () => void;
 }
 
 /**
- * 再入力・要確認の商品を1件ずつ確かめるダイアログ（読み取った商品の表の「未確定を1件ずつ確かめる」から開く。09 の 6）。
- * 決めるのは、ボタンを押したときだけ（スワイプなどでうっかり確定しないように）。
- * 確定するか外すと、次の商品へ進む。「あとで」で飛ばした商品は、最後に残りとして示す。
- * 直したあとに「使えない」になった商品は、確定できないので「あとで」で次へ進む。
+ * 再入力の商品を1件ずつ直すダイアログ（読み取った商品の表の「再入力を1件ずつ直す」から開く。09 の 6。D-101）。
+ * 直して分類し直し、再入力でなくなった（取り込める・使えないになった）か外すと、次の商品へ進む。
+ * 「あとで」で飛ばした商品は、最後に残りとして示す。取り込みは、表の上の「取り込みを終える」でまとめて行う。
  */
 export const FlyerReviewDialog = ({ menuId, items, queue, isOpen, onClose }: FlyerReviewDialogProps) => {
     const theme = useTheme();
@@ -40,10 +39,10 @@ export const FlyerReviewDialog = ({ menuId, items, queue, isOpen, onClose }: Fly
     const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
 
     const itemOf = (id: string) => items.find((item) => item.id === id);
-    // 確定した・外した（一覧にない）商品は済み
+    // 再入力でなくなった・外した（一覧にない）商品は済み
     const isDone = (id: string) => {
         const item = itemOf(id);
-        return !item || !!item.confirmation;
+        return !item || !isReviewTarget(item);
     };
     const current = currentId ? itemOf(currentId) : undefined;
     const index = currentId ? queue.indexOf(currentId) : -1;
@@ -58,6 +57,16 @@ export const FlyerReviewDialog = ({ menuId, items, queue, isOpen, onClose }: Fly
     };
 
     const handleDone = (item: FlyerItem) => setCurrentId(nextPending(item.id));
+    // 直して分類し直した結果、再入力でなくなったら次へ進む（描画の中で切り替える）。
+    // 再入力のときに開いていた商品だけを見る（「前へ」で済んだ商品を見返すときは進めない）
+    const [watchedId, setWatchedId] = useState<string | null>(null);
+    if (current && isReviewTarget(current) && watchedId !== current.id) {
+        setWatchedId(current.id);
+    }
+    if (current && !isReviewTarget(current) && watchedId === current.id) {
+        setWatchedId(null);
+        setCurrentId(nextPending(current.id));
+    }
 
     // 「あとで」は、済んだかどうかに関係なく次の商品へ（最後まで行ったら、残りを示す）
     const handleLater = () => setCurrentId(index >= 0 && index < queue.length - 1 ? queue[index + 1] : null);
@@ -67,7 +76,7 @@ export const FlyerReviewDialog = ({ menuId, items, queue, isOpen, onClose }: Fly
     return (
         <Dialog open={isOpen} onClose={onClose} fullScreen={isMobile} maxWidth="md" fullWidth aria-labelledby="flyer-review-title">
             <DialogTitle id="flyer-review-title" sx={{ pb: 1 }}>
-                未確定の商品を1件ずつ確かめる
+                再入力を1件ずつ直す
                 <Typography variant="body2" color="text.secondary">
                     {current ? `${index + 1} / ${queue.length}件目` : '終わり'}（済み {doneCount}件・残り {remainingCount}件）
                 </Typography>
@@ -77,28 +86,29 @@ export const FlyerReviewDialog = ({ menuId, items, queue, isOpen, onClose }: Fly
                 {current ? (
                     <Stack spacing={2}>
                         <ReviewItemSummary item={current} />
-                        <FlyerConfirmForm
+                        <FlyerItemForm
                             key={current.id}
                             menuId={menuId}
                             item={current}
                             closeLabel="表に戻る"
                             actionsContainer={actionsEl}
                             onClose={onClose}
-                            onSuccess={() => handleDone(current)}
                             onRemoved={() => handleDone(current)}
                         />
                     </Stack>
                 ) : (
                     <Stack spacing={2} sx={{ alignItems: 'flex-start', py: 2 }}>
                         <Typography variant="h3" component="p">
-                            {remainingCount === 0 ? 'すべて確かめました' : `「あとで」にした商品が ${remainingCount}件 残っています`}
+                            {remainingCount === 0 ? 'すべて直しました' : `「あとで」にした商品が ${remainingCount}件 残っています`}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            {remainingCount === 0 ? '表に戻って、確定した内容を見直せます。' : '確定していない商品は、今週の商品に入りません。'}
+                            {remainingCount === 0
+                                ? '表に戻って「取り込みを終える」を押すと、取り込めるの商品が今週の商品に入ります。'
+                                : '再入力の商品は、直すまで今週の商品に入りません。'}
                         </Typography>
                         {remainingCount > 0 && (
                             <Button variant="contained" onClick={handleRestart}>
-                                残りを確かめる
+                                残りを直す
                             </Button>
                         )}
                     </Stack>
@@ -126,7 +136,7 @@ interface ReviewItemSummaryProps {
     item: FlyerItem;
 }
 
-/** 1件ずつ確かめるときの、商品の見出し（表の1行と同じ内容を縦に並べる） */
+/** 1件ずつ直すときの、商品の見出し（表の1行と同じ内容を縦に並べる） */
 const ReviewItemSummary = ({ item }: ReviewItemSummaryProps) => {
     const read = item.read;
     const summary = matchSummaryOf(item);

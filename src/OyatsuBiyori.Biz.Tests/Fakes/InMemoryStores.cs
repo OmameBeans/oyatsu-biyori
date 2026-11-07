@@ -164,9 +164,10 @@ internal sealed class FakeUnitOfWork(InMemoryData data) : IUnitOfWork
     }
 }
 
-internal sealed class FakeUserContext : IUserContext
+/// <summary>ログインしている職員（loggedIn が false なら、ログインしていないことにする）</summary>
+internal sealed class FakeUserContext(bool loggedIn = true) : IUserContext
 {
-    public Task<CurrentUserInfo?> GetCurrentUserInfoAsync() => Task.FromResult<CurrentUserInfo?>(new CurrentUserInfo("user-1", "staff"));
+    public Task<CurrentUserInfo?> GetCurrentUserInfoAsync() => Task.FromResult(loggedIn ? new CurrentUserInfo("user-1", "staff") : null);
 }
 
 internal sealed class FakeSessionStore : IFlyerSessionStore

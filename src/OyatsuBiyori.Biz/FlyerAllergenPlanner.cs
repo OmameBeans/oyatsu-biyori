@@ -313,6 +313,41 @@ public static class FlyerAllergenPlanner
         return note;
     }
 
+    /// <summary>
+    /// 掲載品の写しに入れる表記の原文（D-101・FR-IMPORT-40。献立の確定で見比べるための表示だけに使う）。
+    /// 読み取った表記の原文と、読み取りの検証で見つけた表記を「／」でつなぐ。どれも表記なしなら「表記なし」。
+    /// 職員が品目を直したとき（editedAllergenNames が null でない）は「（品目を直しました：…）」を後ろに足す
+    /// （表記なしなら「（品目を入れました：…）」、品目が空なら「（品目なし）」）
+    /// </summary>
+    /// <param name="labelText">読み取った表記の原文（二重に読んだ商品はつないだもの）</param>
+    /// <param name="foundLabelTexts">読み取りの検証で見つけた表記の原文</param>
+    /// <param name="editedAllergenNames">職員が品目を直したときの今の品目の名前（直していなければ null）</param>
+    public static string ListingLabelText(string? labelText, IReadOnlyList<string> foundLabelTexts, IReadOnlyList<string>? editedAllergenNames)
+    {
+        ArgumentNullException.ThrowIfNull(foundLabelTexts);
+
+        var texts = new[] { labelText }
+            .Concat(foundLabelTexts)
+            .Where(t => !IsNoLabel(t))
+            .Select(t => t!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var isAbsent = texts.Count == 0;
+        var text = isAbsent ? "表記なし" : string.Join("／", texts);
+        if (editedAllergenNames is null)
+        {
+            return text;
+        }
+
+        if (editedAllergenNames.Count == 0)
+        {
+            return text + "（品目なし）";
+        }
+
+        var names = string.Join("・", editedAllergenNames.Distinct(StringComparer.Ordinal));
+        return text + (isAbsent ? $"（品目を入れました：{names}）" : $"（品目を直しました：{names}）");
+    }
+
     /// <summary>表記がない（空・「なし」・記号だけ）か</summary>
     private static bool IsNoLabel(string? labelText)
     {

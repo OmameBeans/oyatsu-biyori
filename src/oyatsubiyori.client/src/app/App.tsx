@@ -126,7 +126,7 @@ export const App = () => {
                     読み込み中は index.html のスクリプトが同じ style を設定するので、CssBaseline の enableColorScheme は使わない（style の方が強く、効かないため） */}
                 <CssBaseline />
                 <QueryClientProvider client={queryClient}>
-                    <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} autoHideDuration={4000}>
+                    <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} autoHideDuration={4000}>
                         <RouterProvider router={router} />
                     </SnackbarProvider>
                 </QueryClientProvider>

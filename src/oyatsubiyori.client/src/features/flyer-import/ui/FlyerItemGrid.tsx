@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
@@ -25,13 +24,11 @@ import {
     flyerTabLabel,
     isPiecesUnknown,
     isReviewTarget,
-    labelAbsentCompareItemsOf,
     matchSummaryOf,
-    nextOpenableItemId,
+    showsNewMark,
 } from '../model/flyerRows';
-import type { FlyerRowTab } from '../model/flyerRows';
-import { FlyerConfirmForm } from './FlyerConfirmForm';
-import { FlyerLabelAbsentCompareDialog } from './FlyerLabelAbsentCompareDialog';
+import type { FlyerRowTab, PendingFlyerEdit } from '../model/flyerRows';
+import { FlyerItemForm } from './FlyerItemForm';
 import { FlyerPiecesInput } from './FlyerPiecesInput';
 import { FlyerReviewDialog } from './FlyerReviewDialog';
 import { FlyerAllergenChips, FlyerStatusCell } from './FlyerStatusChip';
@@ -39,8 +36,10 @@ import { FlyerAllergenChips, FlyerStatusCell } from './FlyerStatusChip';
 interface FlyerItemGridProps {
     menuId: string;
     session: FlyerSession;
-    /** 開いている（確定のフォームで直している途中の）行が変わったとき。まとめて確定・登録から外すために使う */
-    onExpandedIdChange?: (id: string | null) => void;
+    /** 開いている行のフォームで、直した内容をまだ送っていない状態が変わったとき（「取り込みを終える」の前に聞くために使う） */
+    onPendingEditChange?: (pending: PendingFlyerEdit | null) => void;
+    /** 変わると、開いている行のフォームを作り直す（直した内容を捨てる） */
+    formResetKey?: number;
 }
 
 /** 表の1行。商品の行と、開いている商品のすぐ下に差し込む詳細の行（全部の列をまたぐ） */
@@ -70,7 +69,7 @@ interface ProductNameCellProps {
     item: FlyerItem;
 }
 
-/** 商品名と、内容量・税込価格・手入力の印 */
+/** 商品名と、内容量・税込価格・新しい商品・手入力の印 */
 const ProductNameCell = ({ item }: ProductNameCellProps) => {
     const read = item.read;
     return (
@@ -79,6 +78,7 @@ const ProductNameCell = ({ item }: ProductNameCellProps) => {
                 <Typography sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={read.name}>
                     {read.name || '（商品名なし）'}
                 </Typography>
+                {showsNewMark(item) && <Chip size="small" color="info" variant="outlined" label="新しい商品" sx={{ flexShrink: 0 }} />}
                 {item.isManual && <Chip size="small" label="手入力" sx={{ flexShrink: 0 }} />}
             </Stack>
             <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -117,12 +117,12 @@ const MatchCell = ({ menuId, item }: MatchCellProps) => {
 
 /**
  * SC-09 手順1 読み取った商品の表（MUI X の DataGrid。無料版）。
- * 取り込みの分類の順（再入力 → 要確認 → 使える → 使えない → 確定済み。サーバーが並べたまま）に並べ、タブで絞り込む。
- * 分類・理由・件数はサーバーの値をそのまま出す。並べ替え・列のメニュー・ページ送りは使わない。
- * 行の下の詳細欄（確定のフォーム）は、開いている行のすぐ後ろに全部の列をまたぐ行を差し込んで出す。
+ * 取り込みの分類の順（再入力 → 取り込める → 使えない → 確定済み。サーバーが並べたまま）に並べ、タブで絞り込む。
+ * 分類・理由・注意・件数はサーバーの値をそのまま出す。並べ替え・列のメニュー・ページ送りは使わない。
+ * 行の下の詳細欄（行のフォーム）は、開いている行のすぐ後ろに全部の列をまたぐ行を差し込んで出す。
  * スマホでは、分類のチップ・商品名・アレルゲン表記を1つの列に縦に並べる（横にスクロールしなくても見えるように）。
  */
-export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItemGridProps) => {
+export const FlyerItemGrid = ({ menuId, session, onPendingEditChange, formResetKey = 0 }: FlyerItemGridProps) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const apiRef = useGridApiRef();
@@ -131,18 +131,9 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
     const [tab, setTab] = useState<FlyerRowTab>(FLYER_ROW_TAB.ALL);
     const visibleItems = useMemo(() => filterItems(items, tab), [items, tab]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    // 開いている行を親に知らせる（フォームで直した内容を、まとめて確定・登録で捨てないように）。表が消えたら閉じた扱いにする
-    useEffect(() => {
-        onExpandedIdChange?.(expandedId);
-    }, [expandedId, onExpandedIdChange]);
-    useEffect(() => () => onExpandedIdChange?.(null), [onExpandedIdChange]);
-    // 1件ずつ確かめるダイアログ。開いたときの再入力・要確認の商品を、表と同じ順で確かめる
+    // 1件ずつ直すダイアログ。開いたときの再入力の商品を、表と同じ順で直す
     const reviewIds = items.filter(isReviewTarget).map((item) => item.id);
     const [reviewQueue, setReviewQueue] = useState<string[] | null>(null);
-    // 表記なしの商品のまとめての見比べ（1件ずつ止めずに、まとめてチラシと見比べる。D-97）
-    const labelAbsentItems = labelAbsentCompareItemsOf(items);
-    const labelAbsentPendingCount = labelAbsentItems.filter((item) => !item.isLabelAbsentCompared).length;
-    const [isLabelAbsentDialogOpen, setIsLabelAbsentDialogOpen] = useState(false);
 
     const gridRows = useMemo(
         () =>
@@ -170,42 +161,14 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
         return () => observer.disconnect();
     }, []);
 
-    // 確定したあとに開いた行を、見える位置までスクロールする。確定した行は、読み直したあと下へ移って並びが変わるので、
-    // 読み直しが届くまでは並びが変わるたびに合わせ直し、届いたら止める（そのあとの読み直しでは動かさない）。DataGrid が行を描き直してから動かす
-    const scrollRequestRef = useRef<{ openId: string; confirmedId: string } | null>(null);
-    useEffect(() => {
-        const request = scrollRequestRef.current;
-        if (!request) {
-            return;
-        }
-        const frame = requestAnimationFrame(() => apiRef.current?.getRowElement(request.openId)?.scrollIntoView({ block: 'start' }));
-        if (items.find((item) => item.id === request.confirmedId)?.confirmation) {
-            scrollRequestRef.current = null;
-        }
-        return () => cancelAnimationFrame(frame);
-    }, [gridRows, items, apiRef]);
-
     const handleTabChange = (next: FlyerRowTab) => {
-        scrollRequestRef.current = null;
         setTab(next);
         setExpandedId(null);
     };
 
-    const handleToggle = (id: string) => {
-        scrollRequestRef.current = null;
-        setExpandedId((current) => (current === id ? null : id));
-    };
+    const handleToggle = (id: string) => setExpandedId((current) => (current === id ? null : id));
 
-    const handleConfirmed = (item: FlyerItem) => {
-        const nextId = nextOpenableItemId(visibleItems, item.id);
-        scrollRequestRef.current = nextId ? { openId: nextId, confirmedId: item.id } : null;
-        setExpandedId(nextId);
-    };
-
-    const handleRemoved = () => {
-        scrollRequestRef.current = null;
-        setExpandedId(null);
-    };
+    const handleRemoved = () => setExpandedId(null);
 
     const toggleColumn: GridColDef<GridRow> = {
         field: 'toggle',
@@ -244,13 +207,13 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
                             '&:focus-visible': { outline: 2, outlineColor: 'primary.main', outlineOffset: -2 },
                         }}
                     >
-                        <FlyerConfirmForm
-                            key={row.item.id}
+                        <FlyerItemForm
+                            key={`${row.item.id}-${formResetKey}`}
                             menuId={menuId}
                             item={row.item}
                             onClose={() => handleToggle(row.item.id)}
-                            onSuccess={() => handleConfirmed(row.item)}
                             onRemoved={handleRemoved}
+                            onPendingEditChange={onPendingEditChange}
                         />
                     </Box>
                 );
@@ -330,29 +293,10 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
 
     const columns: GridColDef<GridRow>[] = [toggleColumn, ...(isMobile ? mobileColumns : desktopColumns)];
 
-    // 一覧の Stack は、中身（表の枠の最低の高さ）より小さく縮めない。縮めると、下の「外した掲載品」などが表に重なる
+    // PC では、一覧の Stack が手順1の残りの高さを埋め、表の中だけをスクロールする（中身の高さには合わせない）。
+    // 表の枠の最低の高さより小さくは縮めない（縮めると、下のボタンが表に重なる）
     return (
-        <Stack spacing={1} sx={{ flex: { md: '1 0 auto' } }}>
-            {labelAbsentItems.length > 0 && (
-                <Paper
-                    variant="outlined"
-                    component="section"
-                    aria-labelledby="label-absent-summary-heading"
-                    sx={{ flexShrink: 0, px: 2, py: 1.5, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, alignItems: { sm: 'center' } }}
-                >
-                    <Stack sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography id="label-absent-summary-heading" sx={{ fontWeight: 700 }}>
-                            アレルゲンの表記がないと読んだ {labelAbsentItems.length}件
-                        </Typography>
-                        <Typography variant="body2" color={labelAbsentPendingCount > 0 ? 'warning.dark' : 'text.secondary'}>
-                            {labelAbsentPendingCount > 0 ? `まだチラシと見比べていない ${labelAbsentPendingCount}件は、まとめて確定に入りません` : 'すべてチラシと見比べました'}
-                        </Typography>
-                    </Stack>
-                    <Button variant="outlined" onClick={() => setIsLabelAbsentDialogOpen(true)} sx={{ flexShrink: 0, minHeight: 44 }}>
-                        表記なしの商品をチラシと見比べる
-                    </Button>
-                </Paper>
-            )}
+        <Stack spacing={1} sx={{ flex: { md: '1 1 0' } }}>
             {reviewIds.length > 0 && (
                 <Button
                     variant="outlined"
@@ -363,7 +307,7 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
                     }}
                     sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' }, flexShrink: 0 }}
                 >
-                    未確定を1件ずつ確かめる（再入力・要確認 {reviewIds.length}件）
+                    再入力を1件ずつ直す（{reviewIds.length}件）
                 </Button>
             )}
             <Typography id="flyer-category-heading" variant="subtitle2" component="h3" sx={{ flexShrink: 0, fontWeight: 700, pt: 0.5 }}>
@@ -384,7 +328,7 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
                     <Tab key={value} value={value} label={`${flyerTabLabel(value)} ${flyerTabCount(session, value)}`} />
                 ))}
             </Tabs>
-            <Box ref={wrapperRef} sx={{ flex: { md: '1 1 auto' }, minHeight: { md: 320 }, minWidth: 0 }}>
+            <Box ref={wrapperRef} sx={{ flex: { md: '1 1 0' }, minHeight: { md: 240 }, minWidth: 0 }}>
                 <DataGrid
                     apiRef={apiRef}
                     aria-label="読み取った商品"
@@ -418,7 +362,6 @@ export const FlyerItemGrid = ({ menuId, session, onExpandedIdChange }: FlyerItem
                     }}
                 />
             </Box>
-            {isLabelAbsentDialogOpen && <FlyerLabelAbsentCompareDialog menuId={menuId} items={labelAbsentItems} isOpen onClose={() => setIsLabelAbsentDialogOpen(false)} />}
             {reviewQueue && <FlyerReviewDialog menuId={menuId} items={items} queue={reviewQueue} isOpen onClose={() => setReviewQueue(null)} />}
         </Stack>
     );

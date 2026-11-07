@@ -5,12 +5,13 @@ using OyatsuBiyori.Biz.Menus;
 namespace OyatsuBiyori.Biz.FlyerImport;
 
 /// <summary>
-/// チラシの取り込み（SC-09 手順1。D-100、09-flyer-import.md）。
+/// チラシの取り込み（SC-09 手順1。D-101、09-flyer-import.md）。
 /// 読み取り（Claude）→ 食品以外を外した掲載品へ（FR-IMPORT-20）→ 二重の読み取りをまとめる（FR-IMPORT-06）→ 読み取りの検証（Claude。まとめる前の一覧を渡す）
-/// → 画像を破棄 → 結果をメモリに24時間。分類（FlyerItemClassifier）は保存せず、表示と確定のたびに、名前＋メーカーの完全一致の照合（ProductMatcher）と
-/// 今の商品マスタ・避ける品目で求め直す（09 の 3.1・5.2）。Claude は照合に使わない（FR-IMPORT-05）。
-/// 確定で、商品・「参考」の記録・掲載品の写しに反映する。「確認済み」にはしない（参考の記録だけを作る。SR-03）。
-/// 確認済みの商品とチラシの表記が食い違えば、その取り込みで確定するたびに、食い違いのある全商品の分の「参考」の記録を同じ保存で足す（09 の 3.5）。
+/// → 画像を破棄 → 結果をメモリに24時間。分類（FlyerItemClassifier。使えない / 再入力 / 取り込める）は保存せず、表示と「取り込みを終える」のたびに、
+/// 名前＋メーカーの完全一致の照合（ProductMatcher）と今の商品マスタ・避ける品目で求め直す（09 の 3.1・5.1）。Claude は照合に使わない（FR-IMPORT-05）。
+/// 「取り込みを終える」（FinishAsync）の1回の操作で、取り込めるの商品をすべて、商品（新しい商品の登録・登録済みの商品の上書き）・「参考」の記録・
+/// 掲載品の写し（チラシの表記の原文つき）に反映する。使えない・再入力は決して取り込まない。「確認済み」にはしない（参考の記録だけを作る。SR-03）。
+/// 確認済みの商品とチラシの表記が食い違えば、取り込みを終えるたびに、食い違いのある全商品の分の「参考」の記録を同じ保存で足す（09 の 3.5）。
 /// </summary>
 public sealed class FlyerImportApplicationService(
     IMenuRepository menuRepository,
@@ -33,9 +34,6 @@ public sealed class FlyerImportApplicationService(
 
     private const string SessionNotFound = "読み取り結果が見つかりません（24時間たったか、サーバーが再起動しました）。チラシを読み取り直してください";
     private const string ItemNotFound = "その商品が見つかりません。画面を読み込み直してください";
-
-    /// <summary>直している途中の商品なし</summary>
-    private static readonly IReadOnlySet<string> NoEditing = new HashSet<string>(StringComparer.Ordinal);
 
     private readonly IMenuRepository _menus = menuRepository ?? throw new ArgumentNullException(nameof(menuRepository));
     private readonly IProductRepository _products = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
@@ -126,7 +124,8 @@ public sealed class FlyerImportApplicationService(
                 IsReimport = menu.ListedProducts.Count > 0,
             };
 
-            var reads = reading.Value.Items;
+            // 登録できない値はここで読めなかった扱いにする（分類では「取り込める」なのに、取り込みを終えるときに失敗しないように）
+            var reads = reading.Value.Items.Select(TidyRead).ToList();
             var itemsByIndex = BuildReadItems(session, reads, allergens);
 
             // 読み取りの検証は、画像を破棄する前に同じ処理の中で行う。失敗しても読み取り結果は出す。
@@ -153,14 +152,7 @@ public sealed class FlyerImportApplicationService(
         {
             lock (previousSession.SyncRoot)
             {
-                var carried = previousSession.Items.Where(i => i.IsManual && i.Confirmation is null).ToList();
-                foreach (var item in carried)
-                {
-                    // 表記なしの見比べの印は引き継がない（新しいチラシとは見比べていないため。D-97）
-                    item.IsLabelAbsentCompared = false;
-                }
-
-                session.Items.AddRange(carried);
+                session.Items.AddRange(previousSession.Items.Where(i => i.IsManual && i.Confirmation is null));
             }
         }
 
@@ -169,7 +161,7 @@ public sealed class FlyerImportApplicationService(
     }
 
     /// <summary>
-    /// 手入力の商品を足す（読み取りの一覧からも、読み取り結果がないときからも。チラシと同じ照合・分類。まとめには入れない。D-73）。
+    /// 手入力の商品を足す（読み取りの一覧からも、読み取り結果がないときからも。チラシと同じ照合・分類。注意「読み取りの検証を通っていません」を出す。D-73）。
     /// 足した商品の ID を返す
     /// </summary>
     public async Task<Result<string>> AddManualAsync(string? menuId, FlyerManualInput input, CancellationToken cancellationToken)
@@ -238,8 +230,7 @@ public sealed class FlyerImportApplicationService(
     /// 取り込みの状態（読み取りの処理と、確定前の結果）。分類はここで求め直す。
     /// </summary>
     /// <param name="menuId">献立</param>
-    /// <param name="editingItemIds">画面で行を開いて直している途中の商品（まとめに入れない。09 の 5.2）</param>
-    public async Task<Result<FlyerImportView>> GetLatestAsync(string? menuId, IReadOnlyList<string>? editingItemIds = null)
+    public async Task<Result<FlyerImportView>> GetLatestAsync(string? menuId)
     {
         var menu = string.IsNullOrEmpty(menuId) ? null : await _menus.GetAsync(menuId);
         if (menu is null)
@@ -254,24 +245,24 @@ public sealed class FlyerImportApplicationService(
             return Result<FlyerImportView>.Ok(new FlyerImportView(job, null));
         }
 
-        var context = await LoadContextAsync();
-        var editing = ToSet(editingItemIds);
+        var context = await LoadContextAsync(menu);
         lock (session.SyncRoot)
         {
-            return Result<FlyerImportView>.Ok(new FlyerImportView(job, BuildSessionView(session, context, editing)));
+            return Result<FlyerImportView>.Ok(new FlyerImportView(job, BuildSessionView(session, context)));
         }
     }
 
     /// <summary>
     /// 行を直す（09 の 5.3・3.6）。input は行のすべての値（フォームの値）で、今の値と違う項目だけを「直した項目」にする。
     /// 直した値は読み取ったままの値と別に持つ。商品名・メーカーを直したら照合し直す（表示のたびに照合するので、次の分類で変わる）。
-    /// 直した欄の読み取りの検証の指摘と、その欄の「このままでよい」は消す。アレルゲン表記の品目を直したら、表記なしの見比べの印を消す。
-    /// 分類し直した行を返す（結果が「使えない」になることもある）
+    /// 直した欄の読み取りの検証の指摘は消す。分類し直した行を返す（結果が「使えない」「再入力」になることもある）。
+    /// 取り込み済みの行も直せる。値が変わるなら、直す前に取り込みを取り消す（掲載品の写しから外し、この取り込みで新しく登録した商品は「使わない」に戻す。
+    /// 決めたこと B）。直した内容は、もう一度「取り込みを終える」で取り込み直す
     /// </summary>
     public async Task<Result<FlyerItemView>> UpdateItemAsync(FlyerItemEditInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var (_, session, error) = await FindSessionAsync(input.MenuId);
+        var (menu, session, error) = await FindSessionAsync(input.MenuId);
         if (session is null)
         {
             return Result<FlyerItemView>.Error(error!);
@@ -285,7 +276,7 @@ public sealed class FlyerImportApplicationService(
             return result;
         }
 
-        var context = await LoadContextAsync();
+        var context = await LoadContextAsync(menu!);
         if (input.LabelAllergenIds is { } labelIds && labelIds.Any(id => !context.AllergenIds.Contains(id)))
         {
             return Result<FlyerItemView>.Error("アレルゲンの品目が正しくありません。画面を読み込み直してください");
@@ -297,42 +288,68 @@ public sealed class FlyerImportApplicationService(
             return Result<FlyerItemView>.Error(tagError);
         }
 
+        // 「取り込みを終える」・外すと同時に走らないようにする（取り込みの途中の行を直して、写しと商品の状態が食い違わないように）
+        await session.WriteGate.WaitAsync();
+        try
+        {
+            // 待っている間に取り込みを終えたことがあるので、商品マスタを読み直してから直す
+            return await UpdateItemLockedAsync(menu!, session, input, await LoadContextAsync(menu!));
+        }
+        finally
+        {
+            session.WriteGate.Release();
+        }
+    }
+
+    /// <summary>UpdateItemAsync の中身（WriteGate を持っている間だけ呼ぶ）</summary>
+    private async Task<Result<FlyerItemView>> UpdateItemLockedAsync(Menu menu, FlyerImportSession session, FlyerItemEditInput input, ImportContext context)
+    {
+        FlyerImportItem? item;
+        bool unconfirm;
         lock (session.SyncRoot)
         {
-            var (item, itemError) = FindEditableItem(session, input.ItemId);
+            (item, var itemError) = FindEditableItem(session, input.ItemId);
             if (item is null)
             {
                 return Result<FlyerItemView>.Error(itemError!);
             }
 
-            // 「使えない（入数が分からない）」の行に入数を入れたかを、直す前の分類で見る（FR-IMPORT-11・09 の 5.2）
-            var wasPiecesUnknown = Classify(session, item, context, editing: NoEditing)
+            var anyChange = ChangedFields(item, input).Count > 0 || HasOtherChanges(item.Read, input);
+            if (!anyChange)
+            {
+                // 値が1つも変わらなければ何もしない（取り込み済みの行も取り消さない）
+                return Result<FlyerItemView>.Ok(BuildItemView(item, context));
+            }
+
+            unconfirm = item.Confirmation is not null;
+        }
+
+        if (unconfirm)
+        {
+            var unconfirmError = await UnconfirmLockedAsync(menu, session, item, afterSave: null);
+            if (unconfirmError is not null)
+            {
+                return Result<FlyerItemView>.Error(unconfirmError);
+            }
+        }
+
+        lock (session.SyncRoot)
+        {
+            // 「使えない（入数が分からない）」の行に入数を入れたかを、直す前の分類で見る（FR-IMPORT-11）
+            var wasPiecesUnknown = Classify(item, context)
                 .Classification.Reasons.Any(r => r.Code == FlyerItemReasonCode.PiecesUnknown);
             var current = item.Read;
-            var changed = new List<string>();
-            var name = Blank(input.Name) ?? string.Empty;
-            var maker = Blank(input.Maker);
-            var volume = Blank(input.Volume);
-            var orderNo = Blank(input.OrderNo);
-            Track(changed, FlyerItemField.Name, !string.Equals(current.Name, name, StringComparison.Ordinal));
-            Track(changed, FlyerItemField.Maker, !string.Equals(current.Maker, maker, StringComparison.Ordinal));
-            Track(changed, FlyerItemField.Volume, !string.Equals(current.Volume, volume, StringComparison.Ordinal));
-            Track(changed, FlyerItemField.PriceIncludingTax, current.PriceIncludingTax != input.PriceIncludingTax);
-            Track(changed, FlyerItemField.PriceExcludingTax, current.PriceExcludingTax != input.PriceExcludingTax);
-            Track(changed, FlyerItemField.OrderNo, !string.Equals(current.OrderNo, orderNo, StringComparison.Ordinal));
-            Track(changed, FlyerItemField.PiecesPerPack, current.PiecesPerPackCandidate != input.PiecesPerPack);
-            var labelChanged = input.LabelAllergenIds is { } newLabels
-                && !item.LabelAllergenIds.ToHashSet(StringComparer.Ordinal).SetEquals(newLabels);
-            Track(changed, FlyerItemField.AllergenLabel, labelChanged);
+            var changed = ChangedFields(item, input);
+            var labelChanged = changed.Contains(FlyerItemField.AllergenLabel);
 
             item.Read = current with
             {
-                Name = name,
-                Maker = maker,
-                Volume = volume,
+                Name = Blank(input.Name) ?? string.Empty,
+                Maker = Blank(input.Maker),
+                Volume = Blank(input.Volume),
                 PriceIncludingTax = input.PriceIncludingTax,
                 PriceExcludingTax = input.PriceExcludingTax,
-                OrderNo = orderNo,
+                OrderNo = Blank(input.OrderNo),
                 PiecesPerPackCandidate = input.PiecesPerPack,
                 PiecesPerPackReason = current.PiecesPerPackCandidate != input.PiecesPerPack ? "職員が直しました" : current.PiecesPerPackReason,
                 SnackType = input.SnackType,
@@ -342,15 +359,13 @@ public sealed class FlyerImportApplicationService(
             };
             if (wasPiecesUnknown && current.PiecesPerPackCandidate != input.PiecesPerPack)
             {
-                // どの API から入れても、入数を入れて「使えない」から戻した行はまとめに入れない（EnterPiecesAsync と同じ）
+                // どの API から入れても、入数を入れて「使えない」から戻した行には注意を出す（EnterPiecesAsync と同じ）
                 item.IsPiecesEnteredByStaff = true;
             }
 
             if (labelChanged)
             {
                 item.LabelAllergenIds = input.LabelAllergenIds!.Distinct(StringComparer.Ordinal).ToList();
-                // 直した表記で見てもらったことにしない（D-97）
-                item.IsLabelAbsentCompared = false;
             }
 
             foreach (var field in changed)
@@ -359,10 +374,33 @@ public sealed class FlyerImportApplicationService(
                 item.ReviewNotes.RemoveAll(n => ReviewNoteMatchesField(n.Field, field));
             }
 
-            item.AcceptedReasonKeys.RemoveWhere(key => changed.Any(field => AcceptedKeyDependsOn(key, field)));
-            return Result<FlyerItemView>.Ok(BuildItemView(session, item, context, editing: NoEditing));
+            return Result<FlyerItemView>.Ok(BuildItemView(item, context));
         }
     }
+
+    /// <summary>入力のうち、今の値と違う項目（FlyerItemField の値。「直した項目」になるもの）</summary>
+    private static List<string> ChangedFields(FlyerImportItem item, FlyerItemEditInput input)
+    {
+        var current = item.Read;
+        var changed = new List<string>();
+        Track(changed, FlyerItemField.Name, !string.Equals(current.Name, Blank(input.Name) ?? string.Empty, StringComparison.Ordinal));
+        Track(changed, FlyerItemField.Maker, !string.Equals(current.Maker, Blank(input.Maker), StringComparison.Ordinal));
+        Track(changed, FlyerItemField.Volume, !string.Equals(current.Volume, Blank(input.Volume), StringComparison.Ordinal));
+        Track(changed, FlyerItemField.PriceIncludingTax, current.PriceIncludingTax != input.PriceIncludingTax);
+        Track(changed, FlyerItemField.PriceExcludingTax, current.PriceExcludingTax != input.PriceExcludingTax);
+        Track(changed, FlyerItemField.OrderNo, !string.Equals(current.OrderNo, Blank(input.OrderNo), StringComparison.Ordinal));
+        Track(changed, FlyerItemField.PiecesPerPack, current.PiecesPerPackCandidate != input.PiecesPerPack);
+        Track(changed, FlyerItemField.AllergenLabel, input.LabelAllergenIds is { } newLabels
+            && !item.LabelAllergenIds.ToHashSet(StringComparer.Ordinal).SetEquals(newLabels));
+        return changed;
+    }
+
+    /// <summary>「直した項目」に数えない値（おやつの分類・対象年齢・タグ）が変わるか</summary>
+    private static bool HasOtherChanges(FlyerReadProduct current, FlyerItemEditInput input) =>
+        current.SnackType != input.SnackType
+        || !string.Equals(current.TargetAgeLabel, Blank(input.TargetAgeLabel), StringComparison.Ordinal)
+        || (input.CharacterTags is { } characterTags && !characterTags.SequenceEqual(current.CharacterTags, StringComparer.Ordinal))
+        || (input.FlavorTags is { } flavorTags && !flavorTags.SequenceEqual(current.FlavorTags, StringComparer.Ordinal));
 
     /// <summary>
     /// 品目の分からない語に品目を選ぶ（allergenIds が空なら「対応する品目なし」。FR-IMPORT-33）。語は消さずに残し、選んだ品目を表記の品目に足す。
@@ -370,44 +408,61 @@ public sealed class FlyerImportApplicationService(
     /// </summary>
     public async Task<Result<FlyerItemView>> ResolveTermAsync(string? menuId, string? itemId, string? term, IReadOnlyList<string>? allergenIds)
     {
-        var (_, session, error) = await FindSessionAsync(menuId);
+        var (menu, session, error) = await FindSessionAsync(menuId);
         if (session is null)
         {
             return Result<FlyerItemView>.Error(error!);
         }
 
-        var context = await LoadContextAsync();
+        var context = await LoadContextAsync(menu!);
         var ids = (allergenIds ?? []).Distinct(StringComparer.Ordinal).ToList();
         if (ids.Any(id => !context.AllergenIds.Contains(id)))
         {
             return Result<FlyerItemView>.Error("アレルゲンの品目が正しくありません。画面を読み込み直してください");
         }
 
-        lock (session.SyncRoot)
+        // 「取り込みを終える」と同時に走らないようにする（終える途中の行の品目・入数を変えて、確かめた内容と取り込む内容が食い違わないように）
+        await session.WriteGate.WaitAsync();
+        try
         {
-            var (item, itemError) = FindEditableItem(session, itemId);
-            if (item is null)
+            // 待っている間に取り込みを終えたことがあるので、商品マスタを読み直す
+            context = await LoadContextAsync(menu!);
+            lock (session.SyncRoot)
             {
-                return Result<FlyerItemView>.Error(itemError!);
-            }
+                var (item, itemError) = FindEditableItem(session, itemId);
+                if (item is null)
+                {
+                    return Result<FlyerItemView>.Error(itemError!);
+                }
 
-            if (term is null || !item.UnmappedTerms.Contains(term, StringComparer.Ordinal))
-            {
-                return Result<FlyerItemView>.Error("その表記の語が見つかりません。画面を読み込み直してください");
-            }
+                if (item.Confirmation is not null)
+                {
+                    // 取り込み済みの行には、品目を決めていない語は残っていない（直すときは行を開いて表記の品目を直す）
+                    return Result<FlyerItemView>.Error("取り込み済みの商品です。品目を直すときは、行を開いてアレルゲン表記の品目を直してください");
+                }
 
-            item.ResolvedTerms[term] = ids;
-            return Result<FlyerItemView>.Ok(BuildItemView(session, item, context, editing: NoEditing));
+                if (term is null || !item.UnmappedTerms.Contains(term, StringComparer.Ordinal))
+                {
+                    return Result<FlyerItemView>.Error("その表記の語が見つかりません。画面を読み込み直してください");
+                }
+
+                item.ResolvedTerms[term] = ids;
+                return Result<FlyerItemView>.Ok(BuildItemView(item, context));
+            }
+        }
+        finally
+        {
+            session.WriteGate.Release();
         }
     }
 
     /// <summary>
     /// 「使えない（入数が分からない）」の行に入数を入れる（FR-IMPORT-11）。読み取った内容（アレルゲン表記・説明文を含む）のまま分類し直す。
-    /// 入れた行は読み取りの検証を通っていないため、まとめて確定・まとめて登録に入れない（1件ずつ確定する）。分類し直した行を返す
+    /// 入れた行は読み取りの検証を通っていないため、注意「読み取りの検証を通っていません」を出す。分類し直した行を返す
     /// </summary>
     public async Task<Result<FlyerItemView>> EnterPiecesAsync(string? menuId, string? itemId, int? piecesPerPack)
     {
-        var (_, session, error) = await FindSessionAsync(menuId);
+        var (menu, session, error) = await FindSessionAsync(menuId);
         if (session is null)
         {
             return Result<FlyerItemView>.Error(error!);
@@ -424,67 +479,45 @@ public sealed class FlyerImportApplicationService(
             return Result<FlyerItemView>.Error(validation.ErrorMessages[0]);
         }
 
-        var context = await LoadContextAsync();
-        lock (session.SyncRoot)
+        var context = await LoadContextAsync(menu!);
+        // 「取り込みを終える」と同時に走らないようにする（終える途中の行の品目・入数を変えて、確かめた内容と取り込む内容が食い違わないように）
+        await session.WriteGate.WaitAsync();
+        try
         {
-            var (item, itemError) = FindEditableItem(session, itemId);
-            if (item is null)
+            // 待っている間に取り込みを終えたことがあるので、商品マスタを読み直す
+            context = await LoadContextAsync(menu!);
+            lock (session.SyncRoot)
             {
-                return Result<FlyerItemView>.Error(itemError!);
-            }
+                var (item, itemError) = FindEditableItem(session, itemId);
+                if (item is null)
+                {
+                    return Result<FlyerItemView>.Error(itemError!);
+                }
 
-            var state = Classify(session, item, context, editing: NoEditing);
-            if (!state.Classification.Reasons.Any(r => r.Code == FlyerItemReasonCode.PiecesUnknown))
-            {
-                return Result<FlyerItemView>.Error("この商品は入数が分かっています。入数を直すときは、行を開いて直してください");
-            }
+                if (item.Confirmation is not null)
+                {
+                    return Result<FlyerItemView>.Error("取り込み済みの商品です。入数を直すときは、行を開いて直してください");
+                }
 
-            item.Read = item.Read with { PiecesPerPackCandidate = piecesPerPack, PiecesPerPackReason = "職員が入れました" };
-            item.IsPiecesEnteredByStaff = true;
-            return Result<FlyerItemView>.Ok(BuildItemView(session, item, context, editing: NoEditing));
+                var state = Classify(item, context);
+                if (!state.Classification.Reasons.Any(r => r.Code == FlyerItemReasonCode.PiecesUnknown))
+                {
+                    return Result<FlyerItemView>.Error("この商品は入数が分かっています。入数を直すときは、行を開いて直してください");
+                }
+
+                item.Read = item.Read with { PiecesPerPackCandidate = piecesPerPack, PiecesPerPackReason = "職員が入れました" };
+                item.IsPiecesEnteredByStaff = true;
+                return Result<FlyerItemView>.Ok(BuildItemView(item, context));
+            }
+        }
+        finally
+        {
+            session.WriteGate.Release();
         }
     }
 
     /// <summary>
-    /// 再入力の理由に「このままでよい」を押す（理由ごと。CanAccept の理由だけ）。取り込みのメモリにだけ持ち、記録には使わない（09 の 5.3）。
-    /// 分類し直した行を返す
-    /// </summary>
-    public async Task<Result<FlyerItemView>> AcceptReasonAsync(string? menuId, string? itemId, string? reasonKey)
-    {
-        var (_, session, error) = await FindSessionAsync(menuId);
-        if (session is null)
-        {
-            return Result<FlyerItemView>.Error(error!);
-        }
-
-        var context = await LoadContextAsync();
-        lock (session.SyncRoot)
-        {
-            var (item, itemError) = FindEditableItem(session, itemId);
-            if (item is null)
-            {
-                return Result<FlyerItemView>.Error(itemError!);
-            }
-
-            var state = Classify(session, item, context, editing: NoEditing);
-            var reason = state.Classification.Reasons.FirstOrDefault(r => r.Key == reasonKey);
-            if (reason is null)
-            {
-                return Result<FlyerItemView>.Error("その理由はもうありません。画面を読み込み直してください");
-            }
-
-            if (!reason.CanAccept)
-            {
-                return Result<FlyerItemView>.Error("この理由は「このままでよい」にできません。欄を直してください");
-            }
-
-            item.AcceptedReasonKeys.Add(reason.Key);
-            return Result<FlyerItemView>.Ok(BuildItemView(session, item, context, editing: NoEditing));
-        }
-    }
-
-    /// <summary>
-    /// 外した掲載品に移す（FR-IMPORT-21）。どの分類の商品でも外せる。確定済みの商品は、確定を取り消してから外す
+    /// 外した掲載品に移す（FR-IMPORT-21）。どの分類の商品でも外せる。取り込み済みの商品は、取り込みを取り消してから外す
     /// （掲載品の写しから除き、その取り込みで新しく登録した商品は「使わない」にする）。外した掲載品は今週の商品にも商品マスタにも入れない（FR-IMPORT-22）
     /// </summary>
     public async Task<Result> RemoveItemAsync(string? menuId, string? itemId)
@@ -495,7 +528,7 @@ public sealed class FlyerImportApplicationService(
             return Result.Error(error!);
         }
 
-        // 確定と同時に走らないようにする（確定の途中の行を取り消して、写しと商品の状態が食い違わないように）
+        // 取り込みを終えるのと同時に走らないようにする（取り込みの途中の行を取り消して、写しと商品の状態が食い違わないように）
         await session.WriteGate.WaitAsync();
         try
         {
@@ -511,8 +544,6 @@ public sealed class FlyerImportApplicationService(
     private async Task<Result> RemoveItemLockedAsync(Menu menu, FlyerImportSession session, string? itemId)
     {
         FlyerImportItem? item;
-        FlyerItemConfirmation? confirmation;
-        bool sharedListing;
         lock (session.SyncRoot)
         {
             item = session.Items.FirstOrDefault(i => i.Id == itemId);
@@ -526,11 +557,7 @@ public sealed class FlyerImportApplicationService(
                 return new Result();
             }
 
-            confirmation = item.Confirmation;
-            // 同じ商品に確定したほかの行があれば、写しの行は残す
-            sharedListing = confirmation is not null
-                && session.Items.Any(i => i != item && !i.IsRemoved && i.Confirmation?.ProductId == confirmation.ProductId);
-            if (confirmation is null)
+            if (item.Confirmation is null)
             {
                 item.IsRemoved = true;
                 item.RemovedReason = "職員が外しました";
@@ -538,10 +565,44 @@ public sealed class FlyerImportApplicationService(
             }
         }
 
+        var unconfirmError = await UnconfirmLockedAsync(menu, session, item, afterSave: removed =>
+        {
+            removed.IsRemoved = true;
+            removed.RemovedReason = "職員が外しました";
+        });
+        return unconfirmError is null ? new Result() : Result.Error(unconfirmError);
+    }
+
+    /// <summary>
+    /// 取り込み済みの行の取り込みを取り消す（WriteGate を持っている間だけ呼ぶ）。掲載品の写しから外し、この取り込みで新しく登録した商品は「使わない」にして保存する。
+    /// 保存できてから行の確定を null に戻し、afterSave を呼ぶ。エラーなら何も変えずにその文を返す
+    /// </summary>
+    private async Task<string?> UnconfirmLockedAsync(Menu menu, FlyerImportSession session, FlyerImportItem item, Action<FlyerImportItem>? afterSave)
+    {
+        FlyerItemConfirmation? confirmation;
+        bool sharedListing;
+        bool createdInSession;
+        FlyerProductOverwrite? overwrite;
+        lock (session.SyncRoot)
+        {
+            confirmation = item.Confirmation;
+            if (confirmation is null)
+            {
+                return null;
+            }
+
+            // 同じ商品に取り込んだほかの行があれば、写しの行は残す
+            sharedListing = session.Items.Any(i => i != item && !i.IsRemoved && i.Confirmation?.ProductId == confirmation.ProductId);
+            // この取り込みで新しく登録した商品か（同じ商品の後の行として取り込んだ行を、最後に取り消したときも「使わない」にするため）
+            createdInSession = confirmation.Kind == FlyerConfirmationKind.CreatedNew
+                || session.Items.Any(i => i.CreatedProductId == confirmation.ProductId);
+            overwrite = session.ProductOverwrites.GetValueOrDefault(confirmation.ProductId);
+        }
+
         var user = await _userContext.GetCurrentUserInfoAsync();
         if (user is null)
         {
-            return Result.Error("ログインが必要です。ログインし直してください");
+            return "ログインが必要です。ログインし直してください";
         }
 
         var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -550,9 +611,9 @@ public sealed class FlyerImportApplicationService(
             ListedProductsUpdater.Remove(menu, confirmation.ProductId);
         }
 
-        // ほかの行がまだこの商品で確定しているときは「使わない」にしない（写しに残る商品が候補から外れないように）
+        // ほかの行がまだこの商品で取り込んでいるときは「使わない」にしない（写しに残る商品が候補から外れないように）
         if (!sharedListing
-            && confirmation.Kind == FlyerConfirmationKind.CreatedNew
+            && createdInSession
             && await _products.GetAsync(confirmation.ProductId) is { } created)
         {
             // 新しく登録した商品は消さずに「使わない」にする（商品一覧に使われない商品が増えないように）
@@ -560,29 +621,89 @@ public sealed class FlyerImportApplicationService(
             created.UpdateDateTime = now;
             created.UpdateUserId = user.UserId;
         }
+        else if (!sharedListing
+            && overwrite is not null
+            && await _products.GetAsync(confirmation.ProductId) is { } updated
+            && RestoreOverwrittenValues(updated, overwrite))
+        {
+            // 登録済みの商品に上書きした値（価格・内容量・入数など）を、取り込む前の値に戻す（読み違いを商品一覧に残さない。FR-IMPORT-22 と同じ考え方）
+            updated.UpdateDateTime = now;
+            updated.UpdateUserId = user.UserId;
+        }
 
         Touch(menu, now, user);
         await _unitOfWork.SaveChangesAsync();
         lock (session.SyncRoot)
         {
             item.Confirmation = null;
-            item.IsRemoved = true;
-            item.RemovedReason = "職員が外しました";
+            if (!sharedListing)
+            {
+                session.ProductOverwrites.Remove(confirmation.ProductId);
+            }
+
+            afterSave?.Invoke(item);
         }
 
-        return new Result();
+        return null;
+    }
+
+    /// <summary>
+    /// 取り込みで上書きした項目のうち、まだ上書きした値のままの項目だけを、上書きする前の値に戻す（取り込みのあとに職員が商品一覧で直した値は戻さない）。
+    /// 1つでも戻したら true
+    /// </summary>
+    private static bool RestoreOverwrittenValues(Product product, FlyerProductOverwrite overwrite)
+    {
+        var (before, after) = (overwrite.Before, overwrite.After);
+        var restored = false;
+        if (before.Price != after.Price && product.Price == after.Price)
+        {
+            product.Price = before.Price;
+            restored = true;
+        }
+
+        if (before.PriceExcludingTax != after.PriceExcludingTax && product.PriceExcludingTax == after.PriceExcludingTax)
+        {
+            product.PriceExcludingTax = before.PriceExcludingTax;
+            restored = true;
+        }
+
+        if (before.OrderNo != after.OrderNo && product.OrderNo == after.OrderNo)
+        {
+            product.OrderNo = before.OrderNo;
+            restored = true;
+        }
+
+        if (before.ListedWeekStart != after.ListedWeekStart && product.ListedWeekStart == after.ListedWeekStart)
+        {
+            product.ListedWeekStart = before.ListedWeekStart;
+            restored = true;
+        }
+
+        if (before.Volume != after.Volume && product.Volume == after.Volume)
+        {
+            product.Volume = before.Volume;
+            restored = true;
+        }
+
+        if (before.PiecesPerPack != after.PiecesPerPack && product.PiecesPerPack == after.PiecesPerPack)
+        {
+            product.PiecesPerPack = before.PiecesPerPack;
+            restored = true;
+        }
+
+        return restored;
     }
 
     /// <summary>外した掲載品を一覧に戻す（FR-IMPORT-21。戻すと分類し直す）。分類し直した行を返す</summary>
     public async Task<Result<FlyerItemView>> RestoreItemAsync(string? menuId, string? itemId)
     {
-        var (_, session, error) = await FindSessionAsync(menuId);
+        var (menu, session, error) = await FindSessionAsync(menuId);
         if (session is null)
         {
             return Result<FlyerItemView>.Error(error!);
         }
 
-        var context = await LoadContextAsync();
+        var context = await LoadContextAsync(menu!);
         lock (session.SyncRoot)
         {
             var item = session.Items.FirstOrDefault(i => i.Id == itemId);
@@ -593,131 +714,11 @@ public sealed class FlyerImportApplicationService(
 
             item.IsRemoved = false;
             item.RemovedReason = null;
-            return Result<FlyerItemView>.Ok(BuildItemView(session, item, context, editing: NoEditing));
+            return Result<FlyerItemView>.Ok(BuildItemView(item, context));
         }
     }
 
-    /// <summary>
-    /// 1件を確定する（09 の 5.1）。確定の直前に分類を求め直し、使える＝一致した商品を更新、要確認＝新しい商品として登録する。
-    /// 使えない・再入力・外した掲載品・確定済みはエラー（何も保存しない）。確定と同じ保存で、食い違いの「参考」の記録も足す（09 の 3.5）
-    /// </summary>
-    public async Task<Result<FlyerConfirmResult>> ConfirmItemAsync(string? menuId, string? itemId)
-    {
-        var (menu, session, error) = await FindSessionAsync(menuId);
-        if (session is null)
-        {
-            return Result<FlyerConfirmResult>.Error(error!);
-        }
-
-        return await ConfirmCoreAsync(menu!, session, NoEditing, states =>
-        {
-            var item = session.Items.FirstOrDefault(i => i.Id == itemId);
-            if (item is null)
-            {
-                return Selection.Fail(ItemNotFound);
-            }
-
-            if (item.IsRemoved)
-            {
-                return Selection.Fail("外した掲載品は確定できません。「戻す」で一覧に戻してから確定してください");
-            }
-
-            if (item.Confirmation is not null)
-            {
-                return Selection.Fail("この商品はもう確定しています");
-            }
-
-            var state = states.First(s => s.Item == item);
-            return state.Classification.Category switch
-            {
-                FlyerItemCategory.Unusable => Selection.Fail("「使えない」の商品は確定できません（" + string.Join("／", state.Classification.Reasons.Select(r => r.Message)) + "）"),
-                FlyerItemCategory.NeedsInput => Selection.Fail("直すところがあるため確定できません（" + string.Join("／", state.Classification.Reasons.Select(r => r.Message)) + "）"),
-                _ => new Selection([state], 0, null, FailOnInvalid: true),
-            };
-        });
-    }
-
-    /// <summary>
-    /// 「使える商品をまとめて確定」（09 の 5.1・5.2）。確定の直前に分類と 5.2 の条件を求め直し、当たる「使える」の商品だけを確定する。
-    /// </summary>
-    /// <param name="menuId">献立</param>
-    /// <param name="itemIds">確かめのダイアログに並べた商品（null なら、まとめに入る「使える」の商品すべて）</param>
-    /// <param name="editingItemIds">画面で行を開いて直している途中の商品（まとめに入れない）</param>
-    /// <returns>確定した件数と確定しなかった件数（itemIds を渡したときはそのうち確定しなかった件数、null なら「使える」でまとめに入らなかった件数）</returns>
-    public async Task<Result<FlyerConfirmResult>> ConfirmAllUsableAsync(string? menuId, IReadOnlyList<string>? itemIds = null, IReadOnlyList<string>? editingItemIds = null)
-    {
-        var (menu, session, error) = await FindSessionAsync(menuId);
-        if (session is null)
-        {
-            return Result<FlyerConfirmResult>.Error(error!);
-        }
-
-        return await ConfirmCoreAsync(menu!, session, ToSet(editingItemIds), states => SelectBulk(states, FlyerItemCategory.Usable, itemIds));
-    }
-
-    /// <summary>
-    /// 「新しい商品をまとめて登録」（09 の 5.1・5.2、D-98 のダイアログ）。職員がダイアログで印を付けた商品のうち、確定の直前に分類と 5.2 の条件を
-    /// 求め直して当たる「要確認」の商品だけを、Claude の候補（直していればその値）で新しく登録する。
-    /// </summary>
-    /// <param name="menuId">献立</param>
-    /// <param name="itemIds">登録する商品（必須）</param>
-    /// <param name="editingItemIds">画面で行を開いて直している途中の商品（まとめに入れない）</param>
-    public async Task<Result<FlyerConfirmResult>> ConfirmAllNewAsync(string? menuId, IReadOnlyList<string>? itemIds, IReadOnlyList<string>? editingItemIds = null)
-    {
-        var (menu, session, error) = await FindSessionAsync(menuId);
-        if (session is null)
-        {
-            return Result<FlyerConfirmResult>.Error(error!);
-        }
-
-        if (itemIds is null || itemIds.Count == 0)
-        {
-            return Result<FlyerConfirmResult>.Error("登録する商品を選んでください");
-        }
-
-        return await ConfirmCoreAsync(menu!, session, ToSet(editingItemIds), states => SelectBulk(states, FlyerItemCategory.New, itemIds));
-    }
-
-    /// <summary>
-    /// 「表記なし」と読んだ商品を、職員がチラシで見比べたことを残す（まとめての見比べ。D-97・FR-FLYER-04a）。
-    /// 取り込みのメモリにだけ持ち、記録（allergen_checks）や確定の内容には使わない。まとめに入れてよいかの判断にだけ使う。
-    /// 見比べに並べられない商品（読み取りの検証ができなかった・確定済み・外した・表記のある商品）は飛ばす。印を付けた件数を返す
-    /// </summary>
-    public async Task<Result<int>> MarkLabelAbsentComparedAsync(string? menuId, IReadOnlyList<string>? itemIds)
-    {
-        var (_, session, error) = await FindSessionAsync(menuId);
-        if (session is null)
-        {
-            return Result<int>.Error(error!);
-        }
-
-        if (itemIds is null || itemIds.Count == 0)
-        {
-            return Result<int>.Error("見比べた商品を選んでください");
-        }
-
-        var ids = itemIds.ToHashSet(StringComparer.Ordinal);
-        var context = await LoadContextAsync();
-        var count = 0;
-        lock (session.SyncRoot)
-        {
-            foreach (var item in session.Items.Where(i => ids.Contains(i.Id) && !i.IsRemoved && i.Confirmation is null))
-            {
-                var classification = Classify(session, item, context, editing: NoEditing).Classification;
-                if (!classification.IsLabelAbsent || !classification.CanMarkLabelAbsentCompared)
-                {
-                    continue;
-                }
-
-                item.IsLabelAbsentCompared = true;
-                count++;
-            }
-        }
-
-        return Result<int>.Ok(count);
-    }
-
-    /// <summary>取り込みをやめる（確定前の結果を捨てる。確定した商品・写しはそのまま）</summary>
+    /// <summary>取り込みをやめる（確定前の結果を捨てる。取り込んだ商品・写しはそのまま）</summary>
     public Result Discard(string? menuId)
     {
         if (!string.IsNullOrEmpty(menuId))
@@ -729,16 +730,24 @@ public sealed class FlyerImportApplicationService(
     }
 
     /// <summary>
-    /// 確定の本体。分類を求め直して対象を選び（select）、確定の内容を確かめてから、DB の変更（食い違いの記録・商品の更新か登録・確定の記録・写し）を
-    /// 組み立てて1回で保存する。保存できてから取り込みのメモリを変える。
-    /// 1件の確定（FailOnInvalid）で確かめに失敗したら、何も変えずにエラーを返す（まとめての確定では、その商品を飛ばす）
+    /// 「取り込みを終える」（09 の 5.1・6。D-101）。分類をサーバーで求め直し、「取り込める」の商品をすべて1回の保存で取り込む
+    /// （新しい商品は登録、登録済みの商品は価格・税抜・注文番号・最後に載った週などを上書き、掲載品の写しにチラシの表記の原文つきで入れる）。
+    /// 使えない・再入力・外した掲載品は決して取り込まない（画面の値を信用しない。SR-10・SR-21）。
+    /// 確認済みとの食い違いの「参考」の記録（09 の 3.5）は、使えない・再入力・外した掲載品も含めて同じ保存で足す（取り込めるが0件でも。決めたこと D）。
+    /// 全部か無し：1件でも組み立てに失敗したら、何も保存せずにエラーを返す（決めたこと C）
     /// </summary>
-    private async Task<Result<FlyerConfirmResult>> ConfirmCoreAsync(Menu menu, FlyerImportSession session, IReadOnlySet<string> editing, Func<IReadOnlyList<ItemState>, Selection> select)
+    public async Task<Result<FlyerFinishResult>> FinishAsync(string? menuId)
     {
+        var (menu, session, error) = await FindSessionAsync(menuId);
+        if (session is null)
+        {
+            return Result<FlyerFinishResult>.Error(error!);
+        }
+
         await session.WriteGate.WaitAsync();
         try
         {
-            return await ConfirmCoreLockedAsync(menu, session, editing, select);
+            return await FinishLockedAsync(menu!, session);
         }
         finally
         {
@@ -746,87 +755,106 @@ public sealed class FlyerImportApplicationService(
         }
     }
 
-    /// <summary>ConfirmCoreAsync の中身（WriteGate を持っている間だけ呼ぶ）</summary>
-    private async Task<Result<FlyerConfirmResult>> ConfirmCoreLockedAsync(Menu menu, FlyerImportSession session, IReadOnlySet<string> editing, Func<IReadOnlyList<ItemState>, Selection> select)
+    /// <summary>FinishAsync の中身（WriteGate を持っている間だけ呼ぶ）</summary>
+    private async Task<Result<FlyerFinishResult>> FinishLockedAsync(Menu menu, FlyerImportSession session)
     {
         var user = await _userContext.GetCurrentUserInfoAsync();
         if (user is null)
         {
-            return Result<FlyerConfirmResult>.Error("ログインが必要です。ログインし直してください");
+            return Result<FlyerFinishResult>.Error("ログインが必要です。ログインし直してください");
         }
 
-        var context = await LoadContextAsync();
+        var context = await LoadContextAsync(menu);
         List<ItemState> states;
         List<ItemState> removedStates;
-        Selection selection;
         lock (session.SyncRoot)
         {
             states = session.Items
                 .Where(i => !i.IsRemoved && i.Confirmation is null)
-                .Select(i => Classify(session, i, context, editing))
+                .Select(i => Classify(i, context))
                 .ToList();
-            // 外した掲載品は確定の対象にしないが、確認済みとの食い違いの記録（09 の 3.5）には入れる
+            // 外した掲載品は取り込まないが、確認済みとの食い違いの記録（09 の 3.5）には入れる
             removedStates = session.Items
                 .Where(i => i.IsRemoved && i.Confirmation is null)
-                .Select(i => Classify(session, i, context, editing))
+                .Select(i => Classify(i, context))
                 .ToList();
-            selection = select(states);
         }
 
-        if (selection.Error is not null)
-        {
-            return Result<FlyerConfirmResult>.Error(selection.Error);
-        }
+        // 取り込むのは「取り込める」だけ（使えない・再入力は決して取り込まない）
+        var targets = states.Where(s => s.Classification.Category == FlyerItemCategory.Ready).ToList();
 
-        // ここで、確定の内容の確かめ（エラーを返すもの）をすべて済ませる。DB の変更はこのあとでだけ組み立てる
-        // （エラーで返したときに、追跡中の変更が残って次の保存に混ざらないように。09 の 5.2）
+        // ここで、取り込みの内容の確かめ（エラーを返すもの）をすべて済ませる。DB の変更はこのあとでだけ組み立てる
+        // （エラーで返したときに、追跡中の変更が残って次の保存に混ざらないように。全部か無し）
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var skipped = selection.SkippedCount;
         var plans = new List<ConfirmPlan>();
-        foreach (var state in selection.Targets)
+        // 同じ取り込みの中で、正規化した名前＋メーカーが同じ行（手入力の行・名前やメーカーを直した行は、二重の読み取りのまとめ（FR-IMPORT-06）を通らない）は、
+        // 1件の商品にまとめる。先の行で使う・作る商品を後の行も使い、同じ商品を2件登録しない（2件あると、パッケージで確かめた記録が片方にしか付かない）
+        var leadPlans = new Dictionary<ProductMatchKey, ConfirmPlan>();
+        foreach (var state in targets)
         {
             var (plan, planError) = await PlanConfirmAsync(state, context, now, user);
-            if (plan is not null)
+            if (plan is null)
             {
-                plans.Add(plan);
-                continue;
+                return Result<FlyerFinishResult>.Error($"「{state.Item.Read.Name}」を取り込めませんでした（{planError}）。何も保存していません");
             }
 
-            if (selection.FailOnInvalid)
+            var key = ProductMatcher.KeyOf(state.Item.Read.Name, state.Item.Read.Maker);
+            if (leadPlans.TryGetValue(key, out var lead))
             {
-                return Result<FlyerConfirmResult>.Error(planError!);
+                // 後の行：商品の値は先の行の値を使い（上書きしない）、チラシの品目は「参考」の記録で足す（和集合。確認する側に倒す）
+                plan = plan with { Kind = FlyerConfirmationKind.UpdatedExisting, Product = lead.Product, IsCreated = false, Tags = [], FollowsEarlierRow = true };
+            }
+            else if (key.NotMatchableReason is null)
+            {
+                leadPlans[key] = plan;
             }
 
-            skipped++;
+            plans.Add(plan);
         }
 
-        if (plans.Count == 0)
-        {
-            return Result<FlyerConfirmResult>.Ok(new FlyerConfirmResult(0, skipped, [], []));
-        }
+        var notListedUnusable = states.Count(s => s.Classification.Category == FlyerItemCategory.Unusable);
+        var notListedNeedsInput = states.Count(s => s.Classification.Category == FlyerItemCategory.NeedsInput);
 
         // ここから下ではエラーを返さない
-        // 1. 確認済みとの食い違いの「参考」の記録（使えない・未確定を含む、食い違いのある全商品の分。09 の 3.5）
+        // 1. 確認済みとの食い違いの「参考」の記録（使えない・再入力・取り込める、外した掲載品を含む、食い違いのある全商品の分。09 の 3.5）
         // 外した掲載品（職員が外した・Claude が食品以外とした）も、外した理由を問わず対象にする（今週使わなくても、ほかの週の写しや献立に残りうるため）
         var recorded = AddDiscrepancyRecords([.. states, .. removedStates], context, now, user);
 
-        // 2. 確定する商品
+        // 2. 取り込む商品（取り込み直しでは、最初に取り込むときだけ写しを空にする）
         var clearFirst = session.IsReimport && !session.HasConfirmedAny;
         var confirmations = new List<(FlyerImportItem Item, FlyerItemConfirmation Confirmation, string? CreatedProductId)>();
+        var overwrites = new List<(string ProductId, FlyerProductValues Before, FlyerProductValues After)>();
         foreach (var plan in plans)
         {
+            var before = FlyerProductValues.Of(plan.Product);
             var confirmation = ApplyConfirm(menu, plan, context, now, user, clearFirst);
             clearFirst = false;
             confirmations.Add((plan.State.Item, confirmation, plan.Kind == FlyerConfirmationKind.CreatedNew ? plan.Product.Id : null));
+            if (plan.Kind == FlyerConfirmationKind.UpdatedExisting && !plan.FollowsEarlierRow)
+            {
+                overwrites.Add((plan.Product.Id, before, FlyerProductValues.Of(plan.Product)));
+            }
+        }
+
+        // 3. 同じ商品（名前＋メーカーが同じ）の、今週の商品に入れなかった行（使えない・再入力）のチラシの品目も、取り込んだ商品の「参考」の記録に足す
+        // （同じ商品なのに、避ける品目を含むと読んだ行だけが 🔴 になり、取り込んだ商品にその品目が残らないことがないように。確認を増やす方向だけ）
+        var sameProductRecords = AddSameProductRecords(menu, states, leadPlans, context, now, user);
+        if (confirmations.Count == 0 && recorded.Count == 0 && sameProductRecords == 0)
+        {
+            return Result<FlyerFinishResult>.Ok(new FlyerFinishResult(0, 0, notListedUnusable, notListedNeedsInput, [], []));
         }
 
         Touch(menu, now, user);
         await _unitOfWork.SaveChangesAsync();
 
-        // 保存できてから、取り込みの状態を変える（保存に失敗したら、確定していない扱いのまま）
+        // 保存できてから、取り込みの状態を変える（保存に失敗したら、取り込んでいない扱いのまま）
         lock (session.SyncRoot)
         {
-            session.HasConfirmedAny = true;
+            if (confirmations.Count > 0)
+            {
+                session.HasConfirmedAny = true;
+            }
+
             foreach (var (item, confirmation, createdId) in confirmations)
             {
                 item.Confirmation = confirmation;
@@ -834,6 +862,14 @@ public sealed class FlyerImportApplicationService(
                 {
                     item.CreatedProductId = createdId;
                 }
+            }
+
+            // 上書きする前の値は、この取り込みで最初に上書きしたときの値を残す（取り込みを取り消したら戻す）
+            foreach (var (productId, before, after) in overwrites)
+            {
+                session.ProductOverwrites[productId] = session.ProductOverwrites.TryGetValue(productId, out var earlier)
+                    ? earlier with { After = after }
+                    : new FlyerProductOverwrite(before, after);
             }
 
             foreach (var record in recorded)
@@ -850,33 +886,35 @@ public sealed class FlyerImportApplicationService(
             .GroupBy(r => r.Product.Id, StringComparer.Ordinal)
             .Select(g => new FlyerRecordedProductView(g.Key, g.First().Product.Name, g.SelectMany(r => r.Allergens).Distinct().ToList()))
             .ToList();
-        return Result<FlyerConfirmResult>.Ok(new FlyerConfirmResult(
-            confirmations.Count,
-            skipped,
+        // 件数は商品の数で数える（同じ商品の2行目は数えない）
+        var createdIds = confirmations
+            .Where(c => c.Confirmation.Kind == FlyerConfirmationKind.CreatedNew)
+            .Select(c => c.Confirmation.ProductId)
+            .ToHashSet(StringComparer.Ordinal);
+        return Result<FlyerFinishResult>.Ok(new FlyerFinishResult(
+            createdIds.Count,
+            confirmations
+                .Where(c => c.Confirmation.Kind == FlyerConfirmationKind.UpdatedExisting && !createdIds.Contains(c.Confirmation.ProductId))
+                .Select(c => c.Confirmation.ProductId)
+                .Distinct(StringComparer.Ordinal)
+                .Count(),
+            notListedUnusable,
+            notListedNeedsInput,
             confirmations.Select(c => c.Item.Id).ToList(),
             recordedProducts));
     }
 
-    /// <summary>まとめての確定の対象を選ぶ（分類が category で、5.2 の条件に当たらないもの）</summary>
-    private static Selection SelectBulk(IReadOnlyList<ItemState> states, FlyerItemCategory category, IReadOnlyList<string>? itemIds)
-    {
-        var candidates = states.Where(s => s.Classification.Category == category).ToList();
-        if (itemIds is null)
-        {
-            var targets = candidates.Where(s => s.Classification.CanBulk).ToList();
-            return new Selection(targets, candidates.Count - targets.Count, null, FailOnInvalid: false);
-        }
-
-        var ids = itemIds.Distinct(StringComparer.Ordinal).ToList();
-        var selected = candidates.Where(s => s.Classification.CanBulk && ids.Contains(s.Item.Id)).ToList();
-        return new Selection(selected, ids.Count - selected.Count, null, FailOnInvalid: false);
-    }
-
-    /// <summary>1件の確定の内容を確かめて組み立てる（DB は変えない）。確定できなければエラーの文を返す</summary>
+    /// <summary>1件の取り込みの内容を確かめて組み立てる（DB は変えない）。取り込めなければエラーの文を返す</summary>
     private async Task<(ConfirmPlan? Plan, string? Error)> PlanConfirmAsync(ItemState state, ImportContext context, DateTime now, CurrentUserInfo user)
     {
         var read = state.Item.Read;
         var classification = state.Classification;
+        if (classification.Category != FlyerItemCategory.Ready)
+        {
+            // 呼び出し側で「取り込める」だけを渡すが、念のためここでも確かめる（使えない・再入力を取り込まない）
+            return (null, "「取り込める」の商品ではありません");
+        }
+
         if (classification.PiecesPerPack is not >= 1)
         {
             return (null, "入数（1パックで何人分か）を入れてください");
@@ -895,15 +933,15 @@ public sealed class FlyerImportApplicationService(
         var allergenInput = AllergenInputOf(state.Item, context, ignoreUnresolved: false);
         if (allergenInput.UnresolvedLabelTerms.Count > 0)
         {
-            return (null, $"対応づけできていないアレルゲンの表記（{string.Join("・", allergenInput.UnresolvedLabelTerms)}）があります。品目を選ぶか「対応する品目なし」を選んでから確定してください");
+            return (null, $"対応づけできていないアレルゲンの表記（{string.Join("・", allergenInput.UnresolvedLabelTerms)}）があります。品目を選ぶか「対応する品目なし」を選んでください");
         }
 
-        if (classification.Category == FlyerItemCategory.Usable)
+        if (!classification.IsNew)
         {
             return (new ConfirmPlan(state, FlyerConfirmationKind.UpdatedExisting, state.Product!, IsCreated: false, [], allergenInput), null);
         }
 
-        // 要確認：新しい商品として登録する項目がそろっているか
+        // 新しい商品として登録する項目がそろっているか
         if (string.IsNullOrWhiteSpace(read.Name))
         {
             return (null, "商品名を入れてください");
@@ -911,10 +949,10 @@ public sealed class FlyerImportApplicationService(
 
         if (read.SnackType is not { } snackType || !Enum.IsDefined(snackType))
         {
-            return (null, "おやつの分類を選んでください（行を開いて直してから確定してください）");
+            return (null, "おやつの分類を選んでください");
         }
 
-        // 前にこの行で新しく登録して、確定を取り消した商品があれば、それを直して使う（選び直すたびに商品が増えないように）
+        // 前にこの行で新しく登録して、取り込みを取り消した商品があれば、それを直して使う（選び直すたびに商品が増えないように）
         var reused = state.Item.CreatedProductId is { } createdId ? await _products.GetAsync(createdId) : null;
         var product = reused ?? new Product { UpdateDateTime = now };
         IReadOnlyList<ProductTag> tags = [];
@@ -938,18 +976,22 @@ public sealed class FlyerImportApplicationService(
         return (new ConfirmPlan(state, FlyerConfirmationKind.CreatedNew, product, IsCreated: reused is null, tags, allergenInput), null);
     }
 
-    /// <summary>確かめ済みの確定を DB の変更として組み立てる（保存はしない。エラーは返さない）</summary>
+    /// <summary>確かめ済みの取り込みを DB の変更として組み立てる（保存はしない。エラーは返さない）</summary>
     private FlyerItemConfirmation ApplyConfirm(Menu menu, ConfirmPlan plan, ImportContext context, DateTime now, CurrentUserInfo user, bool clearFirst)
     {
         var item = plan.State.Item;
         var read = item.Read;
         var product = plan.Product;
         var pieces = plan.State.Classification.PiecesPerPack!.Value;
-        if (plan.Kind == FlyerConfirmationKind.UpdatedExisting)
+        if (plan.FollowsEarlierRow)
         {
-            // 価格・税抜・注文番号・最後に載った週を上書きする（過去の週の取り込みでは上書きしない。FR-FLYER-07）
+            // 同じ取り込みの先の行と同じ商品：商品の値は先の行の値のまま（FR-IMPORT-06 の「先に読んだ値を使う」と同じ）
+        }
+        else if (plan.Kind == FlyerConfirmationKind.UpdatedExisting)
+        {
+            // 価格・税抜・注文番号・最後に載った週を上書きする（過去の週の取り込みでは上書きしない。読めなかった値（null）で上書きしない。FR-FLYER-07）
             var overwritten = ListedProductsUpdater.ApplyListing(product, menu.WeekStart, read.PriceIncludingTax, read.PriceExcludingTax, Blank(read.OrderNo));
-            // 再入力で確かめた内容量・入数を上書きする（FR-IMPORT-12）。おやつの分類・タグはマスタの値のまま（09 の 5.1）
+            // 内容量・入数はチラシの値で上書きする（FR-IMPORT-12。注意で知らせる）。過去の週は空のときだけ埋める。おやつの分類・タグはマスタの値のまま（09 の 5.1）
             if ((overwritten || product.Volume is null) && Blank(read.Volume) is { } volume)
             {
                 product.Volume = volume;
@@ -985,21 +1027,100 @@ public sealed class FlyerImportApplicationService(
         product.UpdateDateTime = now;
         product.UpdateUserId = user.UserId;
 
-        // チラシの品目から「参考」の記録を足すか（03 §3 の表）。食い違いの記録はもう足してあるので、ここでは重ならない
+        // チラシの品目から「参考」の記録を足すか（03 §3 の表）。表記なしは品目が空の「参考（表記なし）」で、どの品目も「含まない」にはしない。
+        // 食い違いの記録はもう足してあるので、ここでは重ならない。
+        // 同じ商品の後の行は、先の行で足した記録を見て、品目が増えたときだけ足す（有効な記録の和集合になる）
         var allergenPlan = FlyerAllergenPlanner.Plan(plan.AllergenInput, context.Allergens, context.AvoidedIds, product.AllergenChecks);
         var addReference = allergenPlan.CanConfirm && allergenPlan.ShouldAddReference();
         if (addReference)
         {
-            AddReferenceCheck(product, item, allergenPlan, context, now, user, note: null);
+            AddReferenceCheck(product, item, allergenPlan, context, now, user, note: plan.FollowsEarlierRow ? "同じ商品の別の行のチラシの表記" : null);
         }
 
-        ListedProductsUpdater.ApplyConfirmation(menu, new ListedProduct(product.Id, read.PriceIncludingTax, Blank(read.OrderNo)), clearFirst);
+        // 写しにはチラシの表記の原文を入れる（献立の確定で見比べるための表示だけ。D-101・FR-IMPORT-40）
+        var labelText = ListingLabelTextOf(item, context);
+        var listed = plan.FollowsEarlierRow ? menu.ListedProducts.FirstOrDefault(l => l.ProductId == product.Id) : null;
+        if (listed is not null)
+        {
+            // 同じ商品の後の行：価格・注文番号は先の行のまま。表記の原文は違えば書き足す（どちらの表記も見比べられるように）
+            if (listed.LabelText != labelText)
+            {
+                ListedProductsUpdater.ApplyConfirmation(
+                    menu,
+                    listed with { LabelText = string.IsNullOrEmpty(listed.LabelText) ? labelText : listed.LabelText + "／" + labelText },
+                    clearFirst: false);
+            }
+        }
+        else
+        {
+            ListedProductsUpdater.ApplyConfirmation(
+                menu,
+                new ListedProduct(product.Id, read.PriceIncludingTax, Blank(read.OrderNo), labelText),
+                clearFirst);
+        }
+
         return new FlyerItemConfirmation(plan.Kind, product.Id, product.Name, addReference);
     }
 
     /// <summary>
+    /// 同じ商品（名前＋メーカーが同じ）の、今週の商品に入れなかった行（使えない・再入力）のチラシの品目を、
+    /// 今週の商品に入っている（この保存で取り込む、または写しにある）その商品の「参考」の記録に足す（保存はしない）。足した件数を返す。
+    /// 記録がないか「参考」だけの商品で、チラシの品目が増えるときだけ足す（確認済みの商品の食い違いは 3.5 で足してある）。
+    /// 品目の分からない語が残っていても、対応づけできた品目で足す（記録は確認を増やす方向だけ）
+    /// </summary>
+    private int AddSameProductRecords(Menu menu, IReadOnlyList<ItemState> states, IReadOnlyDictionary<ProductMatchKey, ConfirmPlan> leadPlans, ImportContext context, DateTime now, CurrentUserInfo user)
+    {
+        var count = 0;
+        foreach (var state in states.Where(s => s.Classification.Category != FlyerItemCategory.Ready))
+        {
+            Product? product;
+            if (state.Product is { } matched)
+            {
+                product = menu.ListedProducts.Any(l => l.ProductId == matched.Id) ? matched : null;
+            }
+            else
+            {
+                var key = ProductMatcher.KeyOf(state.Item.Read.Name, state.Item.Read.Maker);
+                product = key.NotMatchableReason is null && leadPlans.TryGetValue(key, out var lead) ? lead.Product : null;
+            }
+
+            if (product is null)
+            {
+                continue;
+            }
+
+            var plan = FlyerAllergenPlanner.Plan(AllergenInputOf(state.Item, context, ignoreUnresolved: true), context.Allergens, context.AvoidedIds, product.AllergenChecks);
+            if (plan.Decision != FlyerReferenceDecision.Add || plan.FlyerAllergens.Count == 0)
+            {
+                continue;
+            }
+
+            AddReferenceCheck(product, state.Item, plan, context, now, user, note: "同じ商品の、今週の商品に入れなかった行のチラシの表記");
+            count++;
+        }
+
+        return count;
+    }
+
+    /// <summary>掲載品の写しに入れる表記の原文（決めたこと F。行の表示の listingLabelText も同じ）</summary>
+    private static string ListingLabelTextOf(FlyerImportItem item, ImportContext context)
+    {
+        IReadOnlyList<string>? editedNames = item.EditedFields.Contains(FlyerItemField.AllergenLabel)
+            ? item.LabelAllergenIds
+                .Concat(item.ResolvedTerms.Values.SelectMany(ids => ids))
+                .Where(context.AllergenIds.Contains)
+                .Distinct(StringComparer.Ordinal)
+                .Select(id => context.Allergens.First(a => a.Id == id))
+                .OrderBy(a => a.SortOrder)
+                .Select(a => a.Name)
+                .ToList()
+            : null;
+        return FlyerAllergenPlanner.ListingLabelText(item.Read.AllergenLabelText, item.FoundLabelTexts, editedNames);
+    }
+
+    /// <summary>
     /// 確認済みの商品とチラシの表記の食い違い（09 の 3.5）の「参考」の記録を足す（保存はしない）。
-    /// 使えない・未確定を含む、外していない未確定の全商品が対象。品目の分からない語が残っていても、対応づけできた品目で足す（記録は確認を増やす方向だけ）。
+    /// 使えない・再入力を含む、未確定の全商品（外した掲載品も）が対象。品目の分からない語が残っていても、対応づけできた品目で足す（記録は確認を増やす方向だけ）。
     /// 同じ食い違いで2回足さない（足した記録は有効な記録に入るので、足したあとは食い違いがなくなる。鍵でも確かめる）
     /// </summary>
     private List<RecordedDiscrepancy> AddDiscrepancyRecords(IReadOnlyList<ItemState> states, ImportContext context, DateTime now, CurrentUserInfo user)
@@ -1070,15 +1191,20 @@ public sealed class FlyerImportApplicationService(
     }
 
     /// <summary>1商品を分類する（照合はここで今の商品名・メーカーで行う）</summary>
-    private static ItemState Classify(FlyerImportSession session, FlyerImportItem item, ImportContext context, IReadOnlySet<string> editing)
+    private static ItemState Classify(FlyerImportItem item, ImportContext context)
     {
-        // この行で新しく登録して確定を取り消した（使わないにした）商品とは照合しない（自分が作った商品で「使えない」にならないように）
-        var products = item.CreatedProductId is { } createdId
-            ? context.Products.Where(p => !(p.Id == createdId && p.IsDisabled)).ToList()
-            : context.Products;
+        // この行で新しく登録して取り込みを取り消した（使わないにした）商品とは照合しない（自分が作った商品で「使わない」の「使えない」にならないように）。
+        // ただし、その商品の記録で避ける品目を含めば「使えない」にする（決めたこと H。パッケージで確かめた 🔴 を取りこぼさない）
+        var ownCreated = item.CreatedProductId is { } createdId
+            ? context.ProductsById.GetValueOrDefault(createdId) is { IsDisabled: true } own ? own : null
+            : null;
+        var products = ownCreated is null
+            ? context.Products
+            : context.Products.Where(p => p.Id != ownCreated.Id).ToList();
         var match = ProductMatcher.Match(item.Read.Name, item.Read.Maker, products);
         var product = match.IsMatched ? match.Product : null;
         var judgement = product is null ? null : AllergenJudge.Judge(product, context.Avoided, context.Today, context.RecheckDays);
+        var ownJudgement = ownCreated is null ? null : AllergenJudge.Judge(ownCreated, context.Avoided, context.Today, context.RecheckDays);
         var classification = FlyerItemClassifier.Classify(new FlyerClassificationInput
         {
             OriginalRead = item.OriginalRead,
@@ -1093,24 +1219,22 @@ public sealed class FlyerImportApplicationService(
                 StringComparer.Ordinal),
             ReviewNotes = item.ReviewNotes.ToList(),
             DuplicateConflicts = item.DuplicateConflicts,
-            AcceptedReasonKeys = item.AcceptedReasonKeys,
             Match = match,
             MatchedJudgement = judgement,
+            OwnCreatedJudgement = ownJudgement,
             AllAllergens = context.Allergens,
             AvoidedAllergens = context.Avoided,
             IsManual = item.IsManual,
-            ReviewFailed = session.ReviewFailed,
-            IsLabelAbsentCompared = item.IsLabelAbsentCompared,
-            IsEditing = editing.Contains(item.Id),
+            OverwritesMaster = product is null || ListedProductsUpdater.ShouldOverwriteProduct(product, context.MenuWeekStart),
         });
         return new ItemState(item, match, product, judgement, classification);
     }
 
-    private FlyerSessionView BuildSessionView(FlyerImportSession session, ImportContext context, IReadOnlySet<string> editing)
+    private FlyerSessionView BuildSessionView(FlyerImportSession session, ImportContext context)
     {
         var items = session.Items
             .Where(i => !i.IsRemoved)
-            .Select((item, index) => (View: BuildItemView(session, item, context, editing), Index: index))
+            .Select((item, index) => (View: BuildItemView(item, context), Index: index))
             .OrderBy(x => x.View.Status)
             .ThenBy(x => x.Index)
             .Select(x => x.View)
@@ -1119,9 +1243,9 @@ public sealed class FlyerImportApplicationService(
             .Where(i => i.IsRemoved)
             .Select(i => new FlyerRemovedItemView(
                 i.Id, i.Read.Name, i.Read.Maker, i.Read.Volume, i.RemovedReason ?? "外しました", i.OriginalRead.IsNonFood,
-                // 確認済みとの食い違い（確定すると参考の記録を足す。まだ足していないものだけ）
+                // 確認済みとの食い違い（取り込みを終えると参考の記録を足す。まだ足していないものだけ）
                 i.Confirmation is null
-                    ? Classify(session, i, context, editing).Classification.Discrepancies
+                    ? Classify(i, context).Classification.Discrepancies
                         .Select(d => d.Allergen.Name)
                         .Where(name => i.RecordedDiscrepancyAllergens.All(a => a.Name != name))
                         .Distinct()
@@ -1132,13 +1256,17 @@ public sealed class FlyerImportApplicationService(
         int CountOf(FlyerItemStatus status) => items.Count(v => v.Status == status);
         var counts = new FlyerCategoryCounts(
             CountOf(FlyerItemStatus.NeedsInput),
-            CountOf(FlyerItemStatus.New),
-            CountOf(FlyerItemStatus.Usable),
+            CountOf(FlyerItemStatus.Ready),
             CountOf(FlyerItemStatus.Unusable),
             CountOf(FlyerItemStatus.Confirmed),
             removed.Count);
-        var unconfirmed = counts.New + counts.Usable;
-        var notListed = new FlyerNotListedCounts(counts.Unusable + counts.NeedsInput + unconfirmed, counts.Unusable, counts.NeedsInput, unconfirmed);
+        var ready = items.Where(v => v.Status == FlyerItemStatus.Ready).ToList();
+        // 新しい商品・登録済みの商品の件数は商品の数で数える（名前＋メーカーが同じ行は、取り込みを終えると1件の商品にまとめるため）
+        var finish = new FlyerFinishSummary(
+            ready.Count,
+            ready.Where(v => v.IsNew).Select(v => ProductMatcher.KeyOf(v.Read.Name, v.Read.Maker)).Distinct().Count(),
+            ready.Where(v => !v.IsNew).Select(v => v.MatchedProduct?.Id).Distinct().Count());
+        var notListed = new FlyerNotListedCounts(counts.Unusable + counts.NeedsInput, counts.Unusable, counts.NeedsInput);
 
         return new FlyerSessionView(
             session.Id,
@@ -1148,38 +1276,12 @@ public sealed class FlyerImportApplicationService(
             items,
             removed,
             counts,
-            BulkSummary(items, FlyerItemStatus.Usable),
-            BulkSummary(items, FlyerItemStatus.New),
+            finish,
             notListed,
-            counts.NeedsInput + counts.New + counts.Usable + counts.Unusable);
+            counts.NeedsInput + counts.Ready + counts.Unusable);
     }
 
-    private static FlyerBulkSummary BulkSummary(IReadOnlyList<FlyerItemView> items, FlyerItemStatus status)
-    {
-        var candidates = items.Where(v => v.Status == status).ToList();
-        var targets = candidates.Where(v => v.CanBulk).Select(v => v.Id).ToList();
-        var exclusions = candidates
-            .SelectMany(v => v.BulkExclusions)
-            .GroupBy(e => e)
-            .OrderBy(g => g.Key)
-            .Select(g => new FlyerBulkExclusionCount(g.Key, BulkExclusionMessage(g.Key), g.Count()))
-            .ToList();
-        return new FlyerBulkSummary(targets.Count, targets, candidates.Count - targets.Count, exclusions);
-    }
-
-    /// <summary>まとめに入らない理由の文（09 の 5.2）</summary>
-    public static string BulkExclusionMessage(FlyerBulkExclusion exclusion) => exclusion switch
-    {
-        FlyerBulkExclusion.LabelAbsentNotCompared => "アレルゲンの表記なしと読み、まだチラシと見比べていない商品",
-        FlyerBulkExclusion.Manual => "手で入力した商品",
-        FlyerBulkExclusion.PiecesEnteredByStaff => "入数を入れて戻した商品（読み取りの検証を通っていません）",
-        FlyerBulkExclusion.ReviewFailed => "読み取りの検証ができなかった取り込みの商品",
-        FlyerBulkExclusion.Editing => "行を開いて直している途中の商品",
-        FlyerBulkExclusion.MissingNewProductFields => "おやつの分類か入数の候補がない商品",
-        _ => exclusion.ToString(),
-    };
-
-    private FlyerItemView BuildItemView(FlyerImportSession session, FlyerImportItem item, ImportContext context, IReadOnlySet<string> editing)
+    private FlyerItemView BuildItemView(FlyerImportItem item, ImportContext context)
     {
         var labelAllergens = item.LabelAllergenIds
             .Where(context.AllergenIds.Contains)
@@ -1193,14 +1295,21 @@ public sealed class FlyerImportApplicationService(
             .Select(h => h.MatchedText)
             .Distinct(StringComparer.Ordinal)
             .ToList();
+        var listingLabelText = ListingLabelTextOf(item, context);
 
         if (item.Confirmation is { } confirmation)
         {
             var confirmed = context.ProductsById.GetValueOrDefault(confirmation.ProductId);
+            var labelIds = item.LabelAllergenIds
+                .Concat(item.ResolvedTerms.Values.SelectMany(ids => ids))
+                .Where(context.AllergenIds.Contains)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
             return new FlyerItemView(
                 item.Id,
                 FlyerItemStatus.Confirmed,
                 null,
+                confirmation.Kind == FlyerConfirmationKind.CreatedNew,
                 item.IsManual,
                 item.IsPiecesEnteredByStaff,
                 item.Read,
@@ -1217,33 +1326,31 @@ public sealed class FlyerImportApplicationService(
                 [],
                 [],
                 item.RecordedDiscrepancyAllergens.ToList(),
-                false,
-                false,
-                item.IsLabelAbsentCompared,
+                FlyerItemClassifier.IsLabelAbsent(labelIds, []),
+                listingLabelText,
                 confirmed is null ? null : MatchedView(confirmed, context),
                 0,
                 null,
                 confirmed?.PiecesPerPack ?? item.Read.PiecesPerPackCandidate,
                 item.DuplicateConflicts,
                 Math.Max(1, item.SourceIndexes.Count),
-                false,
-                [],
                 item.Confirmation);
         }
 
-        var state = Classify(session, item, context, editing);
+        var state = Classify(item, context);
         var classification = state.Classification;
         return new FlyerItemView(
             item.Id,
             StatusOf(classification.Category),
             classification.Category,
+            classification.IsNew,
             item.IsManual,
             item.IsPiecesEnteredByStaff,
             item.Read,
             item.OriginalRead,
             item.EditedFields.Order(StringComparer.Ordinal).ToList(),
             classification.Reasons,
-            classification.Notices,
+            classification.Notes,
             labelAllergens,
             item.AbbreviationHits,
             item.UnmappedTerms,
@@ -1254,16 +1361,13 @@ public sealed class FlyerImportApplicationService(
             classification.Discrepancies,
             item.RecordedDiscrepancyAllergens.ToList(),
             classification.IsLabelAbsent,
-            classification.CanMarkLabelAbsentCompared,
-            item.IsLabelAbsentCompared,
+            listingLabelText,
             state.Product is null ? null : MatchedView(state.Product, context, state.Judgement),
             state.Match.OtherMatches.Count,
             state.Match.NotMatchableReason,
             classification.PiecesPerPack,
             item.DuplicateConflicts,
             Math.Max(1, item.SourceIndexes.Count),
-            classification.CanBulk,
-            classification.BulkExclusions,
             null);
     }
 
@@ -1284,8 +1388,7 @@ public sealed class FlyerImportApplicationService(
     private static FlyerItemStatus StatusOf(FlyerItemCategory category) => category switch
     {
         FlyerItemCategory.NeedsInput => FlyerItemStatus.NeedsInput,
-        FlyerItemCategory.New => FlyerItemStatus.New,
-        FlyerItemCategory.Usable => FlyerItemStatus.Usable,
+        FlyerItemCategory.Ready => FlyerItemStatus.Ready,
         _ => FlyerItemStatus.Unusable,
     };
 
@@ -1320,6 +1423,27 @@ public sealed class FlyerImportApplicationService(
 
         return itemsByIndex;
     }
+
+    /// <summary>
+    /// Claude の読み取りのうち、商品に登録できない値を整える（Claude の出力は信用しない）。
+    /// 税抜価格が1未満なら読めなかった扱い（null）にし、空のタグと選べる語にない味・種類のタグを除く。
+    /// アレルゲン表記・説明文・商品名は変えない（探す言葉の当たりを消さない）
+    /// </summary>
+    private static FlyerReadProduct TidyRead(FlyerReadProduct read) => read with
+    {
+        PriceExcludingTax = read.PriceExcludingTax is >= 1 ? read.PriceExcludingTax : null,
+        CharacterTags = read.CharacterTags
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList(),
+        FlavorTags = read.FlavorTags
+            .Where(t => t is not null)
+            .Select(t => t.Trim())
+            .Where(ProductTagVocabulary.IsFlavor)
+            .Distinct(StringComparer.Ordinal)
+            .ToList(),
+    };
 
     /// <summary>読み取った1商品を、取り込みの商品にする（アレルゲン表記はアプリでもう一度対応づけ、略記を補正する）</summary>
     private static FlyerImportItem BuildItem(FlyerReadProduct read, IReadOnlyList<Allergen> allergens, bool isManual, IReadOnlyList<int> sourceIndexes, IReadOnlyList<FlyerDuplicateConflict> conflicts)
@@ -1395,6 +1519,12 @@ public sealed class FlyerImportApplicationService(
             }
 
             var parsed = FlyerAllergenPlanner.ParseLabel(missed.LabelText, allergens);
+            // 見つけた表記の原文は、掲載品の写しの表記に書き添える（決めたこと F）
+            if (!string.IsNullOrWhiteSpace(missed.LabelText) && !item.FoundLabelTexts.Contains(missed.LabelText.Trim(), StringComparer.Ordinal))
+            {
+                item.FoundLabelTexts.Add(missed.LabelText.Trim());
+            }
+
             foreach (var allergen in parsed.Allergens.Where(a => !item.LabelAllergenIds.Contains(a.Id)))
             {
                 item.LabelAllergenIds.Add(allergen.Id);
@@ -1440,22 +1570,6 @@ public sealed class FlyerImportApplicationService(
         _ => false,
     };
 
-    /// <summary>「このままでよい」を押した理由が、直した欄に関わるか（直したら押し直してもらう）</summary>
-    private static bool AcceptedKeyDependsOn(string key, string field)
-    {
-        var code = key.Split(':')[0];
-        return code switch
-        {
-            nameof(FlyerItemReasonCode.TaxMismatch) => field is FlyerItemField.PriceIncludingTax or FlyerItemField.PriceExcludingTax,
-            nameof(FlyerItemReasonCode.PiecesMismatch) => field is FlyerItemField.PiecesPerPack or FlyerItemField.Volume,
-            // 商品名・メーカーを直すと一致する商品が変わることがある
-            nameof(FlyerItemReasonCode.MasterVolumeOrPiecesChanged) => field is FlyerItemField.PiecesPerPack or FlyerItemField.Volume or FlyerItemField.Name or FlyerItemField.Maker,
-            nameof(FlyerItemReasonCode.LabelAbsentButMasterContains) => field is FlyerItemField.AllergenLabel or FlyerItemField.Name or FlyerItemField.Maker,
-            nameof(FlyerItemReasonCode.DuplicateConflict) => key == $"{nameof(FlyerItemReasonCode.DuplicateConflict)}:{field}",
-            _ => false,
-        };
-    }
-
     private static void Track(List<string> changed, string field, bool isChanged)
     {
         if (isChanged)
@@ -1471,7 +1585,7 @@ public sealed class FlyerImportApplicationService(
         return menu is null || session is null ? (menu, null, SessionNotFound) : (menu, session, null);
     }
 
-    /// <summary>直せる商品を探す（外した掲載品・確定済みは直さない）</summary>
+    /// <summary>直せる商品を探す（外した掲載品は直さない。取り込み済みの行は直せる。決めたこと B）</summary>
     private static (FlyerImportItem? Item, string? Error) FindEditableItem(FlyerImportSession session, string? itemId)
     {
         var item = session.Items.FirstOrDefault(i => i.Id == itemId);
@@ -1485,21 +1599,16 @@ public sealed class FlyerImportApplicationService(
             return (null, "外した掲載品は直せません。「戻す」で一覧に戻してから直してください");
         }
 
-        if (item.Confirmation is not null)
-        {
-            return (null, "確定済みの商品は直せません。選び直すときは「外す」で確定を取り消し、「戻す」で一覧に戻してください");
-        }
-
         return (item, null);
     }
 
-    private async Task<ImportContext> LoadContextAsync()
+    private async Task<ImportContext> LoadContextAsync(Menu menu)
     {
         var allergens = await _settings.GetAllergensAsync();
         var avoided = await _settings.GetAvoidedAllergensAsync();
         var setting = await _settings.GetSettingAsync();
         var products = await _products.GetAllAsync();
-        return new ImportContext(allergens, avoided, products, JapanDate.Today(_timeProvider), setting.RecheckDays);
+        return new ImportContext(allergens, avoided, products, JapanDate.Today(_timeProvider), setting.RecheckDays, menu.WeekStart);
     }
 
     private static Result ValidateValues(int? piecesPerPack, int? priceIncludingTax, int? priceExcludingTax, SnackType? snackType)
@@ -1540,8 +1649,6 @@ public sealed class FlyerImportApplicationService(
         return tags.HasError ? tags.ErrorMessages[0] : null;
     }
 
-    private static IReadOnlySet<string> ToSet(IReadOnlyList<string>? ids) => (ids ?? []).ToHashSet(StringComparer.Ordinal);
-
     private static void Touch(Menu menu, DateTime now, CurrentUserInfo user)
     {
         // 献立の行を必ず更新して row_version を進める（D-46）
@@ -1551,8 +1658,8 @@ public sealed class FlyerImportApplicationService(
 
     private static string? Blank(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
-    /// <summary>表示・確定に使うマスタと今日</summary>
-    private sealed class ImportContext(IReadOnlyList<Allergen> allergens, IReadOnlyList<Allergen> avoided, IReadOnlyList<Product> products, DateOnly today, int recheckDays)
+    /// <summary>表示・取り込みに使うマスタと今日・献立の週</summary>
+    private sealed class ImportContext(IReadOnlyList<Allergen> allergens, IReadOnlyList<Allergen> avoided, IReadOnlyList<Product> products, DateOnly today, int recheckDays, DateOnly menuWeekStart)
     {
         public IReadOnlyList<Allergen> Allergens { get; } = allergens;
 
@@ -1570,20 +1677,20 @@ public sealed class FlyerImportApplicationService(
 
         public int RecheckDays { get; } = recheckDays;
 
+        /// <summary>献立の週（一致した商品を上書きする週か。ListedProductsUpdater.ShouldOverwriteProduct）</summary>
+        public DateOnly MenuWeekStart { get; } = menuWeekStart;
+
         public string AllergenName(string id) => Allergens.FirstOrDefault(a => a.Id == id)?.Name ?? id;
     }
 
     /// <summary>1商品の分類（照合の結果と一致した商品の判定つき）</summary>
     private sealed record ItemState(FlyerImportItem Item, ProductMatch Match, Product? Product, AllergenJudgement? Judgement, FlyerItemClassification Classification);
 
-    /// <summary>確定の対象（FailOnInvalid：確かめに失敗したらエラーにする＝1件の確定）</summary>
-    private sealed record Selection(IReadOnlyList<ItemState> Targets, int SkippedCount, string? Error, bool FailOnInvalid)
-    {
-        public static Selection Fail(string error) => new([], 0, error, FailOnInvalid: true);
-    }
-
-    /// <summary>確かめ済みの1件の確定の内容</summary>
-    private sealed record ConfirmPlan(ItemState State, FlyerConfirmationKind Kind, Product Product, bool IsCreated, IReadOnlyList<ProductTag> Tags, FlyerAllergenInput AllergenInput);
+    /// <summary>
+    /// 確かめ済みの1件の取り込みの内容。FollowsEarlierRow は、同じ取り込みの先の行と名前＋メーカーが同じで、先の行の商品を使う行
+    /// （商品の値は上書きせず、チラシの品目の「参考」の記録と写しの表記の原文だけを足す）
+    /// </summary>
+    private sealed record ConfirmPlan(ItemState State, FlyerConfirmationKind Kind, Product Product, bool IsCreated, IReadOnlyList<ProductTag> Tags, FlyerAllergenInput AllergenInput, bool FollowsEarlierRow = false);
 
     /// <summary>食い違いで足した記録</summary>
     private sealed record RecordedDiscrepancy(FlyerImportItem Item, Product Product, string Key, IReadOnlyList<AllergenRef> Allergens);
@@ -1639,15 +1746,14 @@ public sealed record FlyerImportView(BackgroundJobStatus? Job, FlyerSessionView?
 /// </summary>
 /// <param name="Id">取り込みの ID</param>
 /// <param name="IsReimport">取り込み直しか</param>
-/// <param name="ReviewFailed">読み取りの検証ができなかったか</param>
+/// <param name="ReviewFailed">読み取りの検証ができなかったか（一覧の上に知らせるだけ）</param>
 /// <param name="MissedProducts">読み落とした商品の指摘</param>
-/// <param name="Items">一覧の商品（再入力 → 要確認 → 使える → 使えない → 確定済み の順。同じ分類の中は読み取りの順）</param>
+/// <param name="Items">一覧の商品（再入力 → 取り込める → 使えない → 確定済み の順。同じ分類の中は読み取りの順）</param>
 /// <param name="RemovedItems">外した掲載品（FR-IMPORT-20・21）</param>
 /// <param name="Counts">分類ごとの件数（タブ）</param>
-/// <param name="BulkUsable">「使える商品をまとめて確定」の対象と、入らない件数・理由</param>
-/// <param name="BulkNew">「新しい商品をまとめて登録」の対象と、入らない件数・理由</param>
+/// <param name="Finish">「取り込みを終える」で取り込む件数と内訳</param>
 /// <param name="NotListed">今週の商品に入らない件数（FR-FLYER-06b）</param>
-/// <param name="UnconfirmedCount">まだ確定していない件数（外した掲載品を除く）</param>
+/// <param name="UnconfirmedCount">まだ取り込んでいない件数（取り込み済み・外した掲載品を除く）</param>
 public sealed record FlyerSessionView(
     string Id,
     bool IsReimport,
@@ -1656,8 +1762,7 @@ public sealed record FlyerSessionView(
     IReadOnlyList<FlyerItemView> Items,
     IReadOnlyList<FlyerRemovedItemView> RemovedItems,
     FlyerCategoryCounts Counts,
-    FlyerBulkSummary BulkUsable,
-    FlyerBulkSummary BulkNew,
+    FlyerFinishSummary Finish,
     FlyerNotListedCounts NotListed,
     int UnconfirmedCount);
 
@@ -1667,16 +1772,13 @@ public enum FlyerItemStatus
     /// <summary>🟠 再入力</summary>
     NeedsInput,
 
-    /// <summary>🔵 要確認（新しい商品）</summary>
-    New,
-
-    /// <summary>🟢 使える</summary>
-    Usable,
+    /// <summary>🟢 取り込める</summary>
+    Ready,
 
     /// <summary>🔴 使えない</summary>
     Unusable,
 
-    /// <summary>確定済み</summary>
+    /// <summary>確定済み（取り込み済み）</summary>
     Confirmed,
 }
 
@@ -1686,13 +1788,14 @@ public enum FlyerItemStatus
 /// <param name="Id">ID</param>
 /// <param name="Status">一覧の状態（確定済みを含む）</param>
 /// <param name="Category">取り込みの分類（確定済みなら null）</param>
+/// <param name="IsNew">新しい商品の印（未確定：一致する商品がない。確定済み：新しい商品として登録した）</param>
 /// <param name="IsManual">手入力した商品か</param>
 /// <param name="IsPiecesEnteredByStaff">「使えない（入数が分からない）」に職員が入数を入れたか</param>
 /// <param name="Read">今の値（直した値を反映したもの）</param>
 /// <param name="OriginalRead">Claude が読んだまま（二重の読み取りをまとめたあと）</param>
 /// <param name="EditedFields">職員が直した項目（FlyerItemField の値）</param>
 /// <param name="Reasons">使えない・再入力の理由（アレルゲンに関わる理由が先）</param>
-/// <param name="Notices">知らせるだけのこと（確認済みとの食い違い）</param>
+/// <param name="Notes">注意（分類は変えない。アレルゲンに関わるものが先。09 の 3.8）</param>
 /// <param name="LabelAllergens">今の表記の品目</param>
 /// <param name="AbbreviationHits">略記で当てた語と品目（「麦→小麦」）</param>
 /// <param name="UnmappedTerms">品目に対応づけできなかった表記の語（選んだ語も残る）</param>
@@ -1700,31 +1803,29 @@ public enum FlyerItemStatus
 /// <param name="UnresolvedTerms">まだ品目を選んでいない語</param>
 /// <param name="DescriptionHitWords">説明文で当たった避ける品目の探す言葉</param>
 /// <param name="FlyerAllergens">チラシの品目（参考の記録に入る品目）</param>
-/// <param name="Discrepancies">確認済みとの食い違い（09 の 3.5。確定すると参考の記録を足す）</param>
-/// <param name="RecordedDiscrepancyAllergens">食い違いで「参考」の記録を足した品目（確定したあとに「記録を足しました」と知らせる）</param>
-/// <param name="IsLabelAbsent">表記なしと読んだか</param>
-/// <param name="CanMarkLabelAbsentCompared">表記なしのまとめての見比べに並べてよいか</param>
-/// <param name="IsLabelAbsentCompared">見比べの印を付けたか</param>
-/// <param name="MatchedProduct">一致した商品（確定済みなら確定に使った商品）</param>
+/// <param name="Discrepancies">確認済みとの食い違い（09 の 3.5。取り込みを終えると参考の記録を足す）</param>
+/// <param name="RecordedDiscrepancyAllergens">食い違いで「参考」の記録を足した品目（「記録を足しました」と知らせる）</param>
+/// <param name="IsLabelAbsent">アレルゲンの表記がないか（表記の品目も品目の分からない語もない。決めたこと E）</param>
+/// <param name="ListingLabelText">取り込みを終えると掲載品の写しに入る表記の原文（献立の確定で見比べる表記。決めたこと F）</param>
+/// <param name="MatchedProduct">一致した商品（確定済みなら取り込みに使った商品）</param>
 /// <param name="OtherMatchCount">ほかに同じ名前（名前＋メーカー）の商品が何件あるか（FR-IMPORT-04）</param>
 /// <param name="NotMatchableReason">照合できない理由（商品名かメーカーが空）</param>
 /// <param name="PiecesPerPack">使う入数（読み取りの候補、なければ一致した商品の入数）</param>
 /// <param name="DuplicateConflicts">二重の読み取りで食い違った値</param>
 /// <param name="SourceCount">まとめた読み取りの数（1なら二重でない）</param>
-/// <param name="CanBulk">まとめて確定・まとめて登録に入るか</param>
-/// <param name="BulkExclusions">まとめに入らない理由（使える・要確認のときだけ）</param>
-/// <param name="Confirmation">確定した内容（未確定なら null）</param>
+/// <param name="Confirmation">取り込んだ内容（未確定なら null）</param>
 public sealed record FlyerItemView(
     string Id,
     FlyerItemStatus Status,
     FlyerItemCategory? Category,
+    bool IsNew,
     bool IsManual,
     bool IsPiecesEnteredByStaff,
     FlyerReadProduct Read,
     FlyerReadProduct OriginalRead,
     IReadOnlyList<string> EditedFields,
     IReadOnlyList<FlyerItemReason> Reasons,
-    IReadOnlyList<FlyerItemReason> Notices,
+    IReadOnlyList<FlyerItemReason> Notes,
     IReadOnlyList<AllergenRef> LabelAllergens,
     IReadOnlyList<FlyerAbbreviationHit> AbbreviationHits,
     IReadOnlyList<string> UnmappedTerms,
@@ -1735,16 +1836,13 @@ public sealed record FlyerItemView(
     IReadOnlyList<FlyerAllergenDiscrepancy> Discrepancies,
     IReadOnlyList<AllergenRef> RecordedDiscrepancyAllergens,
     bool IsLabelAbsent,
-    bool CanMarkLabelAbsentCompared,
-    bool IsLabelAbsentCompared,
+    string ListingLabelText,
     FlyerMatchedProductView? MatchedProduct,
     int OtherMatchCount,
     ProductNotMatchableReason? NotMatchableReason,
     int? PiecesPerPack,
     IReadOnlyList<FlyerDuplicateConflict> DuplicateConflicts,
     int SourceCount,
-    bool CanBulk,
-    IReadOnlyList<FlyerBulkExclusion> BulkExclusions,
     FlyerItemConfirmation? Confirmation);
 
 /// <summary>職員が品目を選んだ語（Allergens が空なら「対応する品目なし」）</summary>
@@ -1772,29 +1870,34 @@ public sealed record FlyerMatchedProductView(
     AllergenJudgementView Judgement);
 
 /// <summary>外した掲載品（商品名と理由。IsNonFood は Claude が食品以外とした商品）</summary>
-/// <param name="DiscrepancyAllergens">確認済みの商品との食い違いの品目の名前（次の確定で「参考」の記録を足す。09 の 3.5）</param>
+/// <param name="DiscrepancyAllergens">確認済みの商品との食い違いの品目の名前（取り込みを終えると「参考」の記録を足す。09 の 3.5）</param>
 public sealed record FlyerRemovedItemView(string Id, string Name, string? Maker, string? Volume, string Reason, bool IsNonFood, IReadOnlyList<string> DiscrepancyAllergens);
 
 /// <summary>分類ごとの件数</summary>
-public sealed record FlyerCategoryCounts(int NeedsInput, int New, int Usable, int Unusable, int Confirmed, int Removed);
+public sealed record FlyerCategoryCounts(int NeedsInput, int Ready, int Unusable, int Confirmed, int Removed);
 
-/// <summary>まとめての確定・登録の対象（Count・ItemIds）と、その分類でまとめに入らない件数と理由（09 の 5.2）</summary>
-public sealed record FlyerBulkSummary(int Count, IReadOnlyList<string> ItemIds, int ExcludedCount, IReadOnlyList<FlyerBulkExclusionCount> Exclusions);
+/// <summary>「取り込みを終える」で取り込む件数（ReadyCount ＝ 取り込める。NewCount ＝ そのうち新しい商品、ExistingCount ＝ 登録済みの商品）</summary>
+public sealed record FlyerFinishSummary(int ReadyCount, int NewCount, int ExistingCount);
 
-/// <summary>まとめに入らない理由ごとの件数（1商品が複数の理由に数えられることがある）</summary>
-public sealed record FlyerBulkExclusionCount(FlyerBulkExclusion Exclusion, string Message, int Count);
-
-/// <summary>今週の商品に入らない件数（Total ＝ 使えない ＋ 再入力 ＋ まだ確定していない。外した掲載品は数えない）</summary>
-public sealed record FlyerNotListedCounts(int Total, int Unusable, int NeedsInput, int Unconfirmed);
+/// <summary>今週の商品に入らない件数（Total ＝ 使えない ＋ 再入力。外した掲載品は数えない）</summary>
+public sealed record FlyerNotListedCounts(int Total, int Unusable, int NeedsInput);
 
 /// <summary>
-/// 確定の結果。
+/// 「取り込みを終える」の結果。
 /// </summary>
-/// <param name="ConfirmedCount">確定した件数</param>
-/// <param name="SkippedCount">確定しなかった件数（まとめての確定で、条件から外れた・見つからない商品）</param>
-/// <param name="ConfirmedItemIds">確定した取り込みの商品</param>
+/// <param name="CreatedCount">新しく登録した件数</param>
+/// <param name="UpdatedCount">登録済みの商品を上書きした件数</param>
+/// <param name="NotListedUnusableCount">使えない（今週の商品に入らない）件数</param>
+/// <param name="NotListedNeedsInputCount">再入力（今週の商品に入らない）件数</param>
+/// <param name="ConfirmedItemIds">取り込んだ取り込みの商品</param>
 /// <param name="RecordedProducts">確認済みとの食い違いで「参考」の記録を足した商品（09 の 3.5）</param>
-public sealed record FlyerConfirmResult(int ConfirmedCount, int SkippedCount, IReadOnlyList<string> ConfirmedItemIds, IReadOnlyList<FlyerRecordedProductView> RecordedProducts);
+public sealed record FlyerFinishResult(
+    int CreatedCount,
+    int UpdatedCount,
+    int NotListedUnusableCount,
+    int NotListedNeedsInputCount,
+    IReadOnlyList<string> ConfirmedItemIds,
+    IReadOnlyList<FlyerRecordedProductView> RecordedProducts);
 
 /// <summary>「参考」の記録を足した商品と、食い違った品目</summary>
 public sealed record FlyerRecordedProductView(string ProductId, string ProductName, IReadOnlyList<AllergenRef> Allergens);

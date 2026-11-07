@@ -68,6 +68,70 @@ public class MenuApplicationServiceTests
     }
 
     [Fact]
+    public async Task D_101_確定のチェックに_今週のチラシの表記の原文を付け_確定の条件と判定は変えない()
+    {
+        var (data, menu, item) = WarningMenu();
+        var (service, _) = Create(data);
+
+        // D-101 より前の写し（表記の原文が null）は null のまま（画面では表記の行を出さない）
+        var unlabeled = (await service.GetConfirmationAsync(menu.Id)).Value!;
+        var oldAck = Assert.Single(unlabeled.Acknowledgements);
+        Assert.Null(oldAck.FlyerLabelText);
+
+        var listed = menu.ListedProducts.Single(l => l.ProductId == item.ProductId);
+        menu.ListedProducts[menu.ListedProducts.IndexOf(listed)] = listed with { LabelText = "表記なし" };
+        var labeled = (await service.GetConfirmationAsync(menu.Id)).Value!;
+
+        var ack = Assert.Single(labeled.Acknowledgements);
+        Assert.Equal("表記なし", ack.FlyerLabelText);
+        // 表記の原文は表示だけ。確定の条件・判定・指紋は変えない（FR-IMPORT-42）
+        Assert.Equal(unlabeled.CanConfirm, labeled.CanConfirm);
+        Assert.Equal(oldAck.Judgement.Kind, ack.Judgement.Kind);
+        Assert.Equal(oldAck.Fingerprint, ack.Fingerprint);
+        // 表記の原文があっても、チェックなしでは確定できない（SR-04）
+        Assert.True((await service.ConfirmAsync(menu.Id, [], null)).HasError);
+
+        var result = await service.ConfirmAsync(menu.Id, [new AcknowledgementInput(item.Id, oldAck.Judgement.Kind, oldAck.Fingerprint)], null);
+        Assert.False(result.HasError, string.Join(",", result.ErrorMessages));
+        Assert.Equal(MenuStatus.Confirmed, menu.Status);
+    }
+
+    [Fact]
+    public async Task D_101_確定のチェックには_同じ週の写しの表記だけを付ける()
+    {
+        var (data, menu, item) = WarningMenu();
+        var listed = menu.ListedProducts.Single(l => l.ProductId == item.ProductId);
+        menu.ListedProducts[menu.ListedProducts.IndexOf(listed)] = listed with { LabelText = "乳・小麦" };
+        var other = NewMenu(20000, 50);
+        other.ListedProducts.Add(listed with { LabelText = "表記なし" });
+        data.Menus.Add(other);
+        var (service, _) = Create(data);
+
+        var ack = Assert.Single((await service.GetConfirmationAsync(menu.Id)).Value!.Acknowledgements);
+
+        Assert.Equal("乳・小麦", ack.FlyerLabelText);
+    }
+
+    [Fact]
+    public async Task D_101_献立の品の表示にも_確認し直しのチェックで出す同じ週の写しの表記の原文を付ける()
+    {
+        var (data, menu, item) = WarningMenu();
+        var listed = menu.ListedProducts.Single(l => l.ProductId == item.ProductId);
+        var (service, _) = Create(data);
+
+        var before = (await service.GetAsync(menu.Id)).Value!.Days.SelectMany(d => d.Items).Single(i => i.Id == item.Id);
+        Assert.Null(before.FlyerLabelText);
+
+        menu.ListedProducts[menu.ListedProducts.IndexOf(listed)] = listed with { LabelText = "表記なし" };
+        var after = (await service.GetAsync(menu.Id)).Value!.Days.SelectMany(d => d.Items).Single(i => i.Id == item.Id);
+
+        Assert.Equal("表記なし", after.FlyerLabelText);
+        // 表示だけ。指紋・判定は変えない（FR-IMPORT-42）
+        Assert.Equal(before.JudgementFingerprint, after.JudgementFingerprint);
+        Assert.Equal(before.Judgement!.Kind, after.Judgement!.Kind);
+    }
+
+    [Fact]
     public async Task SR_22_画面で読んだ判定と今の判定が違えば_確認済みにしない()
     {
         var (data, menu, item) = WarningMenu();

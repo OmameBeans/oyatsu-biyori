@@ -19,7 +19,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import TuneIcon from '@mui/icons-material/Tune';
 import { useSnackbar } from 'notistack';
-import { AllergenCategoryMark, AllergenJudgementLine, acknowledgementSentence } from '../../../entities/allergen-judgement';
+import { AllergenCategoryMark, AllergenJudgementLine, acknowledgementSentence, FlyerLabelNote } from '../../../entities/allergen-judgement';
 import {
     dropTargetSx,
     endMenuDrag,
@@ -345,6 +345,8 @@ const ItemRow = ({ menu, day, item, issues, candidates, isBusy, isExpanded, onTo
                         >
                             ☐ {acknowledgementSentence(item.judgement)}
                         </Button>
+                        {/* 確定のときと同じく、今週のチラシの表記の原文を添える（09 の 5.4） */}
+                        <FlyerLabelNote labelText={item.flyerLabelText} />
                     </Stack>
                 )}
                 {otherIssues.map((issue) => (

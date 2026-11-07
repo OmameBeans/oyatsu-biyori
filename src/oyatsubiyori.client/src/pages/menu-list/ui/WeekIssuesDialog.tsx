@@ -15,7 +15,7 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useSnackbar } from 'notistack';
-import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine, ISSUE_GUIDE, needsPackageCheck } from '../../../entities/allergen-judgement';
+import { acknowledgementSentence, AllergenCategoryMark, AllergenJudgementLine, FlyerLabelNote, ISSUE_GUIDE, needsPackageCheck } from '../../../entities/allergen-judgement';
 import { useAcknowledge, useMenu, useRefreshMenu } from '../../../entities/menu';
 import type { MenuDetail, MenuItem } from '../../../entities/menu';
 import { errorMessageOf } from '../../../shared/api';
@@ -252,6 +252,8 @@ const RecheckAction = ({ menu, item }: RecheckActionProps) => {
             <Button {...newTabProps(`「${item.productName}」をパッケージで確認する`)} to={allergenCheckPath(item.productId)} size="small" sx={{ alignSelf: 'flex-start' }}>
                 パッケージで確認する
             </Button>
+            {/* 確定のときと同じく、今週のチラシの表記の原文を添える（09 の 5.4） */}
+            <FlyerLabelNote labelText={item.flyerLabelText} />
         </Stack>
     );
 };

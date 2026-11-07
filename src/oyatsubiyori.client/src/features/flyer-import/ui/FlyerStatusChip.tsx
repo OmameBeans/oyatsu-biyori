@@ -3,7 +3,7 @@ import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import type { FlyerItem } from '../../../entities/flyer';
-import { allergenChipsOf, FLYER_STATUS_COLOR, FLYER_STATUS_LABEL, shortReasonsOf } from '../model/flyerRows';
+import { allergenChipsOf, FLYER_STATUS_COLOR, FLYER_STATUS_LABEL, shortNotesOf, shortReasonsOf } from '../model/flyerRows';
 
 interface FlyerStatusChipProps {
     item: FlyerItem;
@@ -11,7 +11,7 @@ interface FlyerStatusChipProps {
 
 /**
  * 取り込みの分類のチップ（文字だけ。アレルゲンの3つの表示のアイコンは付けない。09 の 3.1）。
- * 読み上げでは「取り込みの分類：使える」と読む（アレルゲンの表示と取り違えないように）
+ * 読み上げでは「取り込みの分類：取り込める」と読む（アレルゲンの表示と取り違えないように）
  */
 export const FlyerStatusChip = ({ item }: FlyerStatusChipProps) => (
     <Chip
@@ -24,16 +24,23 @@ export const FlyerStatusChip = ({ item }: FlyerStatusChipProps) => (
     />
 );
 
+/** 1行に切り詰める / 折り返す */
+const SINGLE_LINE_SX = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
+const WRAP_SX = { overflowWrap: 'anywhere' } as const;
+
 interface FlyerStatusCellProps {
     item: FlyerItem;
     /** 理由を1行に切り詰める（表の PC の列）。false なら折り返す */
     isSingleLine?: boolean;
 }
 
-/** 分類のチップと短い理由（アレルゲンに関わる理由が先。サーバーの並びのまま） */
+/** 分類のチップと短い理由（アレルゲンに関わる理由が先。サーバーの並びのまま）。注意は理由の下に、目立ちすぎない形で出す（09 の 6） */
 export const FlyerStatusCell = ({ item, isSingleLine = true }: FlyerStatusCellProps) => {
     const reasons = shortReasonsOf(item);
     const fullText = item.reasons.map((reason) => reason.message).join('\n');
+    const notes = shortNotesOf(item);
+    const notesFullText = item.notes.map((note) => note.message).join('\n');
+    const lineSx = isSingleLine ? SINGLE_LINE_SX : WRAP_SX;
     return (
         <Stack sx={{ minWidth: 0, alignItems: 'flex-start' }}>
             <FlyerStatusChip item={item} />
@@ -43,13 +50,20 @@ export const FlyerStatusCell = ({ item, isSingleLine = true }: FlyerStatusCellPr
                     color="text.secondary"
                     component="div"
                     title={fullText}
-                    sx={{
-                        mt: 0.25,
-                        maxWidth: '100%',
-                        ...(isSingleLine ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { overflowWrap: 'anywhere' }),
-                    }}
+                    sx={{ mt: 0.25, maxWidth: '100%', ...lineSx }}
                 >
                     {reasons.join('・')}
+                </Typography>
+            )}
+            {notes.length > 0 && (
+                <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    component="div"
+                    title={notesFullText}
+                    sx={{ mt: 0.25, maxWidth: '100%', fontSize: '0.7rem', ...lineSx }}
+                >
+                    注意：{notes.join('・')}
                 </Typography>
             )}
         </Stack>
@@ -68,7 +82,7 @@ export const FlyerAllergenChips = ({ item, isSingleLine = true }: FlyerAllergenC
     const chips = allergenChipsOf(item);
     return (
         <Box sx={{ minWidth: 0 }}>
-            {/* 読み取った表記の原文（チラシと見比べられるように。FR-FLYER-04a） */}
+            {/* 読み取った表記の原文（チラシと見比べられるように） */}
             {labelText && (
                 <Typography
                     variant="body2"

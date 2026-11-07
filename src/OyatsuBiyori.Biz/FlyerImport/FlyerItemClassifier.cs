@@ -4,11 +4,11 @@ using OyatsuBiyori.Biz.Interfaces;
 namespace OyatsuBiyori.Biz.FlyerImport;
 
 /// <summary>
-/// 取り込みの分類（D-100、09 の 3.2・3.4・5.2、TI-04）。読み取った1商品を 使えない ＞ 再入力 ＞ 要確認（新しい商品） ＞ 使える の順で分け、
-/// 当てはまった理由をすべて返す。まとめて確定・まとめて登録に入れるか（5.2）も同じところで決める。
+/// 取り込みの分類（D-101、09 の 3.2・3.4・3.8、TI-04）。読み取った1商品を 使えない ＞ 再入力 ＞ 取り込める の順で分け、
+/// 当てはまった理由をすべて返す。分類を変えない「注意」（内容量の変化・読み取りの検証の指摘・二重の読み取りの食い違いなど）も、ここで求めて返す。
 /// 一致した商品のアレルゲンの判定（AllergenJudge）は呼び出し側で求めて渡し、ここでは書き換えない。
-/// 分類はアレルゲンの3つの表示とは別のもの（「使える」でも献立では判定どおり 🟡 のことがある）。迷ったら確認する側（使えない・再入力）に倒す。
-/// 画面の表示と確定の API の両方で、同じこの関数で分類する（3.1）。
+/// 分類はアレルゲンの3つの表示とは別のもの（「取り込める」でも献立では判定どおり 🟡 のことがある）。迷ったら確認する側（使えない・再入力）に倒す。
+/// 画面の表示と「取り込みを終える」の API の両方で、同じこの関数で分類する（3.1）。
 /// </summary>
 public static class FlyerItemClassifier
 {
@@ -25,7 +25,7 @@ public static class FlyerItemClassifier
         var product = input.Match.IsMatched ? input.Match.Product : null;
         if (product is not null && input.MatchedJudgement is null)
         {
-            // 判定なしで「使える」にしない（確認する側に倒す）
+            // 判定なしで「取り込める」にしない（確認する側に倒す）
             throw new ArgumentException("一致した商品のアレルゲンの判定を渡してください", nameof(input));
         }
 
@@ -60,7 +60,7 @@ public static class FlyerItemClassifier
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        // チラシの品目と、一致した商品の記録との食い違い（03 §3・09 の 3.5）。記録を足すかは確定の側が決める
+        // チラシの品目と、一致した商品の記録との食い違い（03 §3・09 の 3.5）。記録を足すかは「取り込みを終える」の側が決める
         var plan = FlyerAllergenPlanner.Plan(
             new FlyerAllergenInput(labelIds, read.AllergenLabelText, string.Join("\n", names.Append(original.Description ?? string.Empty).Where(t => t.Length > 0)), unresolvedTerms),
             input.AllAllergens,
@@ -71,77 +71,51 @@ public static class FlyerItemClassifier
             ? read.PiecesPerPackCandidate
             : product?.PiecesPerPack is >= 1 ? product.PiecesPerPack : null;
 
+        var isLabelAbsent = IsLabelAbsent(labelIds, unresolvedTerms);
+
         var unusable = new List<FlyerItemReason>();
         AddUnusableReasons(unusable, input, product, piecesPerPack, labelIds, avoided, avoidedIds, allergensById, names);
 
         var needsInput = new List<FlyerItemReason>();
-        AddNeedsInputReasons(needsInput, input, product, labelIds, unresolvedTerms, allergensById);
-        needsInput.RemoveAll(r => IsResolved(r, input));
+        AddNeedsInputReasons(needsInput, input, product, isLabelAbsent, unresolvedTerms, allergensById);
 
         var category = unusable.Count > 0
             ? FlyerItemCategory.Unusable
             : needsInput.Count > 0
                 ? FlyerItemCategory.NeedsInput
-                : product is null ? FlyerItemCategory.New : FlyerItemCategory.Usable;
-
-        // アレルゲンに関わる理由を先に（同じなら 使えない → 再入力 の順、そのあと見つけた順）
-        var reasons = unusable.Concat(needsInput)
-            .Select((r, i) => (Reason: r, Order: i))
-            .OrderByDescending(x => x.Reason.IsAllergenRelated)
-            .ThenBy(x => x.Order)
-            .Select(x => x.Reason)
-            .ToList();
-
-        var notices = new List<FlyerItemReason>();
-        if (plan.Discrepancies.Count > 0)
-        {
-            notices.Add(new FlyerItemReason(
-                FlyerItemReasonCode.MasterDiscrepancy,
-                nameof(FlyerItemReasonCode.MasterDiscrepancy),
-                FlyerItemReasonLevel.Notice,
-                $"チラシの表記が、パッケージでの確認と食い違っています（{string.Join("・", plan.Discrepancies.Select(d => d.Allergen.Name))}）。確定すると「参考」の記録を足します",
-                FlyerItemField.AllergenLabel,
-                IsAllergenRelated: true,
-                CanAccept: false));
-        }
-
-        var isLabelAbsent = IsLabelAbsent(read, labelIds, input.UnmappedTerms);
-        var bulkExclusions = category is FlyerItemCategory.Usable or FlyerItemCategory.New
-            ? BulkExclusions(input, category, isLabelAbsent)
-            : [];
+                : FlyerItemCategory.Ready;
 
         return new FlyerItemClassification
         {
             Category = category,
-            Reasons = reasons,
-            Notices = notices,
+            // アレルゲンに関わる理由を先に（同じなら 使えない → 再入力 の順、そのあと見つけた順）
+            Reasons = AllergenFirst(unusable.Concat(needsInput)),
+            Notes = AllergenFirst(BuildNotes(input, product, plan)),
             FlyerAllergens = plan.FlyerAllergens,
             Discrepancies = plan.Discrepancies,
             UnresolvedTerms = unresolvedTerms,
             PiecesPerPack = piecesPerPack,
             IsLabelAbsent = isLabelAbsent,
-            CanMarkLabelAbsentCompared = isLabelAbsent && !input.ReviewFailed,
-            CanBulk = (category is FlyerItemCategory.Usable or FlyerItemCategory.New) && bulkExclusions.Count == 0,
-            BulkExclusions = bulkExclusions,
+            IsNew = product is null,
         };
     }
 
     /// <summary>
-    /// アレルゲンの表記がないと読んだか（「表記なし」と読まれた・表記が空・品目も分からない語も1つもない）。
-    /// 「なし」「－」のように文字はあっても品目が1つも出ない表記も、確認する側に倒して「表記なし」とする（FR-FLYER-04a）
+    /// アレルゲンの表記がないか（決めたこと E）。表記の品目（職員が選んだ品目を含む）も、まだ品目を決めていない語も1つもないときだけ「表記なし」。
+    /// 読み取りの「表記なし」の印や原文の有無は見ない（「なし」「－」のように文字はあっても品目が1つも出ない表記も「表記なし」になる。品目を入れれば表記なしでなくなる。09 の 5.3）。
+    /// 表記なしの商品の記録は品目が空の「参考（表記なし）」で、どの品目も「含まない」にはしない
     /// </summary>
-    public static bool IsLabelAbsent(FlyerReadProduct read, IReadOnlyCollection<string> labelAllergenIds, IReadOnlyCollection<string> unmappedTerms)
+    /// <param name="labelAllergenIds">表記の品目（職員が選んだ品目を含む）</param>
+    /// <param name="unresolvedTerms">まだ品目を決めていない表記の語</param>
+    public static bool IsLabelAbsent(IReadOnlyCollection<string> labelAllergenIds, IReadOnlyCollection<string> unresolvedTerms)
     {
-        ArgumentNullException.ThrowIfNull(read);
         ArgumentNullException.ThrowIfNull(labelAllergenIds);
-        ArgumentNullException.ThrowIfNull(unmappedTerms);
+        ArgumentNullException.ThrowIfNull(unresolvedTerms);
 
-        return read.AllergenLabelAbsent
-            || string.IsNullOrWhiteSpace(read.AllergenLabelText)
-            || (labelAllergenIds.Count == 0 && unmappedTerms.Count == 0);
+        return labelAllergenIds.Count == 0 && unresolvedTerms.Count == 0;
     }
 
-    /// <summary>使えない の理由（09 の 3.2・3.4）。職員の「このままでよい」では外せない</summary>
+    /// <summary>使えない の理由（09 の 3.2・3.4）。職員の操作では外せない（外せるのは、職員が今回のチラシの表記の品目を直したときだけ）</summary>
     private static void AddUnusableReasons(
         List<FlyerItemReason> reasons,
         FlyerClassificationInput input,
@@ -184,36 +158,22 @@ public static class FlyerItemClassifier
                 $"商品名に{words}があります（{group.First().AllergenName}）", FlyerItemField.Name));
         }
 
+        // 4. この行で新しく登録して「使わない」に戻した商品（照合からは外す）の記録（決めたこと H。パッケージで確かめた 🔴 を取りこぼさない）
+        if (input.OwnCreatedJudgement is { Kind: AllergenJudgementKind.Contains or AllergenJudgementKind.MayContain } own)
+        {
+            AddJudgementReasons(reasons, own, "OwnCreated", "この取り込みで登録した商品");
+        }
+
         if (product is null)
         {
             return;
         }
 
-        // 4. 商品マスタの記録（03 §5 の判定のうち「含む」「含む可能性あり」だけ。記録がない（不明）ときはチラシの品目だけで決める。09 の 3.2 の注）
+        // 5. 商品マスタの記録（03 §5 の判定のうち「含む」「含む可能性あり」だけ。記録がない（不明）ときはチラシの品目だけで決める。09 の 3.2 の注）
         var judgement = input.MatchedJudgement!;
         if (judgement.Kind is AllergenJudgementKind.Contains or AllergenJudgementKind.MayContain)
         {
-            foreach (var allergen in judgement.ContainedAllergens)
-            {
-                reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, $"{FlyerItemReasonCode.AvoidedInMaster}:{allergen.Id}",
-                    $"{allergen.Name}を含みます（商品一覧の確認の記録）", null));
-            }
-
-            // 原材料の全文は、Claude の読み取りと職員の修正の両方で当たることがあるので1つにまとめる
-            foreach (var group in judgement.KeywordHits.GroupBy(h => (h.Match.AllergenId, InName: h.Source == KeywordHitSource.ProductName)))
-            {
-                var words = string.Join("・", group.Select(h => $"「{h.Match.MatchedText}」").Distinct(StringComparer.Ordinal));
-                var where = group.Key.InName ? "商品一覧の商品名" : "商品一覧の原材料";
-                reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, $"{FlyerItemReasonCode.AvoidedInMaster}:{group.Key.AllergenId}:{(group.Key.InName ? "name" : "ingredients")}",
-                    $"{where}に{words}があります（{group.First().Match.AllergenName}）", null));
-            }
-
-            if (judgement.ContainedAllergens.Count == 0 && judgement.KeywordHits.Count == 0)
-            {
-                // 判定が入れられないのに理由がない（起きないはず）ときも、使えないにする
-                reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, nameof(FlyerItemReasonCode.AvoidedInMaster),
-                    "商品一覧のアレルゲンの判定で、献立に入れられない商品です", null));
-            }
+            AddJudgementReasons(reasons, judgement, null, "商品一覧");
         }
 
         if (product.IsDisabled)
@@ -223,12 +183,40 @@ public static class FlyerItemClassifier
         }
     }
 
-    /// <summary>再入力 の理由（09 の 3.1 の表）。直した・「このままでよい」を押したものはあとで除く</summary>
+    /// <summary>商品の判定（含む / 含む可能性あり）を「使えない」の理由にする</summary>
+    private static void AddJudgementReasons(List<FlyerItemReason> reasons, AllergenJudgement judgement, string? keyPrefix, string where)
+    {
+        var prefix = keyPrefix is null ? $"{FlyerItemReasonCode.AvoidedInMaster}" : $"{FlyerItemReasonCode.AvoidedInMaster}:{keyPrefix}";
+        foreach (var allergen in judgement.ContainedAllergens)
+        {
+            reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, $"{prefix}:{allergen.Id}",
+                keyPrefix is null ? $"{allergen.Name}を含みます（商品一覧の確認の記録）" : $"{where}の記録で{allergen.Name}を含みます",
+                null));
+        }
+
+        // 原材料の全文は、Claude の読み取りと職員の修正の両方で当たることがあるので1つにまとめる
+        foreach (var group in judgement.KeywordHits.GroupBy(h => (h.Match.AllergenId, InName: h.Source == KeywordHitSource.ProductName)))
+        {
+            var words = string.Join("・", group.Select(h => $"「{h.Match.MatchedText}」").Distinct(StringComparer.Ordinal));
+            var place = group.Key.InName ? $"{where}の商品名" : $"{where}の原材料";
+            reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, $"{prefix}:{group.Key.AllergenId}:{(group.Key.InName ? "name" : "ingredients")}",
+                $"{place}に{words}があります（{group.First().Match.AllergenName}）", null));
+        }
+
+        if (judgement.ContainedAllergens.Count == 0 && judgement.KeywordHits.Count == 0)
+        {
+            // 判定が入れられないのに理由がない（起きないはず）ときも、使えないにする
+            reasons.Add(Unusable(FlyerItemReasonCode.AvoidedInMaster, prefix,
+                $"{where}のアレルゲンの判定で、献立に入れられない商品です", null));
+        }
+    }
+
+    /// <summary>再入力 の理由（09 の 3.1 の表の6つ）。直すと分類し直して消える。「このままでよい」はない（D-101）</summary>
     private static void AddNeedsInputReasons(
         List<FlyerItemReason> reasons,
         FlyerClassificationInput input,
         Product? product,
-        IReadOnlyList<string> labelIds,
+        bool isLabelAbsent,
         IReadOnlyList<string> unresolvedTerms,
         Dictionary<string, Allergen> allergensById)
     {
@@ -239,10 +227,10 @@ public static class FlyerItemClassifier
         {
             reasons.Add(NeedsInput(FlyerItemReasonCode.UnmappedTerm, $"{FlyerItemReasonCode.UnmappedTerm}:{term}",
                 $"アレルゲン表記の「{term}」がどの品目か分かりません。品目を選ぶか「対応する品目なし」を選んでください",
-                FlyerItemField.AllergenLabel, isAllergenRelated: true, canAccept: false));
+                FlyerItemField.AllergenLabel, isAllergenRelated: true));
         }
 
-        if (product is not null && IsLabelAbsent(read, labelIds, input.UnmappedTerms))
+        if (product is not null && isLabelAbsent)
         {
             // 表記なしと読んだのに、一致した商品の有効な記録で特定原材料を含む（読み落としの疑い。D-97 から引き継ぐ）
             var contained = AllergenCheckHistory.From(product.AllergenChecks).ContainedAllergenIds
@@ -254,147 +242,146 @@ public static class FlyerItemClassifier
             if (contained.Count > 0)
             {
                 reasons.Add(NeedsInput(FlyerItemReasonCode.LabelAbsentButMasterContains, nameof(FlyerItemReasonCode.LabelAbsentButMasterContains),
-                    $"アレルゲンの表記なしと読みましたが、商品一覧の記録では{string.Join("・", contained.Select(a => a.Name))}を含みます。チラシの表記を見比べてください",
-                    FlyerItemField.AllergenLabel, isAllergenRelated: true, canAccept: true));
+                    $"アレルゲンの表記なしと読みましたが、商品一覧の記録では{string.Join("・", contained.Select(a => a.Name))}を含みます。"
+                        + "チラシで表記を探して品目を入れてください。チラシに本当に表記がなければ「外す」を押してください",
+                    FlyerItemField.AllergenLabel, isAllergenRelated: true, contained.Select(a => new AllergenRef(a.Id, a.Name)).ToList()));
             }
-        }
-
-        foreach (var note in input.ReviewNotes)
-        {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.ReviewNote, note.Key, note.Message, note.Field,
-                isAllergenRelated: note.Field.Contains("アレルゲン", StringComparison.Ordinal), canAccept: true));
         }
 
         if (string.IsNullOrWhiteSpace(read.Name) || ProductMatcher.NormalizeName(read.Name).Length == 0)
         {
             reasons.Add(NeedsInput(FlyerItemReasonCode.MissingName, nameof(FlyerItemReasonCode.MissingName),
-                "商品名が読めませんでした", FlyerItemField.Name, isAllergenRelated: false, canAccept: false));
+                "商品名が読めませんでした", FlyerItemField.Name, isAllergenRelated: false));
         }
 
         if (ProductMatcher.NormalizeMaker(read.Maker).Length == 0)
         {
             reasons.Add(NeedsInput(FlyerItemReasonCode.MissingMaker, nameof(FlyerItemReasonCode.MissingMaker),
-                "メーカーが読めませんでした。メーカーを入れると、登録済みの商品と照合します", FlyerItemField.Maker, isAllergenRelated: false, canAccept: false));
+                "メーカーが読めませんでした。メーカーを入れると、登録済みの商品と照合します", FlyerItemField.Maker, isAllergenRelated: false));
         }
 
         if (read.PriceIncludingTax is not >= 1)
         {
             reasons.Add(NeedsInput(FlyerItemReasonCode.MissingPrice, nameof(FlyerItemReasonCode.MissingPrice),
-                "税込価格が読めませんでした", FlyerItemField.PriceIncludingTax, isAllergenRelated: false, canAccept: false));
-        }
-        else if (read.PriceExcludingTax is int excluding && !FlyerReadingValidator.IsTaxConsistent(excluding, read.PriceIncludingTax.Value))
-        {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.TaxMismatch, nameof(FlyerItemReasonCode.TaxMismatch),
-                $"税込{read.PriceIncludingTax}円が、税抜{excluding}円と合いません", FlyerItemField.PriceIncludingTax, isAllergenRelated: false, canAccept: true));
+                "税込価格が読めませんでした", FlyerItemField.PriceIncludingTax, isAllergenRelated: false));
         }
 
-        if (string.IsNullOrWhiteSpace(read.Volume))
+        if (product is null && (read.SnackType is not { } snackType || !Enum.IsDefined(snackType)))
         {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.MissingVolume, nameof(FlyerItemReasonCode.MissingVolume),
-                "内容量が読めませんでした", FlyerItemField.Volume, isAllergenRelated: false, canAccept: false));
+            // 新しい商品はおやつの分類がないと登録できない（Product.SnackType は必須。09 の 3.1）
+            reasons.Add(NeedsInput(FlyerItemReasonCode.MissingSnackType, nameof(FlyerItemReasonCode.MissingSnackType),
+                "おやつの分類が分かりません。分類を選んでください", FlyerItemField.SnackType, isAllergenRelated: false));
         }
-        else if (read.PiecesPerPackCandidate is >= 1 && !FlyerReadingValidator.IsPiecesCandidateSupported(read.Volume, read.PiecesPerPackCandidate))
+    }
+
+    /// <summary>注意（09 の 3.8。行に出すだけで分類は変えない。値は自動で決めて進める）</summary>
+    private static List<FlyerItemReason> BuildNotes(FlyerClassificationInput input, Product? product, FlyerAllergenPlan plan)
+    {
+        var read = input.Read;
+        var notes = new List<FlyerItemReason>();
+        if (plan.Discrepancies.Count > 0)
         {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.PiecesMismatch, nameof(FlyerItemReasonCode.PiecesMismatch),
-                $"入数の候補{read.PiecesPerPackCandidate}個が、内容量の表記（{read.Volume}）と合いません。1パックで何人分かを確かめてください",
-                FlyerItemField.PiecesPerPack, isAllergenRelated: false, canAccept: true));
+            notes.Add(Note(FlyerItemReasonCode.MasterDiscrepancy, nameof(FlyerItemReasonCode.MasterDiscrepancy),
+                $"チラシの表記が、パッケージでの確認と食い違っています（{string.Join("・", plan.Discrepancies.Select(d => d.Allergen.Name))}）。取り込みを終えると「参考」の記録を足します",
+                FlyerItemField.AllergenLabel, isAllergenRelated: true));
         }
 
-        if (string.IsNullOrWhiteSpace(read.OrderNo))
+        foreach (var note in input.ReviewNotes)
         {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.MissingOrderNo, nameof(FlyerItemReasonCode.MissingOrderNo),
-                "注文番号が読めませんでした", FlyerItemField.OrderNo, isAllergenRelated: false, canAccept: false));
+            // Claude の指摘の文のまま（画面ではテキストとしてだけ出す）。アレルゲンの品目は足すだけで、ここでは減らさない（SR-19）
+            notes.Add(Note(FlyerItemReasonCode.ReviewNote, note.Key, note.Message, note.Field,
+                isAllergenRelated: note.Field.Contains("アレルゲン", StringComparison.Ordinal)));
         }
 
         if (product is not null)
         {
-            // 一致した商品と内容量か入数の候補が違う（FR-IMPORT-12）。マスタの値が空なら比べない（確定で埋めるだけ）
+            // 一致した商品と内容量か入数の候補が違う（FR-IMPORT-12）。マスタの値が空なら比べない（取り込みで埋めるだけ）
             var volumeChanged = !string.IsNullOrWhiteSpace(read.Volume) && !string.IsNullOrWhiteSpace(product.Volume)
                 && TextNormalizer.ForVolume(read.Volume) != TextNormalizer.ForVolume(product.Volume);
             var piecesChanged = read.PiecesPerPackCandidate is >= 1 && product.PiecesPerPack is >= 1
                 && read.PiecesPerPackCandidate != product.PiecesPerPack;
             if (volumeChanged || piecesChanged)
             {
-                var master = $"{product.Volume ?? "内容量なし"}・{(product.PiecesPerPack is int mp ? $"{mp}個" : "入数なし")}";
-                var flyer = $"{read.Volume ?? "内容量なし"}・{(read.PiecesPerPackCandidate is >= 1 ? $"{read.PiecesPerPackCandidate}個" : "入数なし")}";
-                var message = $"商品一覧は{master}、チラシは{flyer}です。入数を確かめてください";
-                if (volumeChanged)
-                {
-                    message += "。内容量が変わりました。届いたらパッケージの原材料も見てください";
-                }
-
-                reasons.Add(NeedsInput(FlyerItemReasonCode.MasterVolumeOrPiecesChanged, nameof(FlyerItemReasonCode.MasterVolumeOrPiecesChanged),
-                    message, FlyerItemField.PiecesPerPack, isAllergenRelated: false, canAccept: true));
+                var overwrite = input.OverwritesMaster
+                    ? "チラシの値で商品一覧を上書きします"
+                    : "過去の週の取り込みなので、商品一覧は上書きしません（空の項目だけ埋めます）";
+                var message = volumeChanged
+                    ? $"内容量が変わりました（商品一覧 {product.Volume}・{PiecesText(product.PiecesPerPack)} → チラシ {read.Volume}・{PiecesText(read.PiecesPerPackCandidate)}）。{overwrite}。届いたらパッケージの原材料も見てください"
+                    : $"入数が変わりました（商品一覧 {PiecesText(product.PiecesPerPack)} → チラシ {PiecesText(read.PiecesPerPackCandidate)}）。{overwrite}";
+                notes.Add(Note(FlyerItemReasonCode.MasterVolumeOrPiecesChanged, nameof(FlyerItemReasonCode.MasterVolumeOrPiecesChanged),
+                    message, volumeChanged ? FlyerItemField.Volume : FlyerItemField.PiecesPerPack, isAllergenRelated: false));
             }
         }
 
-        foreach (var conflict in input.DuplicateConflicts)
+        foreach (var conflict in input.DuplicateConflicts.Where(c => !input.EditedFields.Contains(c.Field)))
         {
-            reasons.Add(NeedsInput(FlyerItemReasonCode.DuplicateConflict, $"{FlyerItemReasonCode.DuplicateConflict}:{conflict.Field}",
-                $"同じ商品を2回以上読み、{FieldLabel(conflict.Field)}が食い違いました（{string.Join("／", conflict.Values)}）。チラシで確かめてください"
-                    // 注文番号が違うのは、同じ名前・メーカーで大きさ違いの商品が別々に載っているときが多い（商品は1つなので、今週使う方を選ぶ。09 の FR-IMPORT-06）
-                    + (conflict.Field == FlyerItemField.OrderNo ? "。同じ名前・メーカーで大きさ違いの商品が載っているかもしれません。今週使う方の値を選んでください" : ""),
-                conflict.Field, isAllergenRelated: false, canAccept: true));
-        }
-    }
+            // 先に読んだ値を使う（FlyerDuplicateMerger がもう先の値にしてある）。職員がその項目を直したら、直した値を使うので出さない
+            var used = conflict.Values.Count > 0 ? conflict.Values[0] : string.Empty;
+            var message = $"2回読みました。{FieldLabel(conflict.Field)}が {string.Join(" / ", conflict.Values)} と違います。{used} を使います";
+            if (conflict.Field == FlyerItemField.OrderNo)
+            {
+                // 注文番号が違うのは、同じ名前・メーカーで大きさ違いの商品が別々に載っているときが多い（FR-IMPORT-06）
+                message += "。同じ名前・メーカーで大きさ違いの商品が載っているかもしれません。後の方を使うときは値を直してください";
+            }
 
-    /// <summary>直した・「このままでよい」を押したので、もう再入力の理由にしないか（09 の 5.3）</summary>
-    private static bool IsResolved(FlyerItemReason reason, FlyerClassificationInput input)
-    {
-        if (reason.CanAccept && input.AcceptedReasonKeys.Contains(reason.Key))
-        {
-            return true;
+            notes.Add(Note(FlyerItemReasonCode.DuplicateConflict, $"{FlyerItemReasonCode.DuplicateConflict}:{conflict.Field}",
+                message, conflict.Field, isAllergenRelated: false));
         }
 
-        return reason.Code switch
+        if (read.PriceIncludingTax is >= 1 && read.PriceExcludingTax is int excluding
+            && !FlyerReadingValidator.IsTaxConsistent(excluding, read.PriceIncludingTax.Value))
         {
-            // 職員が入数を入れた・直したら、入数は確かめたものとする
-            FlyerItemReasonCode.PiecesMismatch => input.IsPiecesEnteredByStaff || input.EditedFields.Contains(FlyerItemField.PiecesPerPack),
-            // 一致した商品との内容量・入数の違いは、「このままでよい」を押したときだけ確かめたものとする。
-            // 入数を入れた・直しただけで消すと、あとで商品名・メーカーを直して別の確認済みの商品に一致したときも、確かめずに引き継いでしまう（FR-IMPORT-12）
-            // 食い違った項目を職員が直したら、その値を使う
-            FlyerItemReasonCode.DuplicateConflict => reason.Field is { } field && input.EditedFields.Contains(field),
-            _ => false,
-        };
-    }
+            notes.Add(Note(FlyerItemReasonCode.TaxMismatch, nameof(FlyerItemReasonCode.TaxMismatch),
+                $"税込{read.PriceIncludingTax}円が税抜{excluding}円と合いません。税込{read.PriceIncludingTax}円を使います",
+                FlyerItemField.PriceIncludingTax, isAllergenRelated: false));
+        }
 
-    /// <summary>まとめて確定・まとめて登録に入れない理由（09 の 5.2）</summary>
-    private static List<FlyerBulkExclusion> BulkExclusions(FlyerClassificationInput input, FlyerItemCategory category, bool isLabelAbsent)
-    {
-        var exclusions = new List<FlyerBulkExclusion>();
-        if (isLabelAbsent && !input.IsLabelAbsentCompared)
+        if (string.IsNullOrWhiteSpace(read.Volume))
         {
-            exclusions.Add(FlyerBulkExclusion.LabelAbsentNotCompared);
+            notes.Add(Note(FlyerItemReasonCode.MissingVolume, nameof(FlyerItemReasonCode.MissingVolume),
+                "内容量が読めませんでした", FlyerItemField.Volume, isAllergenRelated: false));
+        }
+        else if (read.PiecesPerPackCandidate is >= 1
+            && !input.IsPiecesEnteredByStaff
+            && !input.EditedFields.Contains(FlyerItemField.PiecesPerPack)
+            && !FlyerReadingValidator.IsPiecesCandidateSupported(read.Volume, read.PiecesPerPackCandidate))
+        {
+            // 職員が入数を入れた・直したら、職員の値を使うので出さない
+            notes.Add(Note(FlyerItemReasonCode.PiecesMismatch, nameof(FlyerItemReasonCode.PiecesMismatch),
+                $"入数の候補（{read.PiecesPerPackCandidate}）が内容量の表記と合いません。{read.PiecesPerPackCandidate} を使います",
+                FlyerItemField.PiecesPerPack, isAllergenRelated: false));
+        }
+
+        if (string.IsNullOrWhiteSpace(read.OrderNo))
+        {
+            notes.Add(Note(FlyerItemReasonCode.MissingOrderNo, nameof(FlyerItemReasonCode.MissingOrderNo),
+                "注文番号が読めませんでした。注文のときにチラシで確かめてください", FlyerItemField.OrderNo, isAllergenRelated: false));
         }
 
         if (input.IsManual)
         {
-            exclusions.Add(FlyerBulkExclusion.Manual);
+            notes.Add(Note(FlyerItemReasonCode.NotReviewed, nameof(FlyerItemReasonCode.NotReviewed),
+                "手で入力した商品です。読み取りの検証を通っていません", null, isAllergenRelated: false));
         }
-
-        if (input.IsPiecesEnteredByStaff)
+        else if (input.IsPiecesEnteredByStaff)
         {
-            exclusions.Add(FlyerBulkExclusion.PiecesEnteredByStaff);
+            notes.Add(Note(FlyerItemReasonCode.NotReviewed, nameof(FlyerItemReasonCode.NotReviewed),
+                "入数は職員が入れました。読み取りの検証を通っていません", FlyerItemField.PiecesPerPack, isAllergenRelated: false));
         }
 
-        if (input.ReviewFailed)
-        {
-            exclusions.Add(FlyerBulkExclusion.ReviewFailed);
-        }
-
-        if (input.IsEditing)
-        {
-            exclusions.Add(FlyerBulkExclusion.Editing);
-        }
-
-        if (category == FlyerItemCategory.New
-            && (input.Read.SnackType is not { } snackType || !Enum.IsDefined(snackType) || input.Read.PiecesPerPackCandidate is not >= 1))
-        {
-            exclusions.Add(FlyerBulkExclusion.MissingNewProductFields);
-        }
-
-        return exclusions;
+        return notes;
     }
+
+    /// <summary>アレルゲンに関わるものを先に（そのあとは見つけた順）</summary>
+    private static List<FlyerItemReason> AllergenFirst(IEnumerable<FlyerItemReason> reasons) =>
+        reasons
+            .Select((r, i) => (Reason: r, Order: i))
+            .OrderByDescending(x => x.Reason.IsAllergenRelated)
+            .ThenBy(x => x.Order)
+            .Select(x => x.Reason)
+            .ToList();
+
+    private static string PiecesText(int? pieces) => pieces is >= 1 ? $"{pieces}個" : "入数なし";
 
     private static string FieldLabel(string field) => field switch
     {
@@ -406,14 +393,18 @@ public static class FlyerItemClassifier
         FlyerItemField.OrderNo => "注文番号",
         FlyerItemField.PiecesPerPack => "入数",
         FlyerItemField.AllergenLabel => "アレルゲン表記",
+        FlyerItemField.SnackType => "おやつの分類",
         _ => field,
     };
 
     private static FlyerItemReason Unusable(FlyerItemReasonCode code, string key, string message, string? field, bool isAllergenRelated = true) =>
-        new(code, key, FlyerItemReasonLevel.Unusable, message, field, isAllergenRelated, CanAccept: false);
+        new(code, key, FlyerItemReasonLevel.Unusable, message, field, isAllergenRelated, []);
 
-    private static FlyerItemReason NeedsInput(FlyerItemReasonCode code, string key, string message, string? field, bool isAllergenRelated, bool canAccept) =>
-        new(code, key, FlyerItemReasonLevel.NeedsInput, message, field, isAllergenRelated, canAccept);
+    private static FlyerItemReason NeedsInput(FlyerItemReasonCode code, string key, string message, string? field, bool isAllergenRelated, IReadOnlyList<AllergenRef>? allergens = null) =>
+        new(code, key, FlyerItemReasonLevel.NeedsInput, message, field, isAllergenRelated, allergens ?? []);
+
+    private static FlyerItemReason Note(FlyerItemReasonCode code, string key, string message, string? field, bool isAllergenRelated) =>
+        new(code, key, FlyerItemReasonLevel.Note, message, field, isAllergenRelated, []);
 }
 
 /// <summary>取り込みの分類（09 の 3.1。画面では取り込みの画面の中だけで使い、アレルゲンの表示とは別の形で出す）</summary>
@@ -422,14 +413,11 @@ public enum FlyerItemCategory
     /// <summary>🔴 使えない（今週の商品に入れない）</summary>
     Unusable,
 
-    /// <summary>🟠 再入力（職員が直すまで確定できない）</summary>
+    /// <summary>🟠 再入力（職員が直すまで取り込まない）</summary>
     NeedsInput,
 
-    /// <summary>🔵 要確認（商品マスタに一致する商品がない。新しい商品として登録する）</summary>
-    New,
-
-    /// <summary>🟢 使える（商品マスタの商品と同じで、避ける品目が入っていない）</summary>
-    Usable,
+    /// <summary>🟢 取り込める（「取り込みを終える」で、新しい商品は登録し、登録済みの商品は上書きする）</summary>
+    Ready,
 }
 
 /// <summary>理由の重さ</summary>
@@ -441,11 +429,11 @@ public enum FlyerItemReasonLevel
     /// <summary>再入力 の理由</summary>
     NeedsInput,
 
-    /// <summary>知らせるだけ（分類は変えない。確認済みとの食い違いなど）</summary>
-    Notice,
+    /// <summary>注意（行に出すだけで分類は変えない。09 の 3.8）</summary>
+    Note,
 }
 
-/// <summary>理由の種類</summary>
+/// <summary>理由・注意の種類</summary>
 public enum FlyerItemReasonCode
 {
     /// <summary>使えない：入数が分からない（FR-IMPORT-10）</summary>
@@ -460,20 +448,11 @@ public enum FlyerItemReasonCode
     /// <summary>使えない：商品名に避ける品目の探す言葉がある（SR-14）</summary>
     AvoidedInName,
 
-    /// <summary>使えない：一致した商品の判定が「含む」「含む可能性あり」</summary>
+    /// <summary>使えない：一致した商品（またはこの行で登録して照合から外した商品）の判定が「含む」「含む可能性あり」</summary>
     AvoidedInMaster,
 
     /// <summary>使えない：一致した商品を「使わない」にしている</summary>
     Disabled,
-
-    /// <summary>再入力：アレルゲン表記に、品目にも略記にも当たらない語がある</summary>
-    UnmappedTerm,
-
-    /// <summary>再入力：表記なしと読んだのに、一致した商品の有効な記録で特定原材料を含む</summary>
-    LabelAbsentButMasterContains,
-
-    /// <summary>再入力：読み取りの検証（FR-FLYER-03g）の指摘</summary>
-    ReviewNote,
 
     /// <summary>再入力：商品名が読めない</summary>
     MissingName,
@@ -484,48 +463,41 @@ public enum FlyerItemReasonCode
     /// <summary>再入力：税込価格が読めない</summary>
     MissingPrice,
 
-    /// <summary>再入力：税込価格が税抜価格と合わない</summary>
-    TaxMismatch,
+    /// <summary>再入力：アレルゲン表記に、品目にも略記にも当たらない語がある</summary>
+    UnmappedTerm,
 
-    /// <summary>再入力：内容量が読めない</summary>
-    MissingVolume,
+    /// <summary>再入力：表記なしと読んだのに、一致した商品の有効な記録で特定原材料を含む</summary>
+    LabelAbsentButMasterContains,
 
-    /// <summary>再入力：入数の候補が内容量の表記と合わない</summary>
-    PiecesMismatch,
+    /// <summary>再入力：新しい商品で、おやつの分類が分からない</summary>
+    MissingSnackType,
 
-    /// <summary>再入力：注文番号が読めない</summary>
-    MissingOrderNo,
+    /// <summary>注意：確認済みの商品とチラシの表記が食い違う（09 の 3.5）</summary>
+    MasterDiscrepancy,
 
-    /// <summary>再入力：一致した商品と内容量か入数の候補が違う（FR-IMPORT-12）</summary>
+    /// <summary>注意：読み取りの検証（FR-FLYER-03g）の指摘</summary>
+    ReviewNote,
+
+    /// <summary>注意：一致した商品と内容量か入数の候補が違う（FR-IMPORT-12。チラシの値で上書きする）</summary>
     MasterVolumeOrPiecesChanged,
 
-    /// <summary>再入力：二重に読んだ商品で値が食い違う（FR-IMPORT-06）</summary>
+    /// <summary>注意：二重に読んだ商品で値が食い違う（FR-IMPORT-06。先に読んだ値を使う）</summary>
     DuplicateConflict,
 
-    /// <summary>知らせるだけ：確認済みの商品とチラシの表記が食い違う（09 の 3.5）</summary>
-    MasterDiscrepancy,
-}
+    /// <summary>注意：税込価格が税抜価格と合わない（税込を使う）</summary>
+    TaxMismatch,
 
-/// <summary>まとめて確定・まとめて登録に入れない理由（09 の 5.2）</summary>
-public enum FlyerBulkExclusion
-{
-    /// <summary>表記なしで、チラシと見比べた印をまだ付けていない（FR-FLYER-04a・D-97）</summary>
-    LabelAbsentNotCompared,
+    /// <summary>注意：内容量が読めない</summary>
+    MissingVolume,
 
-    /// <summary>取り込みの画面で手入力した（D-73）</summary>
-    Manual,
+    /// <summary>注意：注文番号が読めない</summary>
+    MissingOrderNo,
 
-    /// <summary>入数を入れて「使えない」から戻した（FR-IMPORT-11）</summary>
-    PiecesEnteredByStaff,
+    /// <summary>注意：入数の候補が内容量の表記と合わない（候補を使う）</summary>
+    PiecesMismatch,
 
-    /// <summary>読み取りの検証ができなかった取り込み</summary>
-    ReviewFailed,
-
-    /// <summary>表で行を開いて、確定のフォームで直している途中</summary>
-    Editing,
-
-    /// <summary>要確認で、おやつの分類か入数の候補がそろわない</summary>
-    MissingNewProductFields,
+    /// <summary>注意：手入力・入数を入れ直した（読み取りの検証を通っていない）</summary>
+    NotReviewed,
 }
 
 /// <summary>取り込みの商品の項目（理由の欄・直した項目・二重の読み取りの食い違いで使う。JSON でもこの文字のまま）</summary>
@@ -554,18 +526,21 @@ public static class FlyerItemField
 
     /// <summary>アレルゲン表記</summary>
     public const string AllergenLabel = "allergenLabel";
+
+    /// <summary>おやつの分類</summary>
+    public const string SnackType = "snackType";
 }
 
 /// <summary>
-/// 分類の理由。
+/// 分類の理由・注意。
 /// </summary>
 /// <param name="Code">種類</param>
-/// <param name="Key">理由ごとの鍵（「このままでよい」を押した理由を覚えるため。同じ商品の中で一意）</param>
-/// <param name="Level">使えない / 再入力 / 知らせるだけ</param>
-/// <param name="Message">画面に出す文</param>
+/// <param name="Key">理由ごとの鍵（同じ商品の中で一意。画面の key に使う）</param>
+/// <param name="Level">使えない / 再入力 / 注意</param>
+/// <param name="Message">画面に出す文（ReviewNote は Claude の文。テキストとしてだけ出す）</param>
 /// <param name="Field">直す欄（FlyerItemField の値。読み取りの検証の指摘は Claude が返した項目名のまま。欄がなければ null）</param>
 /// <param name="IsAllergenRelated">アレルゲンに関わる理由か（画面で先に並べる）</param>
-/// <param name="CanAccept">「このままでよい」で外せるか</param>
+/// <param name="Allergens">LabelAbsentButMasterContains で、記録で含む特定原材料（ほかは空）</param>
 public sealed record FlyerItemReason(
     FlyerItemReasonCode Code,
     string Key,
@@ -573,7 +548,7 @@ public sealed record FlyerItemReason(
     string Message,
     string? Field,
     bool IsAllergenRelated,
-    bool CanAccept);
+    IReadOnlyList<AllergenRef> Allergens);
 
 /// <summary>読み取りの検証の指摘（Key は呼び出し側が商品の中で一意に振る。例：review:0）</summary>
 /// <param name="Key">鍵</param>
@@ -593,7 +568,7 @@ public sealed class FlyerClassificationInput
     /// <summary>職員が直した項目（FlyerItemField の値）</summary>
     public IReadOnlySet<string> EditedFields { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 
-    /// <summary>「使えない（入数が分からない）」から、職員が入数を入れて戻したか（FR-IMPORT-11）</summary>
+    /// <summary>「使えない（入数が分からない）」から、職員が入数を入れて戻したか（FR-IMPORT-11。注意 NotReviewed を出す）</summary>
     public bool IsPiecesEnteredByStaff { get; init; }
 
     /// <summary>アレルゲン表記の品目（Claude の対応づけ・アプリの対応づけと略記の補正・職員の直しのあと。品目 ID）</summary>
@@ -605,14 +580,11 @@ public sealed class FlyerClassificationInput
     /// <summary>職員が品目を選んだ語（語 → 品目 ID。空なら「対応する品目なし」）</summary>
     public IReadOnlyDictionary<string, IReadOnlyCollection<string>> ResolvedTerms { get; init; } = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.Ordinal);
 
-    /// <summary>読み取りの検証の指摘（直した・取り消した指摘は呼び出し側が外す）</summary>
+    /// <summary>読み取りの検証の指摘（直した指摘は呼び出し側が外す）</summary>
     public IReadOnlyList<FlyerReviewNoteInput> ReviewNotes { get; init; } = [];
 
     /// <summary>二重の読み取りで食い違った値</summary>
     public IReadOnlyList<FlyerDuplicateConflict> DuplicateConflicts { get; init; } = [];
-
-    /// <summary>「このままでよい」を押した理由の鍵</summary>
-    public IReadOnlySet<string> AcceptedReasonKeys { get; init; } = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>照合の結果（今の商品名・メーカーで ProductMatcher.Match したもの）</summary>
     public required ProductMatch Match { get; init; }
@@ -620,23 +592,26 @@ public sealed class FlyerClassificationInput
     /// <summary>一致した商品の判定（AllergenJudge.Judge。一致したときは必ず渡す。記録と避ける品目の探す言葉を読み込んでおくこと）</summary>
     public AllergenJudgement? MatchedJudgement { get; init; }
 
+    /// <summary>
+    /// この行で新しく登録して「使わない」に戻し、照合から外した商品の判定（決めたこと H。なければ null）。
+    /// 含む / 含む可能性あり なら「使えない」にする
+    /// </summary>
+    public AllergenJudgement? OwnCreatedJudgement { get; init; }
+
     /// <summary>マスタのすべての品目（探す言葉つき）</summary>
     public required IReadOnlyList<Allergen> AllAllergens { get; init; }
 
     /// <summary>施設の避ける品目（探す言葉つき。グループは展開しておく）</summary>
     public required IReadOnlyList<Allergen> AvoidedAllergens { get; init; }
 
-    /// <summary>手入力した商品か（D-73）</summary>
+    /// <summary>手入力した商品か（D-73。注意 NotReviewed を出す）</summary>
     public bool IsManual { get; init; }
 
-    /// <summary>その取り込みで、読み取りの検証ができなかったか</summary>
-    public bool ReviewFailed { get; init; }
-
-    /// <summary>表記なしを、職員がチラシと見比べたか（D-97）</summary>
-    public bool IsLabelAbsentCompared { get; init; }
-
-    /// <summary>画面で行を開いて、確定のフォームで直している途中か（まとめの確定の API で渡す）</summary>
-    public bool IsEditing { get; init; }
+    /// <summary>
+    /// 一致した商品をチラシの値で上書きする週か（ListedProductsUpdater.ShouldOverwriteProduct。一致なしなら true）。
+    /// 注意の文の切り替えだけに使う
+    /// </summary>
+    public bool OverwritesMaster { get; init; } = true;
 }
 
 /// <summary>分類の結果</summary>
@@ -648,8 +623,8 @@ public sealed class FlyerItemClassification
     /// <summary>当てはまった理由（使えない・再入力。アレルゲンに関わる理由が先）</summary>
     public IReadOnlyList<FlyerItemReason> Reasons { get; init; } = [];
 
-    /// <summary>知らせるだけのこと（確認済みとの食い違いなど。分類は変えない）</summary>
-    public IReadOnlyList<FlyerItemReason> Notices { get; init; } = [];
+    /// <summary>注意（分類は変えない。アレルゲンに関わるものが先。09 の 3.8）</summary>
+    public IReadOnlyList<FlyerItemReason> Notes { get; init; } = [];
 
     /// <summary>チラシの品目（表記の品目 ∪ 職員が選んだ品目 ∪ 説明文・商品名で避ける品目の探す言葉が当たった品目）</summary>
     public IReadOnlyList<AllergenRef> FlyerAllergens { get; init; } = [];
@@ -663,15 +638,9 @@ public sealed class FlyerItemClassification
     /// <summary>使う入数（読み取りの候補、なければ一致した商品の入数。分からなければ null）</summary>
     public int? PiecesPerPack { get; init; }
 
-    /// <summary>アレルゲンの表記がないと読んだか</summary>
+    /// <summary>アレルゲンの表記がないか（決めたこと E）</summary>
     public bool IsLabelAbsent { get; init; }
 
-    /// <summary>表記なしのまとめての見比べ（「チラシで見比べました」）に並べてよいか</summary>
-    public bool CanMarkLabelAbsentCompared { get; init; }
-
-    /// <summary>まとめて確定（使える）・まとめて登録（要確認）に入れてよいか</summary>
-    public bool CanBulk { get; init; }
-
-    /// <summary>まとめに入れない理由（分類が使える・要確認のときだけ）</summary>
-    public IReadOnlyList<FlyerBulkExclusion> BulkExclusions { get; init; } = [];
+    /// <summary>新しい商品か（一致する商品がない。取り込みを終えると新しく登録する）</summary>
+    public bool IsNew { get; init; }
 }

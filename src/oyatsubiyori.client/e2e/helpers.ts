@@ -88,8 +88,8 @@ export const openFlyerItemDetail = async (page: Page, name: string) => {
     return detail;
 };
 
-/** 取り込みの分類の名前（09 の 3.1）。一覧はこの順（再入力 → 要確認 → 使える → 使えない → 確定済み）に並ぶ */
-export const FLYER_CATEGORIES = ['再入力', '要確認', '使える', '使えない', '確定済み'] as const;
+/** 取り込みの分類の名前（09 の 3.1。D-101）。一覧はこの順（再入力 → 取り込める → 使えない → 確定済み）に並ぶ */
+export const FLYER_CATEGORIES = ['再入力', '取り込める', '使えない', '確定済み'] as const;
 export type FlyerCategory = (typeof FLYER_CATEGORIES)[number];
 
 /** SC-09 手順1 の読み取った商品の表 */
@@ -99,7 +99,7 @@ export const flyerGrid = (page: Page): Locator => page.getByRole('grid', { name:
 export const flyerRow = (page: Page, name: string): Locator =>
     flyerGrid(page).getByRole('row').filter({ has: page.getByRole('button', { name: `「${name}」の詳細を`, exact: false }) });
 
-/** 行の取り込みの分類のチップ（読み上げは「取り込みの分類：使える」。アレルゲンの表示とは別のもの） */
+/** 行の取り込みの分類のチップ（読み上げは「取り込みの分類：取り込める」。アレルゲンの表示とは別のもの） */
 export const flyerCategoryChip = (row: Locator): Locator => row.getByLabel(/^取り込みの分類：/);
 
 /** 表に並んでいる行の、取り込みの分類（上から順） */
@@ -113,8 +113,15 @@ export const flyerTab = (page: Page, label: 'すべて' | FlyerCategory): Locato
 export const flyerTabCount = async (page: Page, label: 'すべて' | FlyerCategory): Promise<number> =>
     Number((await flyerTab(page, label).innerText()).match(/(\d+)\s*$/)![1]);
 
-/** 一覧の下の「外した掲載品」のカード */
-export const removedListings = (page: Page): Locator => page.getByRole('region', { name: /^外した掲載品（\d+件）$/ });
+/** 「外した掲載品」のダイアログを開いて返す（表の下のボタンから開く。開いていればそのまま返す） */
+export const openRemovedListings = async (page: Page): Promise<Locator> => {
+    const dialog = page.getByRole('dialog', { name: /^外した掲載品（\d+件）$/ });
+    if (!(await dialog.isVisible())) {
+        await page.getByRole('button', { name: /^外した掲載品（\d+件）$/ }).click();
+    }
+    await expect(dialog).toBeVisible();
+    return dialog;
+};
 
 /**
  * 商品一覧の1件（PC は表の行、スマホはカード）。中の商品名のリンクから商品詳細を開ける。

@@ -74,7 +74,11 @@ public sealed record OrderCheck(string ProductId, string? OrderNo, int PackCount
 /// <param name="ProductId">商品</param>
 /// <param name="Price">税込価格（読めなかったら NULL）</param>
 /// <param name="OrderNo">注文番号</param>
-public sealed record ListedProduct(string ProductId, int? Price, string? OrderNo);
+/// <param name="LabelText">
+/// 今週のチラシのアレルゲン表記の原文（表記なしなら「表記なし」。D-101 より前の写しは null）。
+/// 献立の確定で見比べるための表示だけに使い、判定・確定の条件・指紋には使わない（SR-18・FR-IMPORT-42）
+/// </param>
+public sealed record ListedProduct(string ProductId, int? Price, string? OrderNo, string? LabelText = null);
 
 /// <summary>Claude が読み取った要望（D-45）</summary>
 public sealed class InterpretedRequests

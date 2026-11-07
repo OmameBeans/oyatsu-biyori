@@ -7,6 +7,7 @@ import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { useSnackbar } from 'notistack';
 import { useSaveRequest, useStartProposal } from '../../../entities/menu';
@@ -28,6 +29,15 @@ const EXAMPLE = '例：しょっぱいものとゼリー系を合わせて出し
 
 /** PC（md 以上）ではカードを縦いっぱいに広げ、中身が多いときはカードの中だけをスクロールする */
 const cardSx = { height: { md: '100%' }, overflow: { md: 'auto' } } as const;
+
+/** PC では要望の入力欄をカードの残りの高さいっぱいに広げる（注意書きとボタンは下に残す） */
+const requestContentSx = { display: 'flex', flexDirection: 'column', height: { md: '100%' }, boxSizing: 'border-box' } as const;
+const requestFieldSx = {
+    flex: { md: 1 },
+    minHeight: { md: 160 },
+    '& .MuiInputBase-root': { height: { md: '100%' }, alignItems: 'flex-start' },
+    '& textarea': { height: { md: '100% !important' }, overflow: { md: 'auto !important' } },
+} as const;
 
 /**
  * SC-09 手順3 要望の入力（T4-03）。要望は入力欄を離れたとき・手順を移るとき・条件の変更を開く前に保存する。
@@ -60,7 +70,7 @@ export const RequestStep = ({ menu, onStarted, onManual, onEditConditions }: Req
     return (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' }, gap: 2, height: { md: '100%' } }}>
             <Card sx={cardSx}>
-                <CardContent>
+                <CardContent sx={requestContentSx}>
                     <Typography variant="h3" component="h2" sx={{ mb: 1 }}>
                         今週の要望
                     </Typography>
@@ -73,6 +83,7 @@ export const RequestStep = ({ menu, onStarted, onManual, onEditConditions }: Req
                         onChange={(event) => setText(event.target.value)}
                         onBlur={save}
                         slotProps={{ htmlInput: { 'aria-label': '今週の要望', maxLength: 2000 } }}
+                        sx={requestFieldSx}
                     />
                     <Alert severity="info" sx={{ mt: 1.5 }}>
                         子どもの名前は書かないでください（献立の提案のため AI に送ります）。
@@ -80,10 +91,8 @@ export const RequestStep = ({ menu, onStarted, onManual, onEditConditions }: Req
                         要望の文章では、避ける品目（アレルギー）の条件は変えられません。
                     </Alert>
                     {startProposal.isError && <Alert severity="error" sx={{ mt: 1.5 }}>{errorMessageOf(startProposal.error)}</Alert>}
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
-                        <Button variant="contained" size="large" disabled={startProposal.isPending} onClick={() => (hasItems ? setIsRecreateOpen(true) : void start())}>
-                            献立を作る
-                        </Button>
+                    {/* 主のボタン（献立を作る）は PC では右端、スマホでは一番上に置く */}
+                    <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
                         <Button
                             onClick={() => {
                                 save();
@@ -91,6 +100,15 @@ export const RequestStep = ({ menu, onStarted, onManual, onEditConditions }: Req
                             }}
                         >
                             自分で組む（AI を使わない）
+                        </Button>
+                        <Button
+                            variant="contained"
+                            size="large"
+                            startIcon={<AutoAwesomeIcon />}
+                            disabled={startProposal.isPending}
+                            onClick={() => (hasItems ? setIsRecreateOpen(true) : void start())}
+                        >
+                            献立を作る
                         </Button>
                     </Stack>
                 </CardContent>

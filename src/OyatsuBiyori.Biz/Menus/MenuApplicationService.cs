@@ -706,7 +706,7 @@ public sealed class MenuApplicationService(
         }
 
         var context = await _contextFactory.ForMenuAsync(menu);
-        return Result<MenuConfirmationView>.Ok(ToConfirmationView(MenuConfirmationChecker.Check(menu, context), context));
+        return Result<MenuConfirmationView>.Ok(ToConfirmationView(menu, MenuConfirmationChecker.Check(menu, context), context));
     }
 
     /// <summary>
@@ -969,7 +969,9 @@ public sealed class MenuApplicationService(
                         issueKind == MenuItemIssueKind.Recheck,
                         issueKind,
                         product is null ? null : context.Fingerprint(product),
-                        context.PiecesPerPack(item.ProductId));
+                        context.PiecesPerPack(item.ProductId),
+                        // 確認し直しのチェックにも、確定の確認と同じくその週のチラシの表記の原文を出す（09 の 5.4。表示だけ）
+                        menu.ListedProducts.LastOrDefault(l => l.ProductId == item.ProductId)?.LabelText);
                 })
                 .ToList();
             days.Add(new MenuDayView(
@@ -1030,7 +1032,7 @@ public sealed class MenuApplicationService(
         return new BlockingIssueView(issue.Date, issue.ProductName, judgement is null ? issue.Message : null, judgement);
     }
 
-    private static MenuConfirmationView ToConfirmationView(MenuConfirmationResult result, MenuContext context)
+    private static MenuConfirmationView ToConfirmationView(Menu menu, MenuConfirmationResult result, MenuContext context)
     {
         var manufacturer = context.AvoidedAllergens.Where(a => a.LabelNotGuaranteed).Select(a => a.Name).ToList();
         return new MenuConfirmationView(
@@ -1042,7 +1044,9 @@ public sealed class MenuApplicationService(
                 a.Product.Name,
                 AllergenJudgementView.From(a.Product, a.Judgement, context.Today),
                 a.IsAcknowledged,
-                a.Fingerprint)).ToList(),
+                a.Fingerprint,
+                // 今週のチラシの表記の原文（表示だけ。判定・確定の条件・指紋には使わない。D-101・FR-IMPORT-42）
+                menu.ListedProducts.LastOrDefault(l => l.ProductId == a.Product.Id)?.LabelText)).ToList(),
             result.DisplayWarnings.Select(i => i.ToLine()).ToList(),
             manufacturer);
     }
@@ -1172,7 +1176,9 @@ public sealed record MenuItemView(
     MenuItemIssueKind IssueKind,
     string? JudgementFingerprint,
     // 1パックの入数（パック数の計算に使う値。画面で「1パック ○個入り」と出す。未入力なら null）
-    int? PiecesPerPack);
+    int? PiecesPerPack,
+    // 今週のチラシのアレルゲン表記の原文（掲載品の写しの LabelText。D-101 より前の写し・写しにない商品は null。表示だけに使い、判定・指紋には使わない）
+    string? FlyerLabelText);
 
 /// <summary>週の金額</summary>
 public sealed record WeekAmountView(int Total, int Budget, int Remaining, bool IsOverBudget, bool IsUnderBudget);
@@ -1205,7 +1211,8 @@ public sealed record MenuConfirmationView(
     IReadOnlyList<string> ManufacturerCheckAllergens);
 
 /// <summary>確認が要る警告の商品</summary>
-public sealed record AcknowledgementView(string MenuItemId, DateOnly Date, string ProductName, AllergenJudgementView Judgement, bool IsAcknowledged, string Fingerprint);
+/// <param name="FlyerLabelText">今週のチラシのアレルゲン表記の原文（掲載品の写しの LabelText。D-101 より前の写し・写しにない商品は null。表示だけに使う）</param>
+public sealed record AcknowledgementView(string MenuItemId, DateOnly Date, string ProductName, AllergenJudgementView Judgement, bool IsAcknowledged, string Fingerprint, string? FlyerLabelText);
 
 /// <summary>確定を止める問題（アレルゲンなら判定の材料、それ以外なら文言）</summary>
 public sealed record BlockingIssueView(DateOnly? Date, string? ProductName, string? Message, AllergenJudgementView? Judgement);

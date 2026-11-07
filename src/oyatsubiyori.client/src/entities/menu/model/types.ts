@@ -135,6 +135,8 @@ export interface MenuItem {
     judgementFingerprint: string | null;
     /** 1パックの入数（パック数の計算に使う値。未入力なら null） */
     piecesPerPack: number | null;
+    /** 今週のチラシのアレルゲン表記の原文（掲載品の写し。古い写し・写しにない商品は null。表示だけに使う。09 の 5.4） */
+    flyerLabelText: string | null;
 }
 
 /** 日ごとの献立 */
@@ -249,7 +251,16 @@ export interface OrderList {
 export interface MenuConfirmation {
     canConfirm: boolean;
     blockingIssues: { date: string | null; productName: string | null; message: string | null; judgement: AllergenJudgement | null }[];
-    acknowledgements: { menuItemId: string; date: string; productName: string; judgement: AllergenJudgement; isAcknowledged: boolean; fingerprint: string }[];
+    acknowledgements: {
+        menuItemId: string;
+        date: string;
+        productName: string;
+        judgement: AllergenJudgement;
+        isAcknowledged: boolean;
+        fingerprint: string;
+        /** 今週のチラシのアレルゲン表記の原文（掲載品の写し。表記なしなら「表記なし」。D-101 より前の写し・写しにない商品は null）。表示だけに使い、判定には使わない */
+        flyerLabelText: string | null;
+    }[];
     displayWarnings: string[];
     manufacturerCheckAllergens: string[];
 }

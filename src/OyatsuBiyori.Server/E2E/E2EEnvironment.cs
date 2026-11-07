@@ -65,7 +65,18 @@ public static class E2EEnvironment
         await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();
         await scope.ServiceProvider.GetRequiredService<Security.AccountBootstrapper>().RunAsync();
-        await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync(includeE2EDraft: false);
+        await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync(includeE2EDraft: false, includeRegisteredChocolate: true);
+    }
+
+    /// <summary>
+    /// 献立だけをダミーに戻す（開発の環境だけ。`dotnet run --project src/OyatsuBiyori.Server -- --reset-menus`）：
+    /// 下書き・確定済みの献立をすべて消し、ダミーの確定献立を入れ直す。商品・確認の記録・条件設定・アカウントはそのまま。
+    /// </summary>
+    public static async Task ResetDemoMenusAsync(this IServiceProvider services, IHostEnvironment environment, IConfiguration configuration)
+    {
+        DemoDataGuard.EnsureAllowed(environment, configuration);
+        await using var scope = services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().ResetMenusAsync();
     }
 
     /// <summary>E2E の環境なら、ダミーデータを入れ、アカウントのパスワード変更の印を消す</summary>
