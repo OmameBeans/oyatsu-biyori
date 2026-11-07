@@ -500,6 +500,47 @@ public class FlyerImportApplicationServiceTests
     }
 
     [Fact]
+    public async Task SR_20_外した掲載品も_確認済みとの食い違いがあれば_ほかの商品の確定で参考の記録が足される()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var existing = Existing(data, "さくさくクッキー", ConfirmedAll(Today.AddDays(-5), ["wheat"]));
+        var (service, menu, _) = Create(data, new FixedFlyerReader(Read("さくさくクッキー", label: "乳・小麦"), Read("ことりのクッキー")));
+        var session = await ReadAllAsync(service, menu);
+        await service.RemoveItemAsync(menu.Id, ItemOf(session, "さくさくクッキー").Id);
+
+        var removed = Assert.Single((await ViewAsync(service, menu)).RemovedItems);
+        Assert.Equal([Allergen("milk").Name], removed.DiscrepancyAllergens);
+
+        var result = await service.ConfirmItemAsync(menu.Id, ItemOf(session, "ことりのクッキー").Id);
+
+        Assert.Equal(existing.Id, Assert.Single(result.Value!.RecordedProducts).ProductId);
+        var check = Assert.Single(existing.AllergenChecks, c => c.Status == AllergenCheckStatus.Reference);
+        Assert.Contains(check.Items, i => i.AllergenId == Allergen("milk").Id && i.Contains);
+        Assert.Equal(AllergenJudgementCategory.Warning, JudgeOf(data, existing));
+        // 外した掲載品は今週の商品に入れない（FR-IMPORT-22）
+        Assert.DoesNotContain(menu.ListedProducts, l => l.ProductId == existing.Id);
+        Assert.Empty(Assert.Single((await ViewAsync(service, menu)).RemovedItems).DiscrepancyAllergens);
+    }
+
+    [Fact]
+    public async Task SR_20_表記を直してから外した掲載品は_食い違いがなければ記録を足さない()
+    {
+        var data = new InMemoryData();
+        data.Avoid("egg");
+        var existing = Existing(data, "さくさくクッキー", ConfirmedAll(Today.AddDays(-5), ["wheat"]));
+        var (service, menu, _) = Create(data, new FixedFlyerReader(Read("さくさくクッキー", label: "乳・小麦"), Read("ことりのクッキー")));
+        var session = await ReadAllAsync(service, menu);
+        var item = ItemOf(session, "さくさくクッキー");
+        await service.UpdateItemAsync(EditOf(menu, item) with { LabelAllergenIds = [Allergen("wheat").Id] });
+        await service.RemoveItemAsync(menu.Id, item.Id);
+
+        await service.ConfirmItemAsync(menu.Id, ItemOf(session, "ことりのクッキー").Id);
+
+        Assert.Single(existing.AllergenChecks);
+    }
+
+    [Fact]
     public async Task SR_20_同じ食い違いの記録は_2回目の確定で足さない()
     {
         var data = new InMemoryData();

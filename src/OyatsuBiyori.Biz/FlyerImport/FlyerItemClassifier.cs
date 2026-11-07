@@ -331,7 +331,9 @@ public static class FlyerItemClassifier
         foreach (var conflict in input.DuplicateConflicts)
         {
             reasons.Add(NeedsInput(FlyerItemReasonCode.DuplicateConflict, $"{FlyerItemReasonCode.DuplicateConflict}:{conflict.Field}",
-                $"同じ商品を2回以上読み、{FieldLabel(conflict.Field)}が食い違いました（{string.Join("／", conflict.Values)}）。チラシで確かめてください",
+                $"同じ商品を2回以上読み、{FieldLabel(conflict.Field)}が食い違いました（{string.Join("／", conflict.Values)}）。チラシで確かめてください"
+                    // 注文番号が違うのは、同じ名前・メーカーで大きさ違いの商品が別々に載っているときが多い（商品は1つなので、今週使う方を選ぶ。09 の FR-IMPORT-06）
+                    + (conflict.Field == FlyerItemField.OrderNo ? "。同じ名前・メーカーで大きさ違いの商品が載っているかもしれません。今週使う方の値を選んでください" : ""),
                 conflict.Field, isAllergenRelated: false, canAccept: true));
         }
     }

@@ -215,6 +215,8 @@ export interface FlyerRemovedItem {
     volume: string | null;
     reason: string;
     isNonFood: boolean;
+    /** 確認済みの商品との食い違いの品目の名前（次の確定で「参考」の記録を足す。09 の 3.5） */
+    discrepancyAllergens: string[];
 }
 
 /** 状態ごとの件数（タブに出す） */

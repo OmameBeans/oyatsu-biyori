@@ -757,11 +757,17 @@ public sealed class FlyerImportApplicationService(
 
         var context = await LoadContextAsync();
         List<ItemState> states;
+        List<ItemState> removedStates;
         Selection selection;
         lock (session.SyncRoot)
         {
             states = session.Items
                 .Where(i => !i.IsRemoved && i.Confirmation is null)
+                .Select(i => Classify(session, i, context, editing))
+                .ToList();
+            // 外した掲載品は確定の対象にしないが、確認済みとの食い違いの記録（09 の 3.5）には入れる
+            removedStates = session.Items
+                .Where(i => i.IsRemoved && i.Confirmation is null)
                 .Select(i => Classify(session, i, context, editing))
                 .ToList();
             selection = select(states);
@@ -801,7 +807,8 @@ public sealed class FlyerImportApplicationService(
 
         // ここから下ではエラーを返さない
         // 1. 確認済みとの食い違いの「参考」の記録（使えない・未確定を含む、食い違いのある全商品の分。09 の 3.5）
-        var recorded = AddDiscrepancyRecords(states, context, now, user);
+        // 外した掲載品（職員が外した・Claude が食品以外とした）も、外した理由を問わず対象にする（今週使わなくても、ほかの週の写しや献立に残りうるため）
+        var recorded = AddDiscrepancyRecords([.. states, .. removedStates], context, now, user);
 
         // 2. 確定する商品
         var clearFirst = session.IsReimport && !session.HasConfirmedAny;
@@ -1110,7 +1117,16 @@ public sealed class FlyerImportApplicationService(
             .ToList();
         var removed = session.Items
             .Where(i => i.IsRemoved)
-            .Select(i => new FlyerRemovedItemView(i.Id, i.Read.Name, i.Read.Maker, i.Read.Volume, i.RemovedReason ?? "外しました", i.OriginalRead.IsNonFood))
+            .Select(i => new FlyerRemovedItemView(
+                i.Id, i.Read.Name, i.Read.Maker, i.Read.Volume, i.RemovedReason ?? "外しました", i.OriginalRead.IsNonFood,
+                // 確認済みとの食い違い（確定すると参考の記録を足す。まだ足していないものだけ）
+                i.Confirmation is null
+                    ? Classify(session, i, context, editing).Classification.Discrepancies
+                        .Select(d => d.Allergen.Name)
+                        .Where(name => i.RecordedDiscrepancyAllergens.All(a => a.Name != name))
+                        .Distinct()
+                        .ToList()
+                    : []))
             .ToList();
 
         int CountOf(FlyerItemStatus status) => items.Count(v => v.Status == status);
@@ -1756,7 +1772,8 @@ public sealed record FlyerMatchedProductView(
     AllergenJudgementView Judgement);
 
 /// <summary>外した掲載品（商品名と理由。IsNonFood は Claude が食品以外とした商品）</summary>
-public sealed record FlyerRemovedItemView(string Id, string Name, string? Maker, string? Volume, string Reason, bool IsNonFood);
+/// <param name="DiscrepancyAllergens">確認済みの商品との食い違いの品目の名前（次の確定で「参考」の記録を足す。09 の 3.5）</param>
+public sealed record FlyerRemovedItemView(string Id, string Name, string? Maker, string? Volume, string Reason, bool IsNonFood, IReadOnlyList<string> DiscrepancyAllergens);
 
 /// <summary>分類ごとの件数</summary>
 public sealed record FlyerCategoryCounts(int NeedsInput, int New, int Usable, int Unusable, int Confirmed, int Removed);

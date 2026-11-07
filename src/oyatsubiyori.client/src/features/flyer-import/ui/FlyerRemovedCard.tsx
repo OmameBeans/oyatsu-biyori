@@ -50,6 +50,11 @@ export const FlyerRemovedCard = ({ menuId, items }: FlyerRemovedCardProps) => {
                                 )}
                                 {/* 食品以外の理由は Claude の文なので、テキストとしてだけ出す */}
                                 {item.isNonFood ? <ClaudeText text={item.reason} color="text.secondary" /> : <Typography variant="body2" color="text.secondary">{item.reason}</Typography>}
+                                {item.discrepancyAllergens.length > 0 && (
+                                    <Typography variant="body2" sx={{ color: 'warning.dark' }}>
+                                        チラシの表記が、パッケージでの確認と食い違っています（{item.discrepancyAllergens.join('・')}）。ほかの商品を確定すると、商品一覧に「参考」の記録を足します。読み違いなら「戻す」で表記を直してください
+                                    </Typography>
+                                )}
                             </Box>
                             <Button
                                 onClick={() => handleRestore(item)}
