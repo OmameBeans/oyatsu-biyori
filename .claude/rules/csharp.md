@@ -42,7 +42,7 @@ paths:
 - インターフェース：`I` プレフィックス（`IProductRepository`）
 - 非同期メソッドは `Async` サフィックス（`GetAsync`, `CreateAsync`）
 - 種類ごとのサフィックス：`XxxApplicationService` / `XxxRepository` / `XxxQueryService` / `XxxController` / `XxxExtensions`
-- Claude を使うクラスは用途で名付ける（`FlyerReader`, `AllergenExtractor`, `MenuPlanner`, `ProductMatchJudge` など）
+- Claude を使うクラスは用途で名付ける（`FlyerReader`, `AllergenExtractor`, `MenuPlanner`, `FlyerReviewer` など）
 
 ## クラス設計
 
